@@ -1,0 +1,107 @@
+name: Release docker-model
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  build-darwin:
+    runs-on: macos-13
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set Version
+        shell: bash
+        run: |
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=$(echo ${GITHUB_REF_NAME} | cut -f1 -d-)" >> $GITHUB_ENV
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build Darwin
+        run: |
+          make release VERSION=${{ env.VERSION }}
+      - name: Sign and notarize mac binaries # this requires adding the GH repo to https://github.com/docker/infra-terraform/blob/main/infra/aws/default/iam/ci_desktop_signing.tf
+        uses: docker/desktop-action-private/sign@v1.0.1
+        with:
+          mac_binaries_filter: dist/darwin-*/model-cli
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: |
+            dist/
+          if-no-files-found: error
+
+  release:
+    needs:
+      - build-darwin
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set Version
+        shell: bash
+        run: |
+          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
+          echo "RELEASE_VERSION=$(echo ${GITHUB_REF_NAME} | cut -f1 -d-)" >> $GITHUB_ENV
+      - name: Retrieve built artifact
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: dist
+      - name: Fix binary permissions after upload/download
+        run: chmod +x ./dist/*/*
+      - run: |
+          ls -lh dist/
+          (cd dist; find . -type f | xargs sha256sum > ../sha256sum.txt)
+          mv sha256sum.txt dist/
+          cat dist/sha256sum.txt
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERBUILDBOT_USERNAME }}
+          password: ${{ secrets.DOCKERBUILDBOT_WRITE_PAT }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          version: "lab:latest"
+          driver: cloud
+          endpoint: "docker/make-product-smarter"
+          install: true
+      - name: Build and push DD module image
+        uses: docker/build-push-action@v5
+        with:
+          build-contexts: |
+            dist=dist
+            desktop-module=desktop-module
+          file: desktop-module/Dockerfile
+          platforms: darwin/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          sbom: true
+          provenance: mode=max
+          tags: |
+            docker/docker-desktop-model-runner-cli-desktop-module:latest
+            docker/docker-desktop-model-runner-cli-desktop-module:${{ env.VERSION }}
+      - name: Create or update Release
+        run: |
+          echo "Looking for existing release for ${{ env.RELEASE_VERSION }}"
+          OLD_TAG=$(gh release ls --json name,tagName | jq -r ".[] | select(.name == \"${{ env.RELEASE_VERSION }}\") | .tagName")
+          if [ -n "$OLD_TAG" ]; then
+            echo "Updating release ${{ env.RELEASE_VERSION }} to point to new tag ${GITHUB_REF_NAME}"
+            gh release edit ${OLD_TAG} --tag ${GITHUB_REF_NAME}
+          else
+            echo "Creating new release ${{ env.RELEASE_VERSION }} pointing to tag ${GITHUB_REF_NAME}"
+            gh release create ${GITHUB_REF_NAME} \
+              --title ${{ env.RELEASE_VERSION }} \
+              --draft \
+              --generate-notes \
+              --prerelease
+          fi
+          echo "Uploading artifacts for tag ${GITHUB_REF_NAME}"
+          gh release upload ${GITHUB_REF_NAME} dist/* --clobber
