@@ -3,7 +3,7 @@
   "content": [
     {
       "type": "cli-plugin",
-      "name": "desktop"
+      "name": "model"
     }
   ]
 }
