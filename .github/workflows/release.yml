@@ -86,8 +86,8 @@ jobs:
           sbom: true
           provenance: mode=max
           tags: |
-            docker/docker-desktop-model-runner-cli-desktop-module:latest
-            docker/docker-desktop-model-runner-cli-desktop-module:${{ env.VERSION }}
+            docker/docker-model-cli-desktop-module:latest
+            docker/docker-model-cli-desktop-module:${{ env.VERSION }}
       - name: Create or update Release
         run: |
           echo "Looking for existing release for ${{ env.RELEASE_VERSION }}"
