@@ -31,8 +31,8 @@ release:
 		exit 1; \
 	fi
 	@echo "Building release version '$(VERSION)'..."
-	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X github.com/docker/model-cli/commands.Version=$(VERSION)" -o dist/darwin-arm64/$(BINARY_NAME) .
-	@echo "Release build complete: $(BINARY_NAME) version '$(VERSION)'"
+	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X github.com/docker/model-cli/commands.Version=$(VERSION)" -o dist/darwin-arm64/$(PLUGIN_NAME) .
+	@echo "Release build complete: $(PLUGIN_NAME) version '$(VERSION)'"
 
 clean:
 	@echo "Cleaning up..."
