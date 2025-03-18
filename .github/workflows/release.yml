@@ -1,7 +1,20 @@
 name: Release docker-model
-
+run-name: Release ${{ inputs.tag }}
 on:
   workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch"
+        required: true
+        default: "main"
+      tag:
+        description: "Release Tag"
+        required: true
+        type: string
+      changelog:
+        description: ""
+        required: false
+        type: string
 
 jobs:
 
@@ -12,18 +25,13 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Set Version
-        shell: bash
-        run: |
-          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
-          echo "RELEASE_VERSION=$(echo ${GITHUB_REF_NAME} | cut -f1 -d-)" >> $GITHUB_ENV
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
           cache: true
       - name: Build Darwin
         run: |
-          make release VERSION=${{ env.VERSION }}
+          make release VERSION=${{ inputs.tag }}
       - name: Sign and notarize mac binaries # this requires adding the GH repo to https://github.com/docker/infra-terraform/blob/main/infra/aws/default/iam/ci_desktop_signing.tf
         uses: docker/desktop-action-private/sign@v1.0.1
         with:
@@ -45,11 +53,6 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - name: Set Version
-        shell: bash
-        run: |
-          echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
-          echo "RELEASE_VERSION=$(echo ${GITHUB_REF_NAME} | cut -f1 -d-)" >> $GITHUB_ENV
       - name: Retrieve built artifact
         uses: actions/download-artifact@v4
         with:
@@ -86,19 +89,18 @@ jobs:
           sbom: true
           provenance: mode=max
           tags: |
-            docker/docker-model-cli-desktop-module:latest
-            docker/docker-model-cli-desktop-module:${{ env.VERSION }}
+            docker/docker-model-cli-desktop-module:${{ inputs.tag }}
       - name: Create or update Release
         run: |
-          echo "Looking for existing release for ${{ env.RELEASE_VERSION }}"
-          OLD_TAG=$(gh release ls --json name,tagName | jq -r ".[] | select(.name == \"${{ env.RELEASE_VERSION }}\") | .tagName")
+          echo "Looking for existing release for ${{ inputs.tag }}"
+          OLD_TAG=$(gh release ls --json name,tagName | jq -r ".[] | select(.name == \"${{ inputs.tag }}\") | .tagName")
           if [ -n "$OLD_TAG" ]; then
-            echo "Updating release ${{ env.RELEASE_VERSION }} to point to new tag ${GITHUB_REF_NAME}"
+            echo "Updating release ${{ inputs.tag }} to point to new tag ${GITHUB_REF_NAME}"
             gh release edit ${OLD_TAG} --tag ${GITHUB_REF_NAME}
           else
-            echo "Creating new release ${{ env.RELEASE_VERSION }} pointing to tag ${GITHUB_REF_NAME}"
+            echo "Creating new release ${{ inputs.tag }} pointing to tag ${GITHUB_REF_NAME}"
             gh release create ${GITHUB_REF_NAME} \
-              --title ${{ env.RELEASE_VERSION }} \
+              --title ${{ inputs.tag }} \
               --draft \
               --generate-notes \
               --prerelease
