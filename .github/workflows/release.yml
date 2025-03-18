@@ -27,7 +27,7 @@ jobs:
       - name: Sign and notarize mac binaries # this requires adding the GH repo to https://github.com/docker/infra-terraform/blob/main/infra/aws/default/iam/ci_desktop_signing.tf
         uses: docker/desktop-action-private/sign@v1.0.1
         with:
-          mac_binaries_filter: dist/darwin-*/model-cli
+          mac_binaries_filter: dist/darwin-*/docker-model
       - uses: actions/upload-artifact@v4
         with:
           name: dist
