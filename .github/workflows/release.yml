@@ -104,4 +104,4 @@ jobs:
               --prerelease
           fi
           echo "Uploading artifacts for tag ${GITHUB_REF_NAME}"
-          gh release upload ${GITHUB_REF_NAME} dist/* --clobber
+            gh release upload ${GITHUB_REF_NAME} dist/*/* --clobber
