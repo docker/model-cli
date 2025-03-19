@@ -1,4 +1,4 @@
-.PHONY: all build clean link test test-verbose test-coverage
+.PHONY: all build clean link test
 
 BINARY_NAME=model-cli
 
