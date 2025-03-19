@@ -14,7 +14,10 @@ import (
 	"github.com/docker/pinata/common/pkg/inference"
 	"github.com/docker/pinata/common/pkg/inference/models"
 	"github.com/docker/pinata/common/pkg/paths"
+	"github.com/pkg/errors"
 )
+
+var ErrNotFound = errors.New("model not found")
 
 func init() {
 	paths.Init(paths.OnHost)
@@ -82,13 +85,26 @@ func (c *Client) Pull(model string) (string, error) {
 	return fmt.Sprintf("Model %s pulled successfully", model), nil
 }
 
-func (c *Client) List() (string, error) {
-	resp, err := c.dockerClient.HTTPClient().Get(url(inference.InferencePrefix + "/v1/models"))
+func (c *Client) List(openai bool, model string) (string, error) {
+	modelsRoute := inference.ModelsPrefix
+	if openai {
+		modelsRoute = inference.InferencePrefix + "/v1/models"
+	}
+	if model != "" {
+		if len(strings.Split(strings.Trim(model, "/"), "/")) != 2 {
+			return "", fmt.Errorf("invalid model name: %s", model)
+		}
+		modelsRoute += "/" + model
+	}
+	resp, err := c.dockerClient.HTTPClient().Get(url(modelsRoute))
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		if model != "" && resp.StatusCode == http.StatusNotFound {
+			return "", errors.Wrap(ErrNotFound, model)
+		}
 		return "", fmt.Errorf("failed to list models: %s", resp.Status)
 	}
 	body, err := io.ReadAll(resp.Body)
