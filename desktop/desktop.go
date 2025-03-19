@@ -88,6 +88,9 @@ func (c *Client) List(openai bool, model string) (string, error) {
 		modelsRoute = inference.InferencePrefix + "/v1/models"
 	}
 	if model != "" {
+		if len(strings.Split(strings.Trim(model, "/"), "/")) != 2 {
+			return "", fmt.Errorf("invalid model name: %s", model)
+		}
 		modelsRoute += "/" + model
 	}
 	resp, err := c.dockerClient.HTTPClient().Get(url(modelsRoute))
