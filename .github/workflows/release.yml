@@ -61,7 +61,7 @@ jobs:
       - name: Fix binary permissions after upload/download
         run: |
           ls -lahR dist/
-          chmod +x dist/*/*
+          chmod +x dist/dist/*/*
           ls -lahR dist/
           (cd dist; find . -type f | xargs sha256sum > ../sha256sum.txt)
           mv sha256sum.txt dist/
