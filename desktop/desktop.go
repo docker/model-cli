@@ -117,7 +117,34 @@ func (c *Client) List(openai bool, model string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
-	return string(body), nil
+
+	if model != "" {
+		// Handle single model for `docker model inspect`.
+		// TODO: Handle this in model-distribution.
+		var modelJson Model
+		if err := json.Unmarshal(body, &modelJson); err != nil {
+			return "", fmt.Errorf("failed to unmarshal response body: %w", err)
+		}
+
+		modelJsonPretty, err := json.MarshalIndent(modelJson, "", "  ")
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal model: %w", err)
+		}
+
+		return string(modelJsonPretty), nil
+	}
+
+	var modelsJson []Model
+	if err := json.Unmarshal(body, &modelsJson); err != nil {
+		return "", fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+
+	modelsJsonPretty, err := json.MarshalIndent(modelsJson, "", "  ")
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal models list: %w", err)
+	}
+
+	return string(modelsJsonPretty), nil
 }
 
 func (c *Client) Chat(model, prompt string) error {
