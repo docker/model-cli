@@ -7,13 +7,17 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/client"
 	"github.com/docker/pinata/common/pkg/engine"
 	"github.com/docker/pinata/common/pkg/inference"
 	"github.com/docker/pinata/common/pkg/inference/models"
 	"github.com/docker/pinata/common/pkg/paths"
+	"github.com/olekukonko/tablewriter"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 )
@@ -91,7 +95,7 @@ func (c *Client) Pull(model string) (string, error) {
 	return fmt.Sprintf("Model %s pulled successfully", model), nil
 }
 
-func (c *Client) List(openai bool, model string) (string, error) {
+func (c *Client) List(jsonFormat, openai bool, model string) (string, error) {
 	modelsRoute := inference.ModelsPrefix
 	if openai {
 		modelsRoute = inference.InferencePrefix + "/v1/models"
@@ -139,12 +143,16 @@ func (c *Client) List(openai bool, model string) (string, error) {
 		return "", fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 
-	modelsJsonPretty, err := json.MarshalIndent(modelsJson, "", "  ")
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal models list: %w", err)
+	if jsonFormat {
+		modelsJsonPretty, err := json.MarshalIndent(modelsJson, "", "  ")
+		if err != nil {
+			return "", fmt.Errorf("failed to marshal models list: %w", err)
+		}
+
+		return string(modelsJsonPretty), nil
 	}
 
-	return string(modelsJsonPretty), nil
+	return prettyPrintModels(modelsJson), nil
 }
 
 func (c *Client) Chat(model, prompt string) error {
@@ -242,4 +250,74 @@ func (c *Client) Remove(model string) (string, error) {
 
 func url(path string) string {
 	return fmt.Sprintf("http://localhost" + inference.ExperimentalEndpointsPrefix + path)
+}
+
+func prettyPrintModels(models []Model) string {
+	var buf bytes.Buffer
+	table := tablewriter.NewWriter(&buf)
+
+	table.SetHeader([]string{"MODEL", "PARAMETERS", "QUANTIZATION", "ARCHITECTURE", "FORMAT", "MODEL ID", "CREATED", "SIZE"})
+
+	table.SetBorder(false)
+	table.SetColumnSeparator("")
+	table.SetHeaderLine(false)
+	table.SetTablePadding("  ")
+	table.SetNoWhiteSpace(true)
+
+	table.SetColumnAlignment([]int{
+		tablewriter.ALIGN_LEFT, // MODEL
+		tablewriter.ALIGN_LEFT, // PARAMETERS
+		tablewriter.ALIGN_LEFT, // QUANTIZATION
+		tablewriter.ALIGN_LEFT, // ARCHITECTURE
+		tablewriter.ALIGN_LEFT, // FORMAT
+		tablewriter.ALIGN_LEFT, // IMAGE ID
+		tablewriter.ALIGN_LEFT, // CREATED
+		tablewriter.ALIGN_LEFT, // SIZE
+	})
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+
+	for _, m := range models {
+		if len(m.Tags) == 0 {
+			fmt.Fprintf(os.Stderr, "no tags found for model: %v\n", m)
+			continue
+		}
+		if len(m.ID) < 19 {
+			fmt.Fprintf(os.Stderr, "invalid image ID for model: %v\n", m)
+			continue
+		}
+		table.Append([]string{
+			m.Tags[0],
+			m.Config.Parameters,
+			m.Config.Quantization,
+			m.Config.Architecture,
+			string(m.Config.Format),
+			m.ID[7:19],
+			timeAgo(time.Unix(m.Created, 0)),
+			m.Config.Size,
+		})
+	}
+
+	table.Render()
+	return buf.String()
+}
+
+func timeAgo(t time.Time) string {
+	duration := time.Since(t)
+	hours := int(duration.Hours())
+	days := hours / 24
+	months := days / 30
+	years := months / 12
+
+	switch {
+	case hours < 1:
+		return strconv.Itoa(int(duration.Minutes())) + " minutes ago"
+	case hours < 24:
+		return strconv.Itoa(hours) + " hours ago"
+	case days < 30:
+		return strconv.Itoa(days) + " days ago"
+	case months < 12:
+		return strconv.Itoa(months) + " months ago"
+	default:
+		return strconv.Itoa(years) + " years ago"
+	}
 }
