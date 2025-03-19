@@ -59,9 +59,10 @@ jobs:
           path: dist
           pattern: dist
       - name: Fix binary permissions after upload/download
-        run: chmod +x ./dist/*/*
-      - run: |
-          ls -lh dist/
+        run: |
+          ls -lahR dist/
+          chmod +x dist/*/*
+          ls -lahR dist/
           (cd dist; find . -type f | xargs sha256sum > ../sha256sum.txt)
           mv sha256sum.txt dist/
           cat dist/sha256sum.txt
