@@ -18,7 +18,7 @@ func newListCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("Failed to create Docker client: %v\n", err)
 			}
-			models, err := client.List(openai)
+			models, err := client.List(openai, "")
 			if err != nil {
 				return fmt.Errorf("Failed to list models: %v\n", err)
 			}

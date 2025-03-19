@@ -82,10 +82,13 @@ func (c *Client) Pull(model string) (string, error) {
 	return fmt.Sprintf("Model %s pulled successfully", model), nil
 }
 
-func (c *Client) List(openai bool) (string, error) {
+func (c *Client) List(openai bool, model string) (string, error) {
 	modelsRoute := inference.ModelsPrefix
 	if openai {
 		modelsRoute = inference.InferencePrefix + "/v1/models"
+	}
+	if model != "" {
+		modelsRoute += "/" + model
 	}
 	resp, err := c.dockerClient.HTTPClient().Get(url(modelsRoute))
 	if err != nil {
