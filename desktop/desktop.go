@@ -15,12 +15,18 @@ import (
 	"github.com/docker/pinata/common/pkg/inference/models"
 	"github.com/docker/pinata/common/pkg/paths"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
 )
 
 var ErrNotFound = errors.New("model not found")
 
+type otelErrorSilencer struct{}
+
+func (oes *otelErrorSilencer) Handle(error) {}
+
 func init() {
 	paths.Init(paths.OnHost)
+	otel.SetErrorHandler(&otelErrorSilencer{})
 }
 
 type Client struct {
