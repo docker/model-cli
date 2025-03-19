@@ -8,7 +8,7 @@ import (
 )
 
 func newListCmd() *cobra.Command {
-	var openai bool
+	var jsonFormat, openai bool
 	c := &cobra.Command{
 		Use:     "list",
 		Aliases: []string{"ls"},
@@ -18,7 +18,7 @@ func newListCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("Failed to create Docker client: %v\n", err)
 			}
-			models, err := client.List(openai, "")
+			models, err := client.List(jsonFormat, openai, "")
 			if err != nil {
 				return fmt.Errorf("Failed to list models: %v\n", err)
 			}
@@ -26,6 +26,7 @@ func newListCmd() *cobra.Command {
 			return nil
 		},
 	}
+	c.Flags().BoolVar(&jsonFormat, "json", false, "List models in a JSON format")
 	c.Flags().BoolVar(&openai, "openai", false, "List models in an OpenAI format")
 	return c
 }

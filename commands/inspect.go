@@ -28,7 +28,7 @@ func newInspectCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("Failed to create Docker client: %v\n", err)
 			}
-			model, err = client.List(openai, model)
+			model, err = client.List(false, openai, model)
 			if err != nil {
 				return fmt.Errorf("Failed to list models: %v\n", err)
 			}

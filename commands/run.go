@@ -37,7 +37,7 @@ func newRunCmd() *cobra.Command {
 				return fmt.Errorf("Failed to create Docker client: %v\n", err)
 			}
 
-			if _, err := client.List(false, model); err != nil {
+			if _, err := client.List(false, false, model); err != nil {
 				if !errors.Is(err, desktop.ErrNotFound) {
 					return fmt.Errorf("Failed to list model: %v\n", err)
 				}
