@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -34,6 +35,18 @@ func newRunCmd() *cobra.Command {
 			client, err := desktop.New()
 			if err != nil {
 				return fmt.Errorf("Failed to create Docker client: %v\n", err)
+			}
+
+			if _, err := client.List(false, model); err != nil {
+				if !errors.Is(err, desktop.ErrNotFound) {
+					return fmt.Errorf("Failed to list model: %v\n", err)
+				}
+				cmd.Println("Unable to find model '" + model + "' locally. Pulling from the server.")
+				response, err := client.Pull(model)
+				if err != nil {
+					return fmt.Errorf("Failed to pull model: %v\n", err)
+				}
+				cmd.Println(response)
 			}
 
 			if prompt != "" {
