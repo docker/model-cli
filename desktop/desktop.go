@@ -14,7 +14,10 @@ import (
 	"github.com/docker/pinata/common/pkg/inference"
 	"github.com/docker/pinata/common/pkg/inference/models"
 	"github.com/docker/pinata/common/pkg/paths"
+	"github.com/pkg/errors"
 )
+
+var ErrNotFound = errors.New("model not found")
 
 func init() {
 	paths.Init(paths.OnHost)
@@ -99,6 +102,9 @@ func (c *Client) List(openai bool, model string) (string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		if model != "" && resp.StatusCode == http.StatusNotFound {
+			return "", errors.Wrap(ErrNotFound, model)
+		}
 		return "", fmt.Errorf("failed to list models: %s", resp.Status)
 	}
 	body, err := io.ReadAll(resp.Body)
