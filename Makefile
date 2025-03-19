@@ -1,4 +1,4 @@
-.PHONY: all build clean link
+.PHONY: all build clean link test test-verbose test-coverage
 
 BINARY_NAME=model-cli
 
@@ -7,7 +7,7 @@ PLUGIN_NAME=docker-model
 
 VERSION ?=
 
-all: build
+all: clean build test link
 
 build:
 	@echo "Building $(BINARY_NAME)..."
@@ -38,3 +38,7 @@ clean:
 	@echo "Cleaning up..."
 	@rm -f $(BINARY_NAME)
 	@echo "Cleaned!"
+
+test:
+	@echo "Running tests..."
+	@go test ./...

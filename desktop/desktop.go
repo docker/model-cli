@@ -22,6 +22,30 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
+// HTTPClient interface for mocking the HTTP client
+type HTTPClient interface {
+	Get(url string) (*http.Response, error)
+	Post(url, contentType string, body io.Reader) (*http.Response, error)
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// DockerClient interface for mocking the Docker client
+type DockerClient interface {
+	HTTPClient() HTTPClient
+}
+
+// ClientInterface defines the interface for the desktop client
+type ClientInterface interface {
+	Status() (string, error)
+	Pull(model string) (string, error)
+	List(jsonFormat, openai bool, model string) (string, error)
+	Chat(model, prompt string) error
+	Remove(model string) (string, error)
+}
+
+// Ensure Client implements ClientInterface
+var _ ClientInterface = (*Client)(nil)
+
 var ErrNotFound = errors.New("model not found")
 
 type otelErrorSilencer struct{}
@@ -34,10 +58,42 @@ func init() {
 }
 
 type Client struct {
-	dockerClient *client.Client
+	dockerClient    DockerClient
+	inferencePrefix string
+	modelsPrefix    string
 }
 
 func New() (*Client, error) {
+	return NewWithPrefixes(inference.InferencePrefix, inference.ModelsPrefix)
+}
+
+// DockerClientAdapter adapts the Docker client to our DockerClient interface
+type DockerClientAdapter struct {
+	client *client.Client
+}
+
+func (a *DockerClientAdapter) HTTPClient() HTTPClient {
+	return &HTTPClientAdapter{a.client.HTTPClient()}
+}
+
+// HTTPClientAdapter adapts the HTTP client to our HTTPClient interface
+type HTTPClientAdapter struct {
+	client *http.Client
+}
+
+func (a *HTTPClientAdapter) Get(url string) (*http.Response, error) {
+	return a.client.Get(url)
+}
+
+func (a *HTTPClientAdapter) Post(url, contentType string, body io.Reader) (*http.Response, error) {
+	return a.client.Post(url, contentType, body)
+}
+
+func (a *HTTPClientAdapter) Do(req *http.Request) (*http.Response, error) {
+	return a.client.Do(req)
+}
+
+func NewWithPrefixes(inferencePrefix, modelsPrefix string) (*Client, error) {
 	dockerClient, err := client.NewClientWithOpts(
 		// TODO: Make sure it works while running in Windows containers mode.
 		client.WithHost(paths.HostServiceSockets().DockerHost(engine.Linux)),
@@ -45,12 +101,19 @@ func New() (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Client{dockerClient}, nil
+
+	adapter := &DockerClientAdapter{client: dockerClient}
+
+	return &Client{
+		dockerClient:    adapter,
+		inferencePrefix: inferencePrefix,
+		modelsPrefix:    modelsPrefix,
+	}, nil
 }
 
 func (c *Client) Status() (string, error) {
 	// TODO: Query "/".
-	resp, err := c.dockerClient.HTTPClient().Get(url(inference.ModelsPrefix))
+	resp, err := c.dockerClient.HTTPClient().Get(c.url(c.modelsPrefix))
 	if err != nil {
 		return "", err
 	}
@@ -68,17 +131,20 @@ func (c *Client) Pull(model string) (string, error) {
 	}
 
 	resp, err := c.dockerClient.HTTPClient().Post(
-		url(inference.ModelsPrefix+"/create"),
+		c.url(c.modelsPrefix+"/create"),
 		"application/json",
 		bytes.NewReader(jsonData),
 	)
 	if err != nil {
-		return "", fmt.Errorf("error querying %s: %w", inference.ModelsPrefix+"/create", err)
+		return "", fmt.Errorf("error querying %s: %w", c.modelsPrefix+"/create", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return "", fmt.Errorf("failed to read response body: %w", err)
+		}
 		return "", fmt.Errorf("pulling %s failed with status %s: %s", model, resp.Status, string(body))
 	}
 
@@ -96,9 +162,9 @@ func (c *Client) Pull(model string) (string, error) {
 }
 
 func (c *Client) List(jsonFormat, openai bool, model string) (string, error) {
-	modelsRoute := inference.ModelsPrefix
+	modelsRoute := c.modelsPrefix
 	if openai {
-		modelsRoute = inference.InferencePrefix + "/v1/models"
+		modelsRoute = c.inferencePrefix + "/v1/models"
 	}
 	if model != "" {
 		if len(strings.Split(strings.Trim(model, "/"), "/")) != 2 {
@@ -106,7 +172,7 @@ func (c *Client) List(jsonFormat, openai bool, model string) (string, error) {
 		}
 		modelsRoute += "/" + model
 	}
-	resp, err := c.dockerClient.HTTPClient().Get(url(modelsRoute))
+	resp, err := c.dockerClient.HTTPClient().Get(c.url(modelsRoute))
 	if err != nil {
 		return "", err
 	}
@@ -173,12 +239,12 @@ func (c *Client) Chat(model, prompt string) error {
 	}
 
 	resp, err := c.dockerClient.HTTPClient().Post(
-		url(inference.InferencePrefix+"/v1/chat/completions"),
+		c.url(c.inferencePrefix+"/v1/chat/completions"),
 		"application/json",
 		bytes.NewReader(jsonData),
 	)
 	if err != nil {
-		return fmt.Errorf("error querying %s: %w", inference.InferencePrefix+"/v1/chat/completions", err)
+		return fmt.Errorf("error querying %s: %w", c.inferencePrefix+"/v1/chat/completions", err)
 	}
 	defer resp.Body.Close()
 
@@ -223,14 +289,14 @@ func (c *Client) Chat(model, prompt string) error {
 }
 
 func (c *Client) Remove(model string) (string, error) {
-	req, err := http.NewRequest(http.MethodDelete, url(inference.ModelsPrefix+"/"+model), nil)
+	req, err := http.NewRequest(http.MethodDelete, c.url(c.modelsPrefix+"/"+model), nil)
 	if err != nil {
 		return "", fmt.Errorf("error creating request: %w", err)
 	}
 
 	resp, err := c.dockerClient.HTTPClient().Do(req)
 	if err != nil {
-		return "", fmt.Errorf("error querying %s: %w", inference.ModelsPrefix+"/"+model, err)
+		return "", fmt.Errorf("error querying %s: %w", c.modelsPrefix+"/"+model, err)
 	}
 	defer resp.Body.Close()
 
@@ -248,7 +314,7 @@ func (c *Client) Remove(model string) (string, error) {
 	return fmt.Sprintf("Model %s removed successfully", model), nil
 }
 
-func url(path string) string {
+func (c *Client) url(path string) string {
 	return fmt.Sprintf("http://localhost" + inference.ExperimentalEndpointsPrefix + path)
 }
 
