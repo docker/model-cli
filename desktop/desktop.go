@@ -8,11 +8,11 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/docker/docker/client"
+	"github.com/docker/go-units"
 	"github.com/docker/pinata/common/pkg/engine"
 	"github.com/docker/pinata/common/pkg/inference"
 	"github.com/docker/pinata/common/pkg/inference/models"
@@ -326,7 +326,7 @@ func prettyPrintModels(models []Model) string {
 	var buf bytes.Buffer
 	table := tablewriter.NewWriter(&buf)
 
-	table.SetHeader([]string{"MODEL", "PARAMETERS", "QUANTIZATION", "ARCHITECTURE", "FORMAT", "MODEL ID", "CREATED", "SIZE"})
+	table.SetHeader([]string{"MODEL", "PARAMETERS", "QUANTIZATION", "ARCHITECTURE", "MODEL ID", "CREATED", "SIZE"})
 
 	table.SetBorder(false)
 	table.SetColumnSeparator("")
@@ -339,8 +339,7 @@ func prettyPrintModels(models []Model) string {
 		tablewriter.ALIGN_LEFT, // PARAMETERS
 		tablewriter.ALIGN_LEFT, // QUANTIZATION
 		tablewriter.ALIGN_LEFT, // ARCHITECTURE
-		tablewriter.ALIGN_LEFT, // FORMAT
-		tablewriter.ALIGN_LEFT, // IMAGE ID
+		tablewriter.ALIGN_LEFT, // MODEL ID
 		tablewriter.ALIGN_LEFT, // CREATED
 		tablewriter.ALIGN_LEFT, // SIZE
 	})
@@ -360,34 +359,12 @@ func prettyPrintModels(models []Model) string {
 			m.Config.Parameters,
 			m.Config.Quantization,
 			m.Config.Architecture,
-			string(m.Config.Format),
 			m.ID[7:19],
-			timeAgo(time.Unix(m.Created, 0)),
+			units.HumanDuration(time.Since(time.Unix(m.Created, 0))) + " ago",
 			m.Config.Size,
 		})
 	}
 
 	table.Render()
 	return buf.String()
-}
-
-func timeAgo(t time.Time) string {
-	duration := time.Since(t)
-	hours := int(duration.Hours())
-	days := hours / 24
-	months := days / 30
-	years := months / 12
-
-	switch {
-	case hours < 1:
-		return strconv.Itoa(int(duration.Minutes())) + " minutes ago"
-	case hours < 24:
-		return strconv.Itoa(hours) + " hours ago"
-	case days < 30:
-		return strconv.Itoa(days) + " days ago"
-	case months < 12:
-		return strconv.Itoa(months) + " months ago"
-	default:
-		return strconv.Itoa(years) + " years ago"
-	}
 }
