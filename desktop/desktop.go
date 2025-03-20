@@ -122,6 +122,10 @@ func (c *Client) List(jsonFormat, openai bool, model string) (string, error) {
 		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	if openai {
+		return string(body), nil
+	}
+
 	if model != "" {
 		// Handle single model for `docker model inspect`.
 		// TODO: Handle this in model-distribution.
