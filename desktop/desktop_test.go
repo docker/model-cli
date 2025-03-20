@@ -182,7 +182,43 @@ func TestList(t *testing.T) {
 				"sha256:0987654321fedcba",
 			},
 		},
-		// TODO what should happen when openai is true? Can openai be true and json format false?
+		{
+			name:       "openai format",
+			jsonFormat: false,
+			openai:     true,
+			model:      "",
+			mockResponse: `[
+					{
+						"id": "model1",
+						"object": "model",
+						"created": 1647270123,
+						"owned_by": "docker",
+						"permission": [],
+						"root": "model1",
+						"parent": null
+					},
+					{
+						"id": "model2",
+						"object": "model",
+						"created": 1647270123,
+						"owned_by": "docker",
+						"permission": [],
+						"root": "model2",
+						"parent": null
+					}
+				]`,
+			expectedOutput: []string{
+				"model1",
+				"model2",
+				"owned_by",
+				"docker",
+			},
+			unexpectedOutput: []string{
+				"PARAMETERS",
+				"QUANTIZATION",
+				"sha256:",
+			},
+		},
 	}
 
 	for _, tt := range tests {
