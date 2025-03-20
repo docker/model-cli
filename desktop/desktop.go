@@ -9,8 +9,10 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/client"
+	"github.com/docker/go-units"
 	"github.com/docker/pinata/common/pkg/engine"
 	"github.com/docker/pinata/common/pkg/inference"
 	"github.com/docker/pinata/common/pkg/inference/models"
@@ -258,7 +260,7 @@ func prettyPrintModels(models []Model) string {
 	var buf bytes.Buffer
 	table := tablewriter.NewWriter(&buf)
 
-	table.SetHeader([]string{"MODEL", "PARAMETERS", "QUANTIZATION", "ARCHITECTURE", "MODEL ID", "SIZE"})
+	table.SetHeader([]string{"MODEL", "PARAMETERS", "QUANTIZATION", "ARCHITECTURE", "MODEL ID", "CREATED", "SIZE"})
 
 	table.SetBorder(false)
 	table.SetColumnSeparator("")
@@ -271,7 +273,8 @@ func prettyPrintModels(models []Model) string {
 		tablewriter.ALIGN_LEFT, // PARAMETERS
 		tablewriter.ALIGN_LEFT, // QUANTIZATION
 		tablewriter.ALIGN_LEFT, // ARCHITECTURE
-		tablewriter.ALIGN_LEFT, // IMAGE ID
+		tablewriter.ALIGN_LEFT, // MODEL ID
+		tablewriter.ALIGN_LEFT, // CREATED
 		tablewriter.ALIGN_LEFT, // SIZE
 	})
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
@@ -291,6 +294,7 @@ func prettyPrintModels(models []Model) string {
 			m.Config.Quantization,
 			m.Config.Architecture,
 			m.ID[7:19],
+			units.HumanDuration(time.Since(time.Unix(m.Created, 0))) + " ago",
 			m.Config.Size,
 		})
 	}
