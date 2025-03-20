@@ -163,7 +163,6 @@ func TestList(t *testing.T) {
 				"PARAMETERS",
 				"QUANTIZATION",
 				"ARCHITECTURE",
-				"FORMAT",
 				"MODEL ID",
 				"CREATED",
 				"SIZE",
@@ -174,7 +173,6 @@ func TestList(t *testing.T) {
 				"Q4_K_M",
 				"IQ4_XS",
 				"llama",
-				"gguf",
 			},
 			// Table format should not contain the full SHA256 IDs
 			unexpectedOutput: []string{
@@ -262,7 +260,7 @@ func TestList(t *testing.T) {
 				}
 
 				// Check that the first line contains all the column headers
-				headers := []string{"MODEL", "PARAMETERS", "QUANTIZATION", "ARCHITECTURE", "FORMAT", "MODEL ID", "CREATED", "SIZE"}
+				headers := []string{"MODEL", "PARAMETERS", "QUANTIZATION", "ARCHITECTURE", "MODEL ID", "CREATED", "SIZE"}
 				for _, header := range headers {
 					if !strings.Contains(lines[0], header) {
 						t.Errorf("Expected first line to contain header %q but got: %s", header, lines[0])
