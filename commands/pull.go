@@ -27,7 +27,7 @@ func newPullCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("Failed to create Docker client: %v\n", err)
 			}
-			response, err := client.Pull(model)
+			response, err := client.Pull(model, TUIProgress)
 			if err != nil {
 				return fmt.Errorf("Failed to pull model: %v\n", err)
 			}
@@ -36,4 +36,8 @@ func newPullCmd() *cobra.Command {
 		},
 	}
 	return c
+}
+
+func TUIProgress(line string) {
+	fmt.Print("\r\033[K", line)
 }

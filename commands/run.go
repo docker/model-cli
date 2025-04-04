@@ -42,7 +42,7 @@ func newRunCmd() *cobra.Command {
 					return fmt.Errorf("Failed to list model: %v\n", err)
 				}
 				cmd.Println("Unable to find model '" + model + "' locally. Pulling from the server.")
-				response, err := client.Pull(model)
+				response, err := client.Pull(model, TUIProgress)
 				if err != nil {
 					return fmt.Errorf("Failed to pull model: %v\n", err)
 				}
