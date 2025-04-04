@@ -48,17 +48,33 @@ func New() (*Client, error) {
 	return &Client{dockerClient}, nil
 }
 
-func (c *Client) Status() (string, error) {
+type Status struct {
+	Running  bool  `json:"running"`
+	Error    error `json:"error"`
+	ExitCode int   `json:"exitCode"`
+}
+
+func (c *Client) Status() Status {
 	// TODO: Query "/".
 	resp, err := c.dockerClient.HTTPClient().Get(url(inference.ModelsPrefix))
 	if err != nil {
-		return "", err
+		return Status{
+			Running:  false,
+			Error:    err,
+			ExitCode: 1,
+		}
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusOK {
-		return "Docker Model Runner is running", nil
+		return Status{
+			Running:  true,
+			ExitCode: 0,
+		}
 	}
-	return "Docker Model Runner is not running", nil
+	return Status{
+		Running:  false,
+		ExitCode: 1,
+	}
 }
 
 func (c *Client) Pull(model string) (string, error) {
