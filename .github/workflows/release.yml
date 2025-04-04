@@ -109,7 +109,7 @@ jobs:
             dist=dist
             desktop-module=desktop-module
           file: desktop-module/Dockerfile
-          platforms: [darwin/arm64, windows/amd64]
+          platforms: darwin/arm64,windows/amd64
           push: ${{ github.event_name != 'pull_request' }}
           sbom: true
           provenance: mode=max
