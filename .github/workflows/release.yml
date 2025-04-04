@@ -18,7 +18,7 @@ on:
 
 jobs:
 
-  build-darwin:
+  build:
     runs-on: macos-13
     permissions:
       id-token: write
@@ -43,9 +43,33 @@ jobs:
             dist/
           if-no-files-found: error
 
+  sign-windows:
+    runs-on: windows-latest
+    permissions:
+      id-token: write
+      contents: read
+    needs: [build]
+    steps:
+      - name: Retrieve built artifact
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: dist
+      - name: Sign windows binaries
+        uses: docker/desktop-action-private/sign@v1.0.1
+        with:
+          win_binaries_filter: dist/windows-*/docker-model
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: |
+            dist/
+          if-no-files-found: error
+          overwrite: true
+
   release:
     needs:
-      - build-darwin
+      - sign-windows
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -85,7 +109,7 @@ jobs:
             dist=dist
             desktop-module=desktop-module
           file: desktop-module/Dockerfile
-          platforms: darwin/arm64
+          platforms: [darwin/arm64, windows/amd64]
           push: ${{ github.event_name != 'pull_request' }}
           sbom: true
           provenance: mode=max
