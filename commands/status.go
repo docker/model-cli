@@ -2,9 +2,9 @@ package commands
 
 import (
 	"fmt"
-
-	"github.com/docker/pinata/common/cmd/docker-model/desktop"
+	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
+	"os"
 )
 
 func newStatusCmd() *cobra.Command {
@@ -16,11 +16,17 @@ func newStatusCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("Failed to create Docker client: %v\n", err)
 			}
-			status, err := client.Status()
-			if err != nil {
+			status := client.Status()
+			if status.Error != nil {
 				return fmt.Errorf("Failed to get Docker Model Runner status: %v\n", err)
 			}
-			cmd.Println(status)
+			if status.Running {
+				cmd.Println("Docker Model Runner is running")
+			} else {
+				cmd.Println("Docker Model Runner is not running")
+				os.Exit(1)
+			}
+
 			return nil
 		},
 	}

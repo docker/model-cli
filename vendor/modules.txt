@@ -130,7 +130,6 @@ github.com/docker/model-distribution/pkg/store
 github.com/docker/model-distribution/pkg/types
 # github.com/docker/pinata v0.0.1-0.20250317110157-7302b389632a
 ## explicit; go 1.23.7
-github.com/docker/pinata/common/cmd/docker-model/desktop
 github.com/docker/pinata/common/pkg/engine
 github.com/docker/pinata/common/pkg/inference
 github.com/docker/pinata/common/pkg/inference/models
