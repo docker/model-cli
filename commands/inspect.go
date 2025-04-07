@@ -30,7 +30,7 @@ func newInspectCmd() *cobra.Command {
 			}
 			model, err = client.List(false, openai, model)
 			if err != nil {
-				return fmt.Errorf("Failed to list models: %v\n", err)
+				return handleClientError(err, "Failed to list models")
 			}
 			cmd.Println(model)
 			return nil

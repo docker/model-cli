@@ -39,19 +39,19 @@ func newRunCmd() *cobra.Command {
 
 			if _, err := client.List(false, false, model); err != nil {
 				if !errors.Is(err, desktop.ErrNotFound) {
-					return fmt.Errorf("Failed to list model: %v\n", err)
+					return handleClientError(err, "Failed to list models")
 				}
 				cmd.Println("Unable to find model '" + model + "' locally. Pulling from the server.")
 				response, err := client.Pull(model)
 				if err != nil {
-					return fmt.Errorf("Failed to pull model: %v\n", err)
+					return handleClientError(err, "Failed to pull model")
 				}
 				cmd.Println(response)
 			}
 
 			if prompt != "" {
 				if err := client.Chat(model, prompt); err != nil {
-					return fmt.Errorf("Failed to generate a response: %v\n", err)
+					return handleClientError(err, "Failed to generate a response")
 				}
 				cmd.Println()
 				return nil
@@ -75,7 +75,7 @@ func newRunCmd() *cobra.Command {
 				}
 
 				if err := client.Chat(model, userInput); err != nil {
-					cmd.PrintErrf("Failed to generate a response: %v\n", err)
+					cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
 					cmd.Print("> ")
 					continue
 				}
