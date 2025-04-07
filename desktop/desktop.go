@@ -11,9 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/docker/docker/client"
 	"github.com/docker/go-units"
-	"github.com/docker/pinata/common/pkg/engine"
 	"github.com/docker/pinata/common/pkg/inference"
 	"github.com/docker/pinata/common/pkg/inference/models"
 	"github.com/docker/pinata/common/pkg/paths"
@@ -37,18 +35,16 @@ func init() {
 }
 
 type Client struct {
-	dockerClient *client.Client
+	dockerClient DockerHttpClient
 }
 
-func New() (*Client, error) {
-	dockerClient, err := client.NewClientWithOpts(
-		// TODO: Make sure it works while running in Windows containers mode.
-		client.WithHost(paths.HostServiceSockets().DockerHost(engine.Linux)),
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &Client{dockerClient}, nil
+//go:generate mockgen -source=desktop.go -destination=../mocks/mock_desktop.go -package=mocks DockerHttpClient
+type DockerHttpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+func New(dockerClient DockerHttpClient) *Client {
+	return &Client{dockerClient}
 }
 
 type Status struct {
@@ -58,8 +54,14 @@ type Status struct {
 
 func (c *Client) Status() Status {
 	// TODO: Query "/".
-	resp, err := c.dockerClient.HTTPClient().Get(url(inference.ModelsPrefix))
+	resp, err := c.doRequest(http.MethodGet, inference.ModelsPrefix, nil)
 	if err != nil {
+		err = c.handleQueryError(err, inference.ModelsPrefix)
+		if errors.Is(err, ErrServiceUnavailable) {
+			return Status{
+				Running: false,
+			}
+		}
 		return Status{
 			Running: false,
 			Error:   err,
@@ -73,6 +75,7 @@ func (c *Client) Status() Status {
 	}
 	return Status{
 		Running: false,
+		Error:   fmt.Errorf("unexpected status code: %d", resp.StatusCode),
 	}
 }
 
@@ -268,13 +271,13 @@ func (c *Client) Remove(model string) (string, error) {
 	return fmt.Sprintf("Model %s removed successfully", model), nil
 }
 
-func url(path string) string {
+func URL(path string) string {
 	return fmt.Sprintf("http://localhost" + inference.ExperimentalEndpointsPrefix + path)
 }
 
 // doRequest is a helper function that performs HTTP requests and handles 503 responses
 func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest(method, url(path), body)
+	req, err := http.NewRequest(method, URL(path), body)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -282,7 +285,7 @@ func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response,
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	resp, err := c.dockerClient.HTTPClient().Do(req)
+	resp, err := c.dockerClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

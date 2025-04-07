@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newInspectCmd() *cobra.Command {
+func newInspectCmd(desktopClient *desktop.Client) *cobra.Command {
 	var openai bool
 	c := &cobra.Command{
 		Use:   "inspect MODEL",
@@ -24,11 +24,7 @@ func newInspectCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			model := args[0]
-			client, err := desktop.New()
-			if err != nil {
-				return fmt.Errorf("Failed to create Docker client: %v\n", err)
-			}
-			model, err = client.List(false, openai, model)
+			model, err := desktopClient.List(false, openai, model)
 			if err != nil {
 				err = handleClientError(err, "Failed to list models")
 				return handleNotRunningError(err)

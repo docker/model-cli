@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newPullCmd() *cobra.Command {
+func newPullCmd(desktopClient *desktop.Client) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "pull MODEL",
 		Short: "Download a model",
@@ -23,11 +23,7 @@ func newPullCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			model := args[0]
-			client, err := desktop.New()
-			if err != nil {
-				return fmt.Errorf("Failed to create Docker client: %v\n", err)
-			}
-			response, err := client.Pull(model)
+			response, err := desktopClient.Pull(model)
 			if err != nil {
 				err = handleClientError(err, "Failed to pull model")
 				return handleNotRunningError(err)
