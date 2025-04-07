@@ -39,12 +39,12 @@ func newRunCmd() *cobra.Command {
 
 			if _, err := client.List(false, false, model); err != nil {
 				if !errors.Is(err, desktop.ErrNotFound) {
-					return handleClientError(err, "Failed to list models")
+					return handleNotRunningError(handleClientError(err, "Failed to list models"))
 				}
 				cmd.Println("Unable to find model '" + model + "' locally. Pulling from the server.")
 				response, err := client.Pull(model)
 				if err != nil {
-					return handleClientError(err, "Failed to pull model")
+					return handleNotRunningError(handleClientError(err, "Failed to pull model"))
 				}
 				cmd.Println(response)
 			}
