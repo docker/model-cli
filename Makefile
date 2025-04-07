@@ -1,4 +1,4 @@
-.PHONY: all build clean link
+.PHONY: all build clean link mock unit-tests
 
 BINARY_NAME=model-cli
 
@@ -34,6 +34,17 @@ release:
 	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X github.com/docker/model-cli/commands.Version=$(VERSION)" -o dist/darwin-arm64/$(PLUGIN_NAME) .
 	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X github.com/docker/model-cli/commands.Version=$(VERSION)" -o dist/windows-amd64/$(PLUGIN_NAME).exe .
 	@echo "Release build complete: $(PLUGIN_NAME) version '$(VERSION)'"
+
+mock:
+	@echo "Generating mocks..."
+	@mkdir -p mocks
+	@go generate ./...
+	@echo "Mocks generated!"
+
+unit-tests:
+	@echo "Running unit tests..."
+	@go test -v ./...
+	@echo "Unit tests completed!"
 
 clean:
 	@echo "Cleaning up..."
