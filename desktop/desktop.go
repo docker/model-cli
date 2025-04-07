@@ -22,7 +22,10 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
-var ErrNotFound = errors.New("model not found")
+var (
+	ErrNotFound           = errors.New("model not found")
+	ErrServiceUnavailable = errors.New("service unavailable")
+)
 
 type otelErrorSilencer struct{}
 
@@ -79,13 +82,14 @@ func (c *Client) Pull(model string) (string, error) {
 		return "", fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	resp, err := c.dockerClient.HTTPClient().Post(
-		url(inference.ModelsPrefix+"/create"),
-		"application/json",
+	createPath := inference.ModelsPrefix + "/create"
+	resp, err := c.doRequest(
+		http.MethodPost,
+		createPath,
 		bytes.NewReader(jsonData),
 	)
 	if err != nil {
-		return "", fmt.Errorf("error querying %s: %w", inference.ModelsPrefix+"/create", err)
+		return "", c.handleQueryError(err, createPath)
 	}
 	defer resp.Body.Close()
 
@@ -118,17 +122,20 @@ func (c *Client) List(jsonFormat, openai bool, model string) (string, error) {
 		}
 		modelsRoute += "/" + model
 	}
-	resp, err := c.dockerClient.HTTPClient().Get(url(modelsRoute))
+
+	resp, err := c.doRequest(http.MethodGet, modelsRoute, nil)
 	if err != nil {
-		return "", err
+		return "", c.handleQueryError(err, modelsRoute)
 	}
 	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
 		if model != "" && resp.StatusCode == http.StatusNotFound {
 			return "", errors.Wrap(ErrNotFound, model)
 		}
 		return "", fmt.Errorf("failed to list models: %s", resp.Status)
 	}
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response body: %w", err)
@@ -188,13 +195,14 @@ func (c *Client) Chat(model, prompt string) error {
 		return fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	resp, err := c.dockerClient.HTTPClient().Post(
-		url(inference.InferencePrefix+"/v1/chat/completions"),
-		"application/json",
+	chatCompletionsPath := inference.InferencePrefix + "/v1/chat/completions"
+	resp, err := c.doRequest(
+		http.MethodPost,
+		chatCompletionsPath,
 		bytes.NewReader(jsonData),
 	)
 	if err != nil {
-		return fmt.Errorf("error querying %s: %w", inference.InferencePrefix+"/v1/chat/completions", err)
+		return c.handleQueryError(err, chatCompletionsPath)
 	}
 	defer resp.Body.Close()
 
@@ -239,18 +247,14 @@ func (c *Client) Chat(model, prompt string) error {
 }
 
 func (c *Client) Remove(model string) (string, error) {
-	req, err := http.NewRequest(http.MethodDelete, url(inference.ModelsPrefix+"/"+model), nil)
+	removePath := inference.ModelsPrefix + "/" + model
+	resp, err := c.doRequest(http.MethodDelete, removePath, nil)
 	if err != nil {
-		return "", fmt.Errorf("error creating request: %w", err)
-	}
-
-	resp, err := c.dockerClient.HTTPClient().Do(req)
-	if err != nil {
-		return "", fmt.Errorf("error querying %s: %w", inference.ModelsPrefix+"/"+model, err)
+		return "", c.handleQueryError(err, removePath)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK { // from common/pkg/inference/models/manager.go
+	if resp.StatusCode != http.StatusOK {
 		var bodyStr string
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -266,6 +270,36 @@ func (c *Client) Remove(model string) (string, error) {
 
 func url(path string) string {
 	return fmt.Sprintf("http://localhost" + inference.ExperimentalEndpointsPrefix + path)
+}
+
+// doRequest is a helper function that performs HTTP requests and handles 503 responses
+func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response, error) {
+	req, err := http.NewRequest(method, url(path), body)
+	if err != nil {
+		return nil, fmt.Errorf("error creating request: %w", err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+
+	resp, err := c.dockerClient.HTTPClient().Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		resp.Body.Close()
+		return nil, ErrServiceUnavailable
+	}
+
+	return resp, nil
+}
+
+func (c *Client) handleQueryError(err error, path string) error {
+	if errors.Is(err, ErrServiceUnavailable) {
+		return ErrServiceUnavailable
+	}
+	return fmt.Errorf("error querying %s: %w", path, err)
 }
 
 func prettyPrintModels(models []Model) string {

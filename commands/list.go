@@ -20,7 +20,8 @@ func newListCmd() *cobra.Command {
 			}
 			models, err := client.List(jsonFormat, openai, "")
 			if err != nil {
-				return fmt.Errorf("Failed to list models: %v\n", err)
+				err = handleClientError(err, "Failed to list models")
+				return handleNotRunningError(err)
 			}
 			cmd.Println(models)
 			return nil

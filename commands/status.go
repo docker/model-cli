@@ -2,9 +2,11 @@ package commands
 
 import (
 	"fmt"
+	"os"
+
+	"github.com/docker/cli/cli-plugins/hooks"
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 func newStatusCmd() *cobra.Command {
@@ -24,6 +26,7 @@ func newStatusCmd() *cobra.Command {
 				cmd.Println("Docker Model Runner is running")
 			} else {
 				cmd.Println("Docker Model Runner is not running")
+				hooks.PrintNextSteps(os.Stdout, []string{enableViaCLI, enableViaGUI})
 				os.Exit(1)
 			}
 

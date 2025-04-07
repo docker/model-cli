@@ -29,7 +29,8 @@ func newPullCmd() *cobra.Command {
 			}
 			response, err := client.Pull(model)
 			if err != nil {
-				return fmt.Errorf("Failed to pull model: %v\n", err)
+				err = handleClientError(err, "Failed to pull model")
+				return handleNotRunningError(err)
 			}
 			cmd.Println(response)
 			return nil
