@@ -2,9 +2,10 @@ package commands
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
-	"os"
 )
 
 func newStatusCmd() *cobra.Command {
