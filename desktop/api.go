@@ -1,5 +1,11 @@
 package desktop
 
+// ProgressMessage represents a message sent during model pull operations
+type ProgressMessage struct {
+	Type    string `json:"type"`    // "progress", "success", or "error"
+	Message string `json:"message"` // Human-readable message
+}
+
 type OpenAIChatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`

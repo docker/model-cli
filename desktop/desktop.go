@@ -104,14 +104,31 @@ func (c *Client) Pull(model string, progress func(string)) (string, error) {
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		progressLine := scanner.Text()
-		if progressLine != "" {
-			progress(progressLine)
+		if progressLine == "" {
+			continue
+		}
+
+		// Parse the progress message
+		var progressMsg ProgressMessage
+		if err := json.Unmarshal([]byte(progressLine), &progressMsg); err != nil {
+			return "", fmt.Errorf("error parsing progress message: %w", err)
+		}
+
+		// Handle different message types
+		switch progressMsg.Type {
+		case "progress":
+			progress(progressMsg.Message)
+		case "error":
+			return "", fmt.Errorf("error pulling model: %s", progressMsg.Message)
+		case "success":
+			return progressMsg.Message, nil
+		default:
+			return "", fmt.Errorf("unknown message type: %s", progressMsg.Type)
 		}
 	}
 
-	fmt.Println()
-
-	return fmt.Sprintf("Model %s pulled successfully", model), nil
+	// If we get here, something went wrong
+	return "", fmt.Errorf("unexpected end of stream while pulling model %s", model)
 }
 
 func (c *Client) List(jsonFormat, openai bool, model string) (string, error) {

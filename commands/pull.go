@@ -35,6 +35,6 @@ func newPullCmd(desktopClient *desktop.Client) *cobra.Command {
 	return c
 }
 
-func TUIProgress(line string) {
-	fmt.Print("\r\033[K", line)
+func TUIProgress(message string) {
+	fmt.Print("\r\033[K", message)
 }
