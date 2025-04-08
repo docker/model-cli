@@ -79,7 +79,7 @@ func (c *Client) Status() Status {
 	}
 }
 
-func (c *Client) Pull(model string) (string, error) {
+func (c *Client) Pull(model string, progress func(string)) (string, error) {
 	jsonData, err := json.Marshal(models.ModelCreateRequest{From: model})
 	if err != nil {
 		return "", fmt.Errorf("error marshaling request: %w", err)
@@ -105,7 +105,7 @@ func (c *Client) Pull(model string) (string, error) {
 	for scanner.Scan() {
 		progressLine := scanner.Text()
 		if progressLine != "" {
-			fmt.Print("\r\033[K", progressLine)
+			progress(progressLine)
 		}
 	}
 

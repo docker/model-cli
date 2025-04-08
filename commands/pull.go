@@ -23,7 +23,7 @@ func newPullCmd(desktopClient *desktop.Client) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			model := args[0]
-			response, err := desktopClient.Pull(model)
+			response, err := desktopClient.Pull(model, TUIProgress)
 			if err != nil {
 				err = handleClientError(err, "Failed to pull model")
 				return handleNotRunningError(err)
@@ -33,4 +33,8 @@ func newPullCmd(desktopClient *desktop.Client) *cobra.Command {
 		},
 	}
 	return c
+}
+
+func TUIProgress(line string) {
+	fmt.Print("\r\033[K", line)
 }
