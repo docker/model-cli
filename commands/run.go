@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newRunCmd() *cobra.Command {
+func newRunCmd(desktopClient *desktop.Client) *cobra.Command {
 	var debug bool
 
 	cmdArgs := "MODEL [PROMPT]"
@@ -32,17 +32,12 @@ func newRunCmd() *cobra.Command {
 				}
 			}
 
-			client, err := desktop.New()
-			if err != nil {
-				return fmt.Errorf("Failed to create Docker client: %v\n", err)
-			}
-
-			if _, err := client.List(false, false, model); err != nil {
+			if _, err := desktopClient.List(false, false, model); err != nil {
 				if !errors.Is(err, desktop.ErrNotFound) {
 					return handleNotRunningError(handleClientError(err, "Failed to list models"))
 				}
 				cmd.Println("Unable to find model '" + model + "' locally. Pulling from the server.")
-				response, err := client.Pull(model)
+				response, err := desktopClient.Pull(model)
 				if err != nil {
 					return handleNotRunningError(handleClientError(err, "Failed to pull model"))
 				}
@@ -50,7 +45,7 @@ func newRunCmd() *cobra.Command {
 			}
 
 			if prompt != "" {
-				if err := client.Chat(model, prompt); err != nil {
+				if err := desktopClient.Chat(model, prompt); err != nil {
 					return handleClientError(err, "Failed to generate a response")
 				}
 				cmd.Println()
@@ -74,7 +69,7 @@ func newRunCmd() *cobra.Command {
 					continue
 				}
 
-				if err := client.Chat(model, userInput); err != nil {
+				if err := desktopClient.Chat(model, userInput); err != nil {
 					cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
 					cmd.Print("> ")
 					continue

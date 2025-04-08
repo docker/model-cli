@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/docker/cli/cli-plugins/hooks"
@@ -9,25 +8,21 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newStatusCmd() *cobra.Command {
+func newStatusCmd(desktopClient *desktop.Client) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "status",
 		Short: "Check if the Docker Model Runner is running",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			client, err := desktop.New()
-			if err != nil {
-				return fmt.Errorf("Failed to create Docker client: %v\n", err)
-			}
-			status := client.Status()
+			status := desktopClient.Status()
 			if status.Error != nil {
-				return fmt.Errorf("Failed to get Docker Model Runner status: %v\n", err)
+				return handleClientError(status.Error, "Failed to get Docker Model Runner status")
 			}
 			if status.Running {
 				cmd.Println("Docker Model Runner is running")
 			} else {
 				cmd.Println("Docker Model Runner is not running")
-				hooks.PrintNextSteps(os.Stdout, []string{enableViaCLI, enableViaGUI})
-				os.Exit(1)
+				hooks.PrintNextSteps(cmd.OutOrStdout(), []string{enableViaCLI, enableViaGUI})
+				osExit(1)
 			}
 
 			return nil
@@ -35,3 +30,5 @@ func newStatusCmd() *cobra.Command {
 	}
 	return c
 }
+
+var osExit = os.Exit

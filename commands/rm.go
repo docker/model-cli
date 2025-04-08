@@ -7,7 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newRemoveCmd() *cobra.Command {
+func newRemoveCmd(desktopClient *desktop.Client) *cobra.Command {
 	c := &cobra.Command{
 		Use:   "rm MODEL",
 		Short: "Remove a model downloaded from Docker Hub",
@@ -23,11 +23,7 @@ func newRemoveCmd() *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			model := args[0]
-			client, err := desktop.New()
-			if err != nil {
-				return fmt.Errorf("Failed to create Docker client: %v\n", err)
-			}
-			response, err := client.Remove(model)
+			response, err := desktopClient.Remove(model)
 			if err != nil {
 				err = handleClientError(err, "Failed to remove model")
 				return handleNotRunningError(err)
