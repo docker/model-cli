@@ -17,7 +17,7 @@ func newComposeCmd(desktopClient *desktop.Client) *cobra.Command {
 	c.AddCommand(newUpCommand(desktopClient))
 	c.AddCommand(newDownCommand())
 	c.Hidden = true
-	c.Flags().String("project-name", "", "compose project name") // unused by model
+	c.PersistentFlags().String("project-name", "", "compose project name") // unused by model
 
 	return c
 }
