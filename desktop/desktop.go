@@ -120,7 +120,8 @@ func (c *Client) List(jsonFormat, openai bool, model string) (string, error) {
 		modelsRoute = inference.InferencePrefix + "/v1/models"
 	}
 	if model != "" {
-		if len(strings.Split(strings.Trim(model, "/"), "/")) != 2 {
+		if !strings.Contains(strings.Trim(model, "/"), "/") {
+			// We assume a model name is invalid if it does not contain a "/".
 			return "", fmt.Errorf("invalid model name: %s", model)
 		}
 		modelsRoute += "/" + model
