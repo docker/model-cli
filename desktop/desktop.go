@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"os"
@@ -110,7 +111,7 @@ func (c *Client) Pull(model string, progress func(string)) (string, error) {
 
 		// Parse the progress message
 		var progressMsg ProgressMessage
-		if err := json.Unmarshal([]byte(progressLine), &progressMsg); err != nil {
+		if err := json.Unmarshal([]byte(html.UnescapeString(progressLine)), &progressMsg); err != nil {
 			return "", fmt.Errorf("error parsing progress message: %w", err)
 		}
 

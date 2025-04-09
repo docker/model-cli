@@ -23,11 +23,25 @@ func newPullCmd(desktopClient *desktop.Client) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			model := args[0]
-			response, err := desktopClient.Pull(model, TUIProgress)
+
+			// Track if progress was shown
+			progressShown := false
+			progressTracker := func(message string) {
+				progressShown = true
+				TUIProgress(message)
+			}
+
+			response, err := desktopClient.Pull(model, progressTracker)
 			if err != nil {
 				err = handleClientError(err, "Failed to pull model")
 				return handleNotRunningError(err)
 			}
+
+			// Add a newline before the success message only if progress was shown
+			if progressShown {
+				fmt.Println()
+			}
+
 			cmd.Println(response)
 			return nil
 		},
