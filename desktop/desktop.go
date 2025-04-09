@@ -282,34 +282,38 @@ func (c *Client) Chat(model, prompt string) error {
 	return nil
 }
 
-func (c *Client) Remove(model string) (string, error) {
-	// Check if not a model ID passed as parameter.
-	if !strings.Contains(model, "/") {
-		var err error
-		if model, err = c.modelNameFromID(model); err != nil {
-			return "", fmt.Errorf("invalid model name: %s", model)
+func (c *Client) Remove(models []string) (string, error) {
+	modelRemoved := ""
+	for _, model := range models {
+		// Check if not a model ID passed as parameter.
+		if !strings.Contains(model, "/") {
+			var err error
+			modelID := model
+			if model, err = c.modelNameFromID(model); err != nil {
+				return modelRemoved, fmt.Errorf("invalid model name: %s", modelID)
+			}
 		}
-	}
 
-	removePath := inference.ModelsPrefix + "/" + model
-	resp, err := c.doRequest(http.MethodDelete, removePath, nil)
-	if err != nil {
-		return "", c.handleQueryError(err, removePath)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		var bodyStr string
-		body, err := io.ReadAll(resp.Body)
+		removePath := inference.ModelsPrefix + "/" + model
+		resp, err := c.doRequest(http.MethodDelete, removePath, nil)
 		if err != nil {
-			bodyStr = fmt.Sprintf("(failed to read response body: %v)", err)
-		} else {
-			bodyStr = string(body)
+			return modelRemoved, c.handleQueryError(err, removePath)
 		}
-		return "", fmt.Errorf("removing %s failed with status %s: %s", model, resp.Status, bodyStr)
-	}
+		defer resp.Body.Close()
 
-	return fmt.Sprintf("Model %s removed successfully", model), nil
+		if resp.StatusCode != http.StatusOK {
+			var bodyStr string
+			body, err := io.ReadAll(resp.Body)
+			if err != nil {
+				bodyStr = fmt.Sprintf("(failed to read response body: %v)", err)
+			} else {
+				bodyStr = string(body)
+			}
+			return modelRemoved, fmt.Errorf("removing %s failed with status %s: %s", model, resp.Status, bodyStr)
+		}
+		modelRemoved += fmt.Sprintf("Model %s removed successfully\n", model)
+	}
+	return modelRemoved, nil
 }
 
 func URL(path string) string {
