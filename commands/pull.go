@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/docker/model-cli/desktop"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -32,14 +33,25 @@ func newPullCmd(desktopClient *desktop.Client) *cobra.Command {
 			}
 
 			response, err := desktopClient.Pull(model, progressTracker)
-			if err != nil {
-				err = handleClientError(err, "Failed to pull model")
-				return handleNotRunningError(err)
-			}
 
-			// Add a newline before the success message only if progress was shown
+			// Add a newline before any output (success or error) if progress was shown
 			if progressShown {
 				fmt.Println()
+			}
+
+			if err != nil {
+				err = handleClientError(err, "Failed to pull model")
+
+				// Check if it's a "not running" error
+				if errors.Is(err, notRunningErr) {
+					// For "not running" errors, return the error to display the usage
+					return handleNotRunningError(err)
+				}
+
+				// For other errors, print the error message and return nil
+				// to prevent Cobra from displaying the usage
+				fmt.Fprintln(cmd.ErrOrStderr(), err)
+				return nil
 			}
 
 			cmd.Println(response)
