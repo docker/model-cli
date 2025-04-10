@@ -33,7 +33,7 @@ func newUpCommand(desktopClient *desktop.Client) *cobra.Command {
 				return err
 			}
 
-			_, err := desktopClient.Pull(model, func(s string) {
+			_, _, err := desktopClient.Pull(model, func(s string) {
 				sendInfo(s)
 			})
 			if err != nil {
