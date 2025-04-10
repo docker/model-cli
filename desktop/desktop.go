@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"net/http"
 	"os"
@@ -79,10 +80,10 @@ func (c *Client) Status() Status {
 	}
 }
 
-func (c *Client) Pull(model string, progress func(string)) (string, error) {
+func (c *Client) Pull(model string, progress func(string)) (string, bool, error) {
 	jsonData, err := json.Marshal(models.ModelCreateRequest{From: model})
 	if err != nil {
-		return "", fmt.Errorf("error marshaling request: %w", err)
+		return "", false, fmt.Errorf("error marshaling request: %w", err)
 	}
 
 	createPath := inference.ModelsPrefix + "/create"
@@ -92,26 +93,46 @@ func (c *Client) Pull(model string, progress func(string)) (string, error) {
 		bytes.NewReader(jsonData),
 	)
 	if err != nil {
-		return "", c.handleQueryError(err, createPath)
+		return "", false, c.handleQueryError(err, createPath)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("pulling %s failed with status %s: %s", model, resp.Status, string(body))
+		return "", false, fmt.Errorf("pulling %s failed with status %s: %s", model, resp.Status, string(body))
 	}
+
+	progressShown := false
 
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		progressLine := scanner.Text()
-		if progressLine != "" {
-			progress(progressLine)
+		if progressLine == "" {
+			continue
+		}
+
+		// Parse the progress message
+		var progressMsg ProgressMessage
+		if err := json.Unmarshal([]byte(html.UnescapeString(progressLine)), &progressMsg); err != nil {
+			return "", progressShown, fmt.Errorf("error parsing progress message: %w", err)
+		}
+
+		// Handle different message types
+		switch progressMsg.Type {
+		case "progress":
+			progress(progressMsg.Message)
+			progressShown = true
+		case "error":
+			return "", progressShown, fmt.Errorf("error pulling model: %s", progressMsg.Message)
+		case "success":
+			return progressMsg.Message, progressShown, nil
+		default:
+			return "", progressShown, fmt.Errorf("unknown message type: %s", progressMsg.Type)
 		}
 	}
 
-	fmt.Println()
-
-	return fmt.Sprintf("Model %s pulled successfully", model), nil
+	// If we get here, something went wrong
+	return "", progressShown, fmt.Errorf("unexpected end of stream while pulling model %s", model)
 }
 
 func (c *Client) List(jsonFormat, openai bool, model string) (string, error) {

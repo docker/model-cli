@@ -37,11 +37,9 @@ func newRunCmd(desktopClient *desktop.Client) *cobra.Command {
 					return handleNotRunningError(handleClientError(err, "Failed to list models"))
 				}
 				cmd.Println("Unable to find model '" + model + "' locally. Pulling from the server.")
-				response, err := desktopClient.Pull(model, TUIProgress)
-				if err != nil {
-					return handleNotRunningError(handleClientError(err, "Failed to pull model"))
+				if err := pullModel(cmd, desktopClient, model); err != nil {
+					return err
 				}
-				cmd.Println(response)
 			}
 
 			if prompt != "" {
