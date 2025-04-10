@@ -37,7 +37,7 @@ func newUpCommand(desktopClient *desktop.Client) *cobra.Command {
 				sendInfo(s)
 			})
 			if err != nil {
-				sendErrorf("Failed to pull model", err)
+				sendErrorf("Failed to pull model: %v", err)
 				return fmt.Errorf("Failed to pull model: %v\n", err)
 			}
 
