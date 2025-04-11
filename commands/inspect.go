@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 
+	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
 )
@@ -32,6 +33,7 @@ func newInspectCmd(desktopClient *desktop.Client) *cobra.Command {
 			cmd.Println(model)
 			return nil
 		},
+		ValidArgsFunction: completion.ModelNames(desktopClient, 1),
 	}
 	c.Flags().BoolVar(&openai, "openai", false, "List model in an OpenAI format")
 	return c

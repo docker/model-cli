@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 
+	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
 )
@@ -24,6 +25,7 @@ func newPullCmd(desktopClient *desktop.Client) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return pullModel(cmd, desktopClient, args[0])
 		},
+		ValidArgsFunction: completion.NoComplete,
 	}
 	return c
 }
