@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
 )
@@ -81,6 +82,7 @@ func newRunCmd(desktopClient *desktop.Client) *cobra.Command {
 			}
 			return nil
 		},
+		ValidArgsFunction: completion.ModelNames(desktopClient, 1),
 	}
 	c.Args = func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {
@@ -90,7 +92,7 @@ func newRunCmd(desktopClient *desktop.Client) *cobra.Command {
 					"See 'docker model run --help' for more information",
 			)
 		}
-		if len(args) > 2 {
+		if len(args) >= 2 {
 			return fmt.Errorf("too many arguments, expected " + cmdArgs)
 		}
 		return nil

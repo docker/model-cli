@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
 )
@@ -20,6 +21,7 @@ func newListCmd(desktopClient *desktop.Client) *cobra.Command {
 			cmd.Print(models)
 			return nil
 		},
+		ValidArgsFunction: completion.NoComplete,
 	}
 	c.Flags().BoolVar(&jsonFormat, "json", false, "List models in a JSON format")
 	c.Flags().BoolVar(&openai, "openai", false, "List models in an OpenAI format")

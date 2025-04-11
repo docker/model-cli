@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 
+	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
 )
@@ -32,6 +33,7 @@ func newRemoveCmd(desktopClient *desktop.Client) *cobra.Command {
 			}
 			return nil
 		},
+		ValidArgsFunction: completion.ModelNames(desktopClient, -1),
 	}
 	return c
 }
