@@ -8,7 +8,7 @@ import (
 func newListCmd(desktopClient *desktop.Client) *cobra.Command {
 	var jsonFormat, openai bool
 	c := &cobra.Command{
-		Use:     "list",
+		Use:     "list [OPTIONS]",
 		Aliases: []string{"ls"},
 		Short:   "List the available models that can be run with the Docker Model Runner",
 		RunE: func(cmd *cobra.Command, args []string) error {
