@@ -135,7 +135,7 @@ func (c *Client) Pull(model string, progress func(string)) (string, bool, error)
 	return "", progressShown, fmt.Errorf("unexpected end of stream while pulling model %s", model)
 }
 
-func (c *Client) List(jsonFormat, openai bool, model string) (string, error) {
+func (c *Client) List(jsonFormat, openai bool, quiet bool, model string) (string, error) {
 	modelsRoute := inference.ModelsPrefix
 	if openai {
 		modelsRoute = inference.InferencePrefix + "/v1/models"
@@ -188,6 +188,22 @@ func (c *Client) List(jsonFormat, openai bool, model string) (string, error) {
 		}
 
 		return string(modelsJsonPretty), nil
+	}
+
+	if quiet {
+		var modelIDs string
+		for _, m := range modelsJson {
+			if len(m.Tags) == 0 {
+				fmt.Fprintf(os.Stderr, "no tags found for model: %v\n", m)
+				continue
+			}
+			if len(m.ID) < 19 {
+				fmt.Fprintf(os.Stderr, "invalid image ID for model: %v\n", m)
+				continue
+			}
+			modelIDs += fmt.Sprintf("%s\n", m.ID[7:19])
+		}
+		return modelIDs, nil
 	}
 
 	return prettyPrintModels(modelsJson), nil

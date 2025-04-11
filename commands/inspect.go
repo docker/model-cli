@@ -24,7 +24,7 @@ func newInspectCmd(desktopClient *desktop.Client) *cobra.Command {
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			model := args[0]
-			model, err := desktopClient.List(false, openai, model)
+			model, err := desktopClient.List(false, openai, false, model)
 			if err != nil {
 				err = handleClientError(err, "Failed to list models")
 				return handleNotRunningError(err)
