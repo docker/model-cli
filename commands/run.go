@@ -32,7 +32,7 @@ func newRunCmd(desktopClient *desktop.Client) *cobra.Command {
 				}
 			}
 
-			if _, err := desktopClient.List(false, false, model); err != nil {
+			if _, err := desktopClient.List(false, false, false, model); err != nil {
 				if !errors.Is(err, desktop.ErrNotFound) {
 					return handleNotRunningError(handleClientError(err, "Failed to list models"))
 				}
