@@ -30,6 +30,7 @@ func NewRootCmd() *cobra.Command {
 		newStatusCmd(desktopClient),
 		newPullCmd(desktopClient),
 		newListCmd(desktopClient),
+		newLogsCmd(),
 		newRunCmd(desktopClient),
 		newRemoveCmd(desktopClient),
 		newInspectCmd(desktopClient),
