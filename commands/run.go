@@ -92,7 +92,7 @@ func newRunCmd(desktopClient *desktop.Client) *cobra.Command {
 					"See 'docker model run --help' for more information",
 			)
 		}
-		if len(args) >= 2 {
+		if len(args) > 2 {
 			return fmt.Errorf("too many arguments, expected " + cmdArgs)
 		}
 		return nil
