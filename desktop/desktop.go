@@ -322,6 +322,15 @@ func (c *Client) Chat(model, prompt string) error {
 func (c *Client) Remove(models []string) (string, error) {
 	modelRemoved := ""
 	for _, model := range models {
+		// Check if not a model ID passed as parameter.
+		if !strings.Contains(model, "/") {
+			var err error
+			modelID := model
+			if model, err = c.modelNameFromID(model); err != nil {
+				return modelRemoved, fmt.Errorf("invalid model name: %s", modelID)
+			}
+		}
+
 		removePath := inference.ModelsPrefix + "/" + model
 		resp, err := c.doRequest(http.MethodDelete, removePath, nil)
 		if err != nil {
