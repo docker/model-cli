@@ -274,6 +274,28 @@ func (c *Client) List(jsonFormat, openai bool, quiet bool, model string) (string
 	return prettyPrintModels(modelsJson), nil
 }
 
+func (c *Client) Inspect(model string) (Model, error) {
+	if model != "" {
+		if !strings.Contains(strings.Trim(model, "/"), "/") {
+			// Do an extra API call to check if the model parameter isn't a model ID.
+			var err error
+			if model, err = c.modelNameFromID(model); err != nil {
+				return Model{}, fmt.Errorf("invalid model name: %s", model)
+			}
+		}
+	}
+	rawResponse, err := c.listRaw(fmt.Sprintf("%s/%s", inference.ModelsPrefix, model), model)
+	if err != nil {
+		return Model{}, err
+	}
+	var modelInspect Model
+	if err := json.Unmarshal(rawResponse, &modelInspect); err != nil {
+		return modelInspect, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+
+	return modelInspect, nil
+}
+
 func (c *Client) listRaw(route string, model string) ([]byte, error) {
 	resp, err := c.doRequest(http.MethodGet, route, nil)
 	if err != nil {

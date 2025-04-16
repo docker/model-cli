@@ -25,6 +25,8 @@ link:
 	@ln -sf $(shell pwd)/$(BINARY_NAME) $(PLUGIN_DIR)/$(PLUGIN_NAME)
 	@echo "Link created: $(PLUGIN_DIR)/$(PLUGIN_NAME)"
 
+install: build link
+
 release:
 	@if [ -z "$(VERSION)" ]; then \
 		echo "Error: VERSION parameter is required. Use: make release VERSION=x.y.z"; \
