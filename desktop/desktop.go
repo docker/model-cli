@@ -296,6 +296,22 @@ func (c *Client) Inspect(model string) (Model, error) {
 	return modelInspect, nil
 }
 
+func (c *Client) InspectOpenAI(model string) (string, error) {
+	modelsRoute := inference.InferencePrefix + "/v1/models"
+	if !strings.Contains(strings.Trim(model, "/"), "/") {
+		// Do an extra API call to check if the model parameter isn't a model ID.
+		var err error
+		if model, err = c.modelNameFromID(model); err != nil {
+			return "", fmt.Errorf("invalid model name: %s", model)
+		}
+	}
+	rawResponse, err := c.listRaw(fmt.Sprintf("%s/%s", modelsRoute, model), model)
+	if err != nil {
+		return "", err
+	}
+	return string(rawResponse), nil
+}
+
 func (c *Client) listRaw(route string, model string) ([]byte, error) {
 	resp, err := c.doRequest(http.MethodGet, route, nil)
 	if err != nil {
