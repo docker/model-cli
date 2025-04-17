@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"os"
 
 	"github.com/docker/cli/cli-plugins/hooks"
@@ -20,6 +21,16 @@ func newStatusCmd(desktopClient *desktop.Client) *cobra.Command {
 			}
 			if status.Running {
 				cmd.Println("Docker Model Runner is running")
+				cmd.Println("\nStatus:")
+				var backendStatus map[string]string
+				if err := json.Unmarshal(status.Status, &backendStatus); err != nil {
+					cmd.PrintErrln(string(status.Status))
+				}
+				for b, s := range backendStatus {
+					if s != "not running" {
+						cmd.Println(b+":", s)
+					}
+				}
 			} else {
 				cmd.Println("Docker Model Runner is not running")
 				hooks.PrintNextSteps(cmd.OutOrStdout(), []string{enableViaCLI, enableViaGUI})

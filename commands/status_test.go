@@ -78,9 +78,16 @@ func TestStatus(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := mockdesktop.NewMockDockerHttpClient(ctrl)
+
 			req, err := http.NewRequest(http.MethodGet, desktop.URL(inference.ModelsPrefix), nil)
 			require.NoError(t, err)
 			client.EXPECT().Do(req).Return(test.doResponse, test.doErr)
+
+			if test.doResponse != nil && test.doResponse.StatusCode == http.StatusOK {
+				req, err = http.NewRequest(http.MethodGet, desktop.URL(inference.InferencePrefix+"/status"), nil)
+				require.NoError(t, err)
+				client.EXPECT().Do(req).Return(&http.Response{Body: mockBody}, test.doErr)
+			}
 
 			originalOsExit := osExit
 			exitCalled := false
@@ -106,7 +113,7 @@ func TestStatus(t *testing.T) {
 				require.EqualError(t, err, test.expectedErr.Error())
 			} else {
 				require.NoError(t, err)
-				require.Equal(t, test.expectedOutput, buf.String())
+				require.True(t, strings.HasPrefix(buf.String(), test.expectedOutput))
 			}
 		})
 	}
