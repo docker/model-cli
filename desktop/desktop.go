@@ -211,13 +211,17 @@ func (c *Client) List() ([]Model, error) {
 	return modelsJson, nil
 }
 
-func (c *Client) ListOpenAI() (string, error) {
+func (c *Client) ListOpenAI() (OpenAIModelList, error) {
 	modelsRoute := inference.InferencePrefix + "/v1/models"
 	rawResponse, err := c.listRaw(modelsRoute, "")
 	if err != nil {
-		return "", err
+		return OpenAIModelList{}, err
 	}
-	return string(rawResponse), nil
+	var modelsJson OpenAIModelList
+	if err := json.Unmarshal(rawResponse, &modelsJson); err != nil {
+		return modelsJson, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+	return modelsJson, nil
 }
 
 func (c *Client) Inspect(model string) (Model, error) {
@@ -242,20 +246,24 @@ func (c *Client) Inspect(model string) (Model, error) {
 	return modelInspect, nil
 }
 
-func (c *Client) InspectOpenAI(model string) (string, error) {
+func (c *Client) InspectOpenAI(model string) (OpenAIModel, error) {
 	modelsRoute := inference.InferencePrefix + "/v1/models"
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
 		var err error
 		if model, err = c.fullModelID(model); err != nil {
-			return "", fmt.Errorf("invalid model name: %s", model)
+			return OpenAIModel{}, fmt.Errorf("invalid model name: %s", model)
 		}
 	}
 	rawResponse, err := c.listRaw(fmt.Sprintf("%s/%s", modelsRoute, model), model)
 	if err != nil {
-		return "", err
+		return OpenAIModel{}, err
 	}
-	return string(rawResponse), nil
+	var modelInspect OpenAIModel
+	if err := json.Unmarshal(rawResponse, &modelInspect); err != nil {
+		return modelInspect, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+	return modelInspect, nil
 }
 
 func (c *Client) listRaw(route string, model string) ([]byte, error) {

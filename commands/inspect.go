@@ -45,16 +45,12 @@ func inpsectModel(args []string, openai bool, desktopClient *desktop.Client) (st
 			err = handleClientError(err, "Failed to get model "+modelName)
 			return "", handleNotRunningError(err)
 		}
-		return model, nil
+		return formatter.ToStandardJSON(model)
 	}
 	model, err := desktopClient.Inspect(modelName)
 	if err != nil {
 		err = handleClientError(err, "Failed to get model "+modelName)
 		return "", handleNotRunningError(err)
 	}
-	jsonModel, err := formatter.ToStandardJSON(model)
-	if err != nil {
-		return "", err
-	}
-	return jsonModel, nil
+	return formatter.ToStandardJSON(model)
 }

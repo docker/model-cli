@@ -45,7 +45,7 @@ func listModels(openai bool, desktopClient *desktop.Client, quiet bool, jsonForm
 			err = handleClientError(err, "Failed to list models")
 			return "", handleNotRunningError(err)
 		}
-		return models, nil
+		return formatter.ToStandardJSON(models)
 	}
 	models, err := desktopClient.List()
 	if err != nil {
@@ -53,11 +53,7 @@ func listModels(openai bool, desktopClient *desktop.Client, quiet bool, jsonForm
 		return "", handleNotRunningError(err)
 	}
 	if jsonFormat {
-		jsonModels, err := formatter.ToStandardJSON(models)
-		if err != nil {
-			return "", err
-		}
-		return jsonModels, nil
+		return formatter.ToStandardJSON(models)
 	}
 	if quiet {
 		var modelIDs string
