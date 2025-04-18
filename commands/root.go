@@ -29,12 +29,14 @@ func NewRootCmd() *cobra.Command {
 		newVersionCmd(),
 		newStatusCmd(desktopClient),
 		newPullCmd(desktopClient),
+		newPushCmd(desktopClient),
 		newListCmd(desktopClient),
 		newLogsCmd(),
 		newRunCmd(desktopClient),
 		newRemoveCmd(desktopClient),
 		newInspectCmd(desktopClient),
 		newComposeCmd(desktopClient),
+		newTagCmd(desktopClient),
 	)
 	return rootCmd
 }
