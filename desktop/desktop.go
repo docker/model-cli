@@ -476,29 +476,33 @@ func prettyPrintModels(models []Model) string {
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 
 	for _, m := range models {
-		var tag string
-		if len(m.Tags) > 0 {
-			tag = m.Tags[0]
-		} else {
-			tag = "<none>"
-		}
-		if len(m.ID) < 19 {
-			fmt.Fprintf(os.Stderr, "invalid image ID for model: %v\n", m)
+		if len(m.Tags) == 0 {
+			appendRow(table, "<none>", m)
 			continue
 		}
-		table.Append([]string{
-			tag,
-			m.Config.Parameters,
-			m.Config.Quantization,
-			m.Config.Architecture,
-			m.ID[7:19],
-			units.HumanDuration(time.Since(time.Unix(m.Created, 0))) + " ago",
-			m.Config.Size,
-		})
+		for _, tag := range m.Tags {
+			appendRow(table, tag, m)
+		}
 	}
 
 	table.Render()
 	return buf.String()
+}
+
+func appendRow(table *tablewriter.Table, tag string, model Model) {
+	if len(model.ID) < 19 {
+		fmt.Fprintf(os.Stderr, "invalid image ID for model: %v\n", model)
+		return
+	}
+	table.Append([]string{
+		tag,
+		model.Config.Parameters,
+		model.Config.Quantization,
+		model.Config.Architecture,
+		model.ID[7:19],
+		units.HumanDuration(time.Since(time.Unix(model.Created, 0))) + " ago",
+		model.Config.Size,
+	})
 }
 
 func (c *Client) Tag(source, targetRepo, targetTag string) (string, error) {
