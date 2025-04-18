@@ -9,6 +9,8 @@ import (
 )
 
 func newRemoveCmd(desktopClient *desktop.Client) *cobra.Command {
+	var force bool
+
 	c := &cobra.Command{
 		Use:   "rm [MODEL...]",
 		Short: "Remove models downloaded from Docker Hub",
@@ -23,7 +25,7 @@ func newRemoveCmd(desktopClient *desktop.Client) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			response, err := desktopClient.Remove(args)
+			response, err := desktopClient.Remove(args, force)
 			if response != "" {
 				cmd.Println(response)
 			}
@@ -35,5 +37,7 @@ func newRemoveCmd(desktopClient *desktop.Client) *cobra.Command {
 		},
 		ValidArgsFunction: completion.ModelNames(desktopClient, -1),
 	}
+
+	c.Flags().BoolVarP(&force, "force", "f", false, "Forcefully remove the model")
 	return c
 }

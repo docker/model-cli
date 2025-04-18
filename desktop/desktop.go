@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -390,7 +391,7 @@ func (c *Client) Chat(model, prompt string) error {
 	return nil
 }
 
-func (c *Client) Remove(models []string) (string, error) {
+func (c *Client) Remove(models []string, force bool) (string, error) {
 	modelRemoved := ""
 	for _, model := range models {
 		// Check if not a model ID passed as parameter.
@@ -400,7 +401,13 @@ func (c *Client) Remove(models []string) (string, error) {
 			}
 		}
 
-		removePath := inference.ModelsPrefix + "/" + model
+		// Construct the URL with query parameters
+		removePath := fmt.Sprintf("%s/%s?force=%s",
+			inference.ModelsPrefix,
+			model,
+			strconv.FormatBool(force),
+		)
+
 		resp, err := c.doRequest(http.MethodDelete, removePath, nil)
 		if err != nil {
 			return modelRemoved, c.handleQueryError(err, removePath)
