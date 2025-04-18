@@ -135,6 +135,56 @@ func (c *Client) Pull(model string, progress func(string)) (string, bool, error)
 	return "", progressShown, fmt.Errorf("unexpected end of stream while pulling model %s", model)
 }
 
+func (c *Client) Push(model string, progress func(string)) (string, bool, error) {
+	pushPath := inference.ModelsPrefix + "/" + model + "/push"
+	resp, err := c.doRequest(
+		http.MethodPost,
+		pushPath,
+		nil, // Assuming no body is needed for the push request
+	)
+	if err != nil {
+		return "", false, c.handleQueryError(err, pushPath)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", false, fmt.Errorf("pushing %s failed with status %s: %s", model, resp.Status, string(body))
+	}
+
+	progressShown := false
+
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		progressLine := scanner.Text()
+		if progressLine == "" {
+			continue
+		}
+
+		// Parse the progress message
+		var progressMsg ProgressMessage
+		if err := json.Unmarshal([]byte(html.UnescapeString(progressLine)), &progressMsg); err != nil {
+			return "", progressShown, fmt.Errorf("error parsing progress message: %w", err)
+		}
+
+		// Handle different message types
+		switch progressMsg.Type {
+		case "progress":
+			progress(progressMsg.Message)
+			progressShown = true
+		case "error":
+			return "", progressShown, fmt.Errorf("error pushing model: %s", progressMsg.Message)
+		case "success":
+			return progressMsg.Message, progressShown, nil
+		default:
+			return "", progressShown, fmt.Errorf("unknown message type: %s", progressMsg.Type)
+		}
+	}
+
+	// If we get here, something went wrong
+	return "", progressShown, fmt.Errorf("unexpected end of stream while pushing model %s", model)
+}
+
 func (c *Client) List(jsonFormat, openai bool, quiet bool, model string) (string, error) {
 	modelsRoute := inference.ModelsPrefix
 	if openai {
