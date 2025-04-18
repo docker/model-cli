@@ -208,9 +208,8 @@ func (c *Client) List(jsonFormat, openai bool, quiet bool, model string) (string
 	if model != "" {
 		if !strings.Contains(strings.Trim(model, "/"), "/") {
 			// Do an extra API call to check if the model parameter isn't a model ID.
-			var err error
-			if model, err = c.modelNameFromID(model); err != nil {
-				return "", fmt.Errorf("invalid model name: %s", model)
+			if expanded, err := c.fullModelID(model); err == nil {
+				model = expanded
 			}
 		}
 		modelsRoute += "/" + model
@@ -296,7 +295,7 @@ func (c *Client) listRaw(route string, model string) ([]byte, error) {
 
 }
 
-func (c *Client) modelNameFromID(id string) (string, error) {
+func (c *Client) fullModelID(id string) (string, error) {
 	bodyResponse, err := c.listRaw(inference.ModelsPrefix, "")
 	if err != nil {
 		return "", err
@@ -309,7 +308,7 @@ func (c *Client) modelNameFromID(id string) (string, error) {
 
 	for _, m := range modelsJson {
 		if m.ID[7:19] == id || strings.TrimPrefix(m.ID, "sha256:") == id || m.ID == id {
-			return m.Tags[0], nil
+			return m.ID, nil
 		}
 	}
 
@@ -317,6 +316,13 @@ func (c *Client) modelNameFromID(id string) (string, error) {
 }
 
 func (c *Client) Chat(model, prompt string) error {
+	if !strings.Contains(strings.Trim(model, "/"), "/") {
+		// Do an extra API call to check if the model parameter isn't a model ID.
+		if expanded, err := c.fullModelID(model); err == nil {
+			model = expanded
+		}
+	}
+
 	reqBody := OpenAIChatRequest{
 		Model: model,
 		Messages: []OpenAIChatMessage{
@@ -389,10 +395,8 @@ func (c *Client) Remove(models []string) (string, error) {
 	for _, model := range models {
 		// Check if not a model ID passed as parameter.
 		if !strings.Contains(model, "/") {
-			var err error
-			modelID := model
-			if model, err = c.modelNameFromID(model); err != nil {
-				return modelRemoved, fmt.Errorf("invalid model name: %s", modelID)
+			if expanded, err := c.fullModelID(model); err == nil {
+				model = expanded
 			}
 		}
 
@@ -506,6 +510,14 @@ func appendRow(table *tablewriter.Table, tag string, model Model) {
 }
 
 func (c *Client) Tag(source, targetRepo, targetTag string) (string, error) {
+	// Check if the source is a model ID, and expand it if necessary
+	if !strings.Contains(strings.Trim(source, "/"), "/") {
+		// Do an extra API call to check if the model parameter might be a model ID
+		if expanded, err := c.fullModelID(source); err == nil {
+			source = expanded
+		}
+	}
+
 	// Construct the URL with query parameters
 	tagPath := fmt.Sprintf("%s/%s/tag?repo=%s&tag=%s",
 		inference.ModelsPrefix,
