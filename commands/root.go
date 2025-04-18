@@ -36,6 +36,7 @@ func NewRootCmd() *cobra.Command {
 		newRemoveCmd(desktopClient),
 		newInspectCmd(desktopClient),
 		newComposeCmd(desktopClient),
+		newTagCmd(desktopClient),
 	)
 	return rootCmd
 }

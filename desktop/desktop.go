@@ -483,3 +483,31 @@ func prettyPrintModels(models []Model) string {
 	table.Render()
 	return buf.String()
 }
+
+func (c *Client) Tag(source, targetRepo, targetTag string) (string, error) {
+	// Construct the URL with query parameters
+	tagPath := fmt.Sprintf("%s/%s/tag?repo=%s&tag=%s",
+		inference.ModelsPrefix,
+		source,
+		targetRepo,
+		targetTag,
+	)
+
+	resp, err := c.doRequest(http.MethodPost, tagPath, nil)
+	if err != nil {
+		return "", c.handleQueryError(err, tagPath)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("tagging failed with status %s: %s", resp.Status, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return string(body), nil
+}
