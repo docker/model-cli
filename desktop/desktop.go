@@ -456,7 +456,7 @@ func prettyPrintModels(models []Model) string {
 	var buf bytes.Buffer
 	table := tablewriter.NewWriter(&buf)
 
-	table.SetHeader([]string{"MODEL", "PARAMETERS", "QUANTIZATION", "ARCHITECTURE", "MODEL ID", "CREATED", "SIZE"})
+	table.SetHeader([]string{"MODEL NAME", "PARAMETERS", "QUANTIZATION", "ARCHITECTURE", "MODEL ID", "CREATED", "SIZE"})
 
 	table.SetBorder(false)
 	table.SetColumnSeparator("")
@@ -476,16 +476,18 @@ func prettyPrintModels(models []Model) string {
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 
 	for _, m := range models {
-		if len(m.Tags) == 0 {
-			fmt.Fprintf(os.Stderr, "no tags found for model: %v\n", m)
-			continue
+		var tag string
+		if len(m.Tags) > 0 {
+			tag = m.Tags[0]
+		} else {
+			tag = "<none>"
 		}
 		if len(m.ID) < 19 {
 			fmt.Fprintf(os.Stderr, "invalid image ID for model: %v\n", m)
 			continue
 		}
 		table.Append([]string{
-			m.Tags[0],
+			tag,
 			m.Config.Parameters,
 			m.Config.Quantization,
 			m.Config.Architecture,
