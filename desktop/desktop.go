@@ -5,20 +5,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"html"
-	"io"
-	"net/http"
-	"os"
-	"strings"
-	"time"
-
-	"github.com/docker/go-units"
 	"github.com/docker/pinata/common/pkg/inference"
 	"github.com/docker/pinata/common/pkg/inference/models"
 	"github.com/docker/pinata/common/pkg/paths"
-	"github.com/olekukonko/tablewriter"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
+	"html"
+	"io"
+	"net/http"
+	"strings"
 )
 
 var (
@@ -200,78 +195,74 @@ func (c *Client) Push(model string, progress func(string)) (string, bool, error)
 	return "", progressShown, fmt.Errorf("unexpected end of stream while pushing model %s", model)
 }
 
-func (c *Client) List(jsonFormat, openai bool, quiet bool, model string) (string, error) {
+func (c *Client) List() ([]Model, error) {
 	modelsRoute := inference.ModelsPrefix
-	if openai {
-		modelsRoute = inference.InferencePrefix + "/v1/models"
+	body, err := c.listRaw(modelsRoute, "")
+	if err != nil {
+		return []Model{}, err
 	}
+
+	var modelsJson []Model
+	if err := json.Unmarshal(body, &modelsJson); err != nil {
+		return modelsJson, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+
+	return modelsJson, nil
+}
+
+func (c *Client) ListOpenAI() (OpenAIModelList, error) {
+	modelsRoute := inference.InferencePrefix + "/v1/models"
+	rawResponse, err := c.listRaw(modelsRoute, "")
+	if err != nil {
+		return OpenAIModelList{}, err
+	}
+	var modelsJson OpenAIModelList
+	if err := json.Unmarshal(rawResponse, &modelsJson); err != nil {
+		return modelsJson, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+	return modelsJson, nil
+}
+
+func (c *Client) Inspect(model string) (Model, error) {
 	if model != "" {
 		if !strings.Contains(strings.Trim(model, "/"), "/") {
 			// Do an extra API call to check if the model parameter isn't a model ID.
 			var err error
 			if model, err = c.modelNameFromID(model); err != nil {
-				return "", fmt.Errorf("invalid model name: %s", model)
+				return Model{}, fmt.Errorf("invalid model name: %s", model)
 			}
 		}
-		modelsRoute += "/" + model
 	}
-
-	body, err := c.listRaw(modelsRoute, model)
+	rawResponse, err := c.listRaw(fmt.Sprintf("%s/%s", inference.ModelsPrefix, model), model)
 	if err != nil {
-		return "", err
+		return Model{}, err
+	}
+	var modelInspect Model
+	if err := json.Unmarshal(rawResponse, &modelInspect); err != nil {
+		return modelInspect, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 
-	if openai {
-		return string(body), nil
-	}
+	return modelInspect, nil
+}
 
-	if model != "" {
-		// Handle single model for `docker model inspect`.
-		// TODO: Handle this in model-distribution.
-		var modelJson Model
-		if err := json.Unmarshal(body, &modelJson); err != nil {
-			return "", fmt.Errorf("failed to unmarshal response body: %w", err)
+func (c *Client) InspectOpenAI(model string) (OpenAIModel, error) {
+	modelsRoute := inference.InferencePrefix + "/v1/models"
+	if !strings.Contains(strings.Trim(model, "/"), "/") {
+		// Do an extra API call to check if the model parameter isn't a model ID.
+		var err error
+		if model, err = c.modelNameFromID(model); err != nil {
+			return OpenAIModel{}, fmt.Errorf("invalid model name: %s", model)
 		}
-
-		modelJsonPretty, err := json.MarshalIndent(modelJson, "", "  ")
-		if err != nil {
-			return "", fmt.Errorf("failed to marshal model: %w", err)
-		}
-
-		return string(modelJsonPretty), nil
 	}
-
-	var modelsJson []Model
-	if err := json.Unmarshal(body, &modelsJson); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response body: %w", err)
+	rawResponse, err := c.listRaw(fmt.Sprintf("%s/%s", modelsRoute, model), model)
+	if err != nil {
+		return OpenAIModel{}, err
 	}
-
-	if jsonFormat {
-		modelsJsonPretty, err := json.MarshalIndent(modelsJson, "", "  ")
-		if err != nil {
-			return "", fmt.Errorf("failed to marshal models list: %w", err)
-		}
-
-		return string(modelsJsonPretty), nil
+	var modelInspect OpenAIModel
+	if err := json.Unmarshal(rawResponse, &modelInspect); err != nil {
+		return modelInspect, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
-
-	if quiet {
-		var modelIDs string
-		for _, m := range modelsJson {
-			if len(m.Tags) == 0 {
-				fmt.Fprintf(os.Stderr, "no tags found for model: %v\n", m)
-				continue
-			}
-			if len(m.ID) < 19 {
-				fmt.Fprintf(os.Stderr, "invalid image ID for model: %v\n", m)
-				continue
-			}
-			modelIDs += fmt.Sprintf("%s\n", m.ID[7:19])
-		}
-		return modelIDs, nil
-	}
-
-	return prettyPrintModels(modelsJson), nil
+	return modelInspect, nil
 }
 
 func (c *Client) listRaw(route string, model string) ([]byte, error) {
@@ -450,53 +441,6 @@ func (c *Client) handleQueryError(err error, path string) error {
 		return ErrServiceUnavailable
 	}
 	return fmt.Errorf("error querying %s: %w", path, err)
-}
-
-func prettyPrintModels(models []Model) string {
-	var buf bytes.Buffer
-	table := tablewriter.NewWriter(&buf)
-
-	table.SetHeader([]string{"MODEL", "PARAMETERS", "QUANTIZATION", "ARCHITECTURE", "MODEL ID", "CREATED", "SIZE"})
-
-	table.SetBorder(false)
-	table.SetColumnSeparator("")
-	table.SetHeaderLine(false)
-	table.SetTablePadding("  ")
-	table.SetNoWhiteSpace(true)
-
-	table.SetColumnAlignment([]int{
-		tablewriter.ALIGN_LEFT, // MODEL
-		tablewriter.ALIGN_LEFT, // PARAMETERS
-		tablewriter.ALIGN_LEFT, // QUANTIZATION
-		tablewriter.ALIGN_LEFT, // ARCHITECTURE
-		tablewriter.ALIGN_LEFT, // MODEL ID
-		tablewriter.ALIGN_LEFT, // CREATED
-		tablewriter.ALIGN_LEFT, // SIZE
-	})
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-
-	for _, m := range models {
-		if len(m.Tags) == 0 {
-			fmt.Fprintf(os.Stderr, "no tags found for model: %v\n", m)
-			continue
-		}
-		if len(m.ID) < 19 {
-			fmt.Fprintf(os.Stderr, "invalid image ID for model: %v\n", m)
-			continue
-		}
-		table.Append([]string{
-			m.Tags[0],
-			m.Config.Parameters,
-			m.Config.Quantization,
-			m.Config.Architecture,
-			m.ID[7:19],
-			units.HumanDuration(time.Since(time.Unix(m.Created, 0))) + " ago",
-			m.Config.Size,
-		})
-	}
-
-	table.Render()
-	return buf.String()
 }
 
 func (c *Client) Tag(source, targetRepo, targetTag string) (string, error) {
