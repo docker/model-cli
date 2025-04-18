@@ -495,7 +495,7 @@ func prettyPrintModels(models []Model) string {
 
 func appendRow(table *tablewriter.Table, tag string, model Model) {
 	if len(model.ID) < 19 {
-		fmt.Fprintf(os.Stderr, "invalid image ID for model: %v\n", model)
+		fmt.Fprintf(os.Stderr, "invalid model ID for model: %v\n", model)
 		return
 	}
 	table.Append([]string{
