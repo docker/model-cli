@@ -49,8 +49,9 @@ func New(dockerClient DockerHttpClient) *Client {
 }
 
 type Status struct {
-	Running bool  `json:"running"`
-	Error   error `json:"error"`
+	Running bool   `json:"running"`
+	Status  []byte `json:"status"`
+	Error   error  `json:"error"`
 }
 
 func (c *Client) Status() Status {
@@ -70,8 +71,22 @@ func (c *Client) Status() Status {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusOK {
+		var status []byte
+		statusResp, err := c.doRequest(http.MethodGet, inference.InferencePrefix+"/status", nil)
+		if err != nil {
+			status = []byte(fmt.Sprintf("error querying status: %v", err))
+		} else {
+			defer statusResp.Body.Close()
+			statusBody, err := io.ReadAll(statusResp.Body)
+			if err != nil {
+				status = []byte(fmt.Sprintf("error reading status body: %v", err))
+			} else {
+				status = statusBody
+			}
+		}
 		return Status{
 			Running: true,
+			Status:  status,
 		}
 	}
 	return Status{
