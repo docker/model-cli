@@ -7,6 +7,7 @@ require (
 	github.com/docker/docker v28.0.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/docker/pinata v0.0.1-0.20250317110157-7302b389632a
+	github.com/google/go-containerregistry v0.20.3
 	github.com/nxadm/tail v1.4.8
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pkg/errors v0.9.1
@@ -14,6 +15,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/otel v1.34.0
 	go.uber.org/mock v0.5.0
+	golang.org/x/sync v0.11.0
 )
 
 require (
@@ -40,7 +42,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/google/go-containerregistry v0.20.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.25.1 // indirect
@@ -90,7 +91,6 @@ require (
 	golang.org/x/crypto v0.35.0 // indirect
 	golang.org/x/mod v0.22.0 // indirect
 	golang.org/x/net v0.36.0 // indirect
-	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect
 	golang.org/x/term v0.29.0 // indirect
 	golang.org/x/text v0.22.0 // indirect
