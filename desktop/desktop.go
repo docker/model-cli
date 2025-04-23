@@ -415,6 +415,9 @@ func (c *Client) Remove(models []string, force bool) (string, error) {
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
+			if resp.StatusCode == http.StatusNotFound {
+				return modelRemoved, fmt.Errorf("no such model: %s", model)
+			}
 			var bodyStr string
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
