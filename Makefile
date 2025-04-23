@@ -35,6 +35,7 @@ release:
 	@echo "Building release version '$(VERSION)'..."
 	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w -X github.com/docker/model-cli/commands.Version=$(VERSION)" -o dist/darwin-arm64/$(PLUGIN_NAME) .
 	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w -X github.com/docker/model-cli/commands.Version=$(VERSION)" -o dist/windows-amd64/$(PLUGIN_NAME).exe .
+	GOOS=windows GOARCH=arm64 go build -ldflags="-s -w -X github.com/docker/model-cli/commands.Version=$(VERSION)" -o dist/windows-arm64/$(PLUGIN_NAME).exe .
 	@echo "Release build complete: $(PLUGIN_NAME) version '$(VERSION)'"
 
 mock:
