@@ -228,10 +228,11 @@ func (c *Client) Inspect(model string) (Model, error) {
 	if model != "" {
 		if !strings.Contains(strings.Trim(model, "/"), "/") {
 			// Do an extra API call to check if the model parameter isn't a model ID.
-			var err error
-			if model, err = c.fullModelID(model); err != nil {
+			modelId, err := c.fullModelID(model)
+			if err != nil {
 				return Model{}, fmt.Errorf("invalid model name: %s", model)
 			}
+			model = modelId
 		}
 	}
 	rawResponse, err := c.listRaw(fmt.Sprintf("%s/%s", inference.ModelsPrefix, model), model)

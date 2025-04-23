@@ -24,7 +24,7 @@ func newInspectCmd(desktopClient *desktop.Client) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			inspectedModel, err := inpsectModel(args, openai, desktopClient)
+			inspectedModel, err := inspectModel(args, openai, desktopClient)
 			if err != nil {
 				return err
 			}
@@ -37,7 +37,7 @@ func newInspectCmd(desktopClient *desktop.Client) *cobra.Command {
 	return c
 }
 
-func inpsectModel(args []string, openai bool, desktopClient *desktop.Client) (string, error) {
+func inspectModel(args []string, openai bool, desktopClient *desktop.Client) (string, error) {
 	modelName := args[0]
 	if openai {
 		model, err := desktopClient.InspectOpenAI(modelName)
