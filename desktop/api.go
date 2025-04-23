@@ -32,6 +32,18 @@ type OpenAIChatResponse struct {
 	} `json:"choices"`
 }
 
+type OpenAIModel struct {
+	ID      string `json:"id"`
+	Object  string `json:"object"`
+	Created int64  `json:"created"`
+	OwnedBy string `json:"owned_by"`
+}
+
+type OpenAIModelList struct {
+	Object string         `json:"object"`
+	Data   []*OpenAIModel `json:"data"`
+}
+
 // TODO: To be replaced by the Model struct from pianta's common/pkg/inference/models/api.go.
 // (https://github.com/docker/pinata/pull/33331)
 type Format string

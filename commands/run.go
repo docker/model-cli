@@ -33,7 +33,8 @@ func newRunCmd(desktopClient *desktop.Client) *cobra.Command {
 				}
 			}
 
-			if _, err := desktopClient.List(false, false, false, model); err != nil {
+			modelDetail, err := desktopClient.Inspect(model)
+			if err != nil {
 				if !errors.Is(err, desktop.ErrNotFound) {
 					return handleNotRunningError(handleClientError(err, "Failed to list models"))
 				}
@@ -41,6 +42,9 @@ func newRunCmd(desktopClient *desktop.Client) *cobra.Command {
 				if err := pullModel(cmd, desktopClient, model); err != nil {
 					return err
 				}
+			}
+			if model != modelDetail.Tags[0] {
+				model = modelDetail.Tags[0]
 			}
 
 			if prompt != "" {

@@ -5,21 +5,16 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"html"
-	"io"
-	"net/http"
-	"os"
-	"strconv"
-	"strings"
-	"time"
-
-	"github.com/docker/go-units"
 	"github.com/docker/pinata/common/pkg/inference"
 	"github.com/docker/pinata/common/pkg/inference/models"
 	"github.com/docker/pinata/common/pkg/paths"
-	"github.com/olekukonko/tablewriter"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
+	"html"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
 )
 
 var (
@@ -201,77 +196,75 @@ func (c *Client) Push(model string, progress func(string)) (string, bool, error)
 	return "", progressShown, fmt.Errorf("unexpected end of stream while pushing model %s", model)
 }
 
-func (c *Client) List(jsonFormat, openai bool, quiet bool, model string) (string, error) {
+func (c *Client) List() ([]Model, error) {
 	modelsRoute := inference.ModelsPrefix
-	if openai {
-		modelsRoute = inference.InferencePrefix + "/v1/models"
-	}
-	if model != "" {
-		if !strings.Contains(strings.Trim(model, "/"), "/") {
-			// Do an extra API call to check if the model parameter isn't a model ID.
-			if expanded, err := c.fullModelID(model); err == nil {
-				model = expanded
-			}
-		}
-		modelsRoute += "/" + model
-	}
-
-	body, err := c.listRaw(modelsRoute, model)
+	body, err := c.listRaw(modelsRoute, "")
 	if err != nil {
-		return "", err
-	}
-
-	if openai {
-		return string(body), nil
-	}
-
-	if model != "" {
-		// Handle single model for `docker model inspect`.
-		// TODO: Handle this in model-distribution.
-		var modelJson Model
-		if err := json.Unmarshal(body, &modelJson); err != nil {
-			return "", fmt.Errorf("failed to unmarshal response body: %w", err)
-		}
-
-		modelJsonPretty, err := json.MarshalIndent(modelJson, "", "  ")
-		if err != nil {
-			return "", fmt.Errorf("failed to marshal model: %w", err)
-		}
-
-		return string(modelJsonPretty), nil
+		return []Model{}, err
 	}
 
 	var modelsJson []Model
 	if err := json.Unmarshal(body, &modelsJson); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response body: %w", err)
+		return modelsJson, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 
-	if jsonFormat {
-		modelsJsonPretty, err := json.MarshalIndent(modelsJson, "", "  ")
-		if err != nil {
-			return "", fmt.Errorf("failed to marshal models list: %w", err)
-		}
+	return modelsJson, nil
+}
 
-		return string(modelsJsonPretty), nil
+func (c *Client) ListOpenAI() (OpenAIModelList, error) {
+	modelsRoute := inference.InferencePrefix + "/v1/models"
+	rawResponse, err := c.listRaw(modelsRoute, "")
+	if err != nil {
+		return OpenAIModelList{}, err
 	}
+	var modelsJson OpenAIModelList
+	if err := json.Unmarshal(rawResponse, &modelsJson); err != nil {
+		return modelsJson, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+	return modelsJson, nil
+}
 
-	if quiet {
-		var modelIDs string
-		for _, m := range modelsJson {
-			if len(m.Tags) == 0 {
-				fmt.Fprintf(os.Stderr, "no tags found for model: %v\n", m)
-				continue
+func (c *Client) Inspect(model string) (Model, error) {
+	if model != "" {
+		if !strings.Contains(strings.Trim(model, "/"), "/") {
+			// Do an extra API call to check if the model parameter isn't a model ID.
+			modelId, err := c.fullModelID(model)
+			if err != nil {
+				return Model{}, fmt.Errorf("invalid model name: %s", model)
 			}
-			if len(m.ID) < 19 {
-				fmt.Fprintf(os.Stderr, "invalid image ID for model: %v\n", m)
-				continue
-			}
-			modelIDs += fmt.Sprintf("%s\n", m.ID[7:19])
+			model = modelId
 		}
-		return modelIDs, nil
+	}
+	rawResponse, err := c.listRaw(fmt.Sprintf("%s/%s", inference.ModelsPrefix, model), model)
+	if err != nil {
+		return Model{}, err
+	}
+	var modelInspect Model
+	if err := json.Unmarshal(rawResponse, &modelInspect); err != nil {
+		return modelInspect, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 
-	return prettyPrintModels(modelsJson), nil
+	return modelInspect, nil
+}
+
+func (c *Client) InspectOpenAI(model string) (OpenAIModel, error) {
+	modelsRoute := inference.InferencePrefix + "/v1/models"
+	if !strings.Contains(strings.Trim(model, "/"), "/") {
+		// Do an extra API call to check if the model parameter isn't a model ID.
+		var err error
+		if model, err = c.fullModelID(model); err != nil {
+			return OpenAIModel{}, fmt.Errorf("invalid model name: %s", model)
+		}
+	}
+	rawResponse, err := c.listRaw(fmt.Sprintf("%s/%s", modelsRoute, model), model)
+	if err != nil {
+		return OpenAIModel{}, err
+	}
+	var modelInspect OpenAIModel
+	if err := json.Unmarshal(rawResponse, &modelInspect); err != nil {
+		return modelInspect, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+	return modelInspect, nil
 }
 
 func (c *Client) listRaw(route string, model string) ([]byte, error) {
@@ -464,59 +457,6 @@ func (c *Client) handleQueryError(err error, path string) error {
 		return ErrServiceUnavailable
 	}
 	return fmt.Errorf("error querying %s: %w", path, err)
-}
-
-func prettyPrintModels(models []Model) string {
-	var buf bytes.Buffer
-	table := tablewriter.NewWriter(&buf)
-
-	table.SetHeader([]string{"MODEL NAME", "PARAMETERS", "QUANTIZATION", "ARCHITECTURE", "MODEL ID", "CREATED", "SIZE"})
-
-	table.SetBorder(false)
-	table.SetColumnSeparator("")
-	table.SetHeaderLine(false)
-	table.SetTablePadding("  ")
-	table.SetNoWhiteSpace(true)
-
-	table.SetColumnAlignment([]int{
-		tablewriter.ALIGN_LEFT, // MODEL
-		tablewriter.ALIGN_LEFT, // PARAMETERS
-		tablewriter.ALIGN_LEFT, // QUANTIZATION
-		tablewriter.ALIGN_LEFT, // ARCHITECTURE
-		tablewriter.ALIGN_LEFT, // MODEL ID
-		tablewriter.ALIGN_LEFT, // CREATED
-		tablewriter.ALIGN_LEFT, // SIZE
-	})
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-
-	for _, m := range models {
-		if len(m.Tags) == 0 {
-			appendRow(table, "<none>", m)
-			continue
-		}
-		for _, tag := range m.Tags {
-			appendRow(table, tag, m)
-		}
-	}
-
-	table.Render()
-	return buf.String()
-}
-
-func appendRow(table *tablewriter.Table, tag string, model Model) {
-	if len(model.ID) < 19 {
-		fmt.Fprintf(os.Stderr, "invalid model ID for model: %v\n", model)
-		return
-	}
-	table.Append([]string{
-		tag,
-		model.Config.Parameters,
-		model.Config.Quantization,
-		model.Config.Architecture,
-		model.ID[7:19],
-		units.HumanDuration(time.Since(time.Unix(model.Created, 0))) + " ago",
-		model.Config.Size,
-	})
 }
 
 func (c *Client) Tag(source, targetRepo, targetTag string) (string, error) {

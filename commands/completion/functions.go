@@ -1,8 +1,6 @@
 package completion
 
 import (
-	"encoding/json"
-
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
 )
@@ -17,12 +15,8 @@ func ModelNames(desktopClient *desktop.Client, limit int) cobra.CompletionFunc {
 		if limit > 0 && len(args) >= limit {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		modelsString, err := desktopClient.List(true, false, false, "")
+		models, err := desktopClient.List()
 		if err != nil {
-			return nil, cobra.ShellCompDirectiveError
-		}
-		var models []desktop.Model
-		if err := json.Unmarshal([]byte(modelsString), &models); err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
 		var names []string

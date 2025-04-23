@@ -2,8 +2,8 @@ package commands
 
 import (
 	"fmt"
-
 	"github.com/docker/model-cli/commands/completion"
+	"github.com/docker/model-cli/commands/formatter"
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
 )
@@ -24,17 +24,33 @@ func newInspectCmd(desktopClient *desktop.Client) *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			model := args[0]
-			model, err := desktopClient.List(false, openai, false, model)
+			inspectedModel, err := inspectModel(args, openai, desktopClient)
 			if err != nil {
-				err = handleClientError(err, "Failed to list models")
-				return handleNotRunningError(err)
+				return err
 			}
-			cmd.Println(model)
+			cmd.Print(inspectedModel)
 			return nil
 		},
 		ValidArgsFunction: completion.ModelNames(desktopClient, 1),
 	}
 	c.Flags().BoolVar(&openai, "openai", false, "List model in an OpenAI format")
 	return c
+}
+
+func inspectModel(args []string, openai bool, desktopClient *desktop.Client) (string, error) {
+	modelName := args[0]
+	if openai {
+		model, err := desktopClient.InspectOpenAI(modelName)
+		if err != nil {
+			err = handleClientError(err, "Failed to get model "+modelName)
+			return "", handleNotRunningError(err)
+		}
+		return formatter.ToStandardJSON(model)
+	}
+	model, err := desktopClient.Inspect(modelName)
+	if err != nil {
+		err = handleClientError(err, "Failed to get model "+modelName)
+		return "", handleNotRunningError(err)
+	}
+	return formatter.ToStandardJSON(model)
 }
