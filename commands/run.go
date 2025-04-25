@@ -42,8 +42,7 @@ func newRunCmd(desktopClient *desktop.Client) *cobra.Command {
 				if err := pullModel(cmd, desktopClient, model); err != nil {
 					return err
 				}
-			}
-			if model != modelDetail.Tags[0] {
+			} else if model != modelDetail.Tags[0] {
 				model = modelDetail.Tags[0]
 			}
 
