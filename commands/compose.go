@@ -53,6 +53,7 @@ func newUpCommand(desktopClient *desktop.Client) *cobra.Command {
 }
 
 func newDownCommand() *cobra.Command {
+	var model string
 	c := &cobra.Command{
 		Use: "down",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -60,6 +61,7 @@ func newDownCommand() *cobra.Command {
 			return nil
 		},
 	}
+	c.Flags().StringVar(&model, "model", "", "model to use")
 	return c
 }
 
