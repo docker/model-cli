@@ -5,16 +5,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/docker/pinata/common/pkg/inference"
-	"github.com/docker/pinata/common/pkg/inference/models"
-	"github.com/docker/pinata/common/pkg/paths"
-	"github.com/pkg/errors"
-	"go.opentelemetry.io/otel"
 	"html"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/docker/pinata/common/pkg/inference"
+	"github.com/docker/pinata/common/pkg/inference/models"
+	"github.com/docker/pinata/common/pkg/paths"
+	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel"
 )
 
 var (
@@ -48,6 +49,14 @@ type Status struct {
 	Running bool   `json:"running"`
 	Status  []byte `json:"status"`
 	Error   error  `json:"error"`
+}
+
+// normalizeModelName converts Hugging Face model names to lowercase
+func normalizeModelName(model string) string {
+	if strings.HasPrefix(model, "hf.co/") {
+		return strings.ToLower(model)
+	}
+	return model
 }
 
 func (c *Client) Status() Status {
@@ -92,6 +101,7 @@ func (c *Client) Status() Status {
 }
 
 func (c *Client) Pull(model string, progress func(string)) (string, bool, error) {
+	model = normalizeModelName(model)
 	jsonData, err := json.Marshal(models.ModelCreateRequest{From: model})
 	if err != nil {
 		return "", false, fmt.Errorf("error marshaling request: %w", err)
@@ -147,6 +157,7 @@ func (c *Client) Pull(model string, progress func(string)) (string, bool, error)
 }
 
 func (c *Client) Push(model string, progress func(string)) (string, bool, error) {
+	model = normalizeModelName(model)
 	pushPath := inference.ModelsPrefix + "/" + model + "/push"
 	resp, err := c.doRequest(
 		http.MethodPost,
@@ -225,6 +236,7 @@ func (c *Client) ListOpenAI() (OpenAIModelList, error) {
 }
 
 func (c *Client) Inspect(model string) (Model, error) {
+	model = normalizeModelName(model)
 	if model != "" {
 		if !strings.Contains(strings.Trim(model, "/"), "/") {
 			// Do an extra API call to check if the model parameter isn't a model ID.
@@ -310,6 +322,7 @@ func (c *Client) fullModelID(id string) (string, error) {
 }
 
 func (c *Client) Chat(model, prompt string) error {
+	model = normalizeModelName(model)
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
 		if expanded, err := c.fullModelID(model); err == nil {
@@ -387,6 +400,7 @@ func (c *Client) Chat(model, prompt string) error {
 func (c *Client) Remove(models []string, force bool) (string, error) {
 	modelRemoved := ""
 	for _, model := range models {
+		model = normalizeModelName(model)
 		// Check if not a model ID passed as parameter.
 		if !strings.Contains(model, "/") {
 			if expanded, err := c.fullModelID(model); err == nil {
@@ -460,6 +474,7 @@ func (c *Client) handleQueryError(err error, path string) error {
 }
 
 func (c *Client) Tag(source, targetRepo, targetTag string) (string, error) {
+	source = normalizeModelName(source)
 	// Check if the source is a model ID, and expand it if necessary
 	if !strings.Contains(strings.Trim(source, "/"), "/") {
 		// Do an extra API call to check if the model parameter might be a model ID
