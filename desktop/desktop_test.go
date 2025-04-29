@@ -189,3 +189,31 @@ func TestTagHuggingFaceModel(t *testing.T) {
 	_, err := client.Tag(sourceModel, targetRepo, targetTag)
 	assert.NoError(t, err)
 }
+
+func TestInspectOpenAIHuggingFaceModel(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Test case for inspecting a Hugging Face model with mixed case
+	modelName := "hf.co/Bartowski/Llama-3.2-1B-Instruct-GGUF"
+	expectedLowercase := "hf.co/bartowski/llama-3.2-1b-instruct-gguf"
+
+	mockClient := mockdesktop.NewMockDockerHttpClient(ctrl)
+	client := New(mockClient)
+
+	mockClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
+		assert.Contains(t, req.URL.Path, expectedLowercase)
+	}).Return(&http.Response{
+		StatusCode: http.StatusOK,
+		Body: io.NopCloser(bytes.NewBufferString(`{
+			"id": "` + expectedLowercase + `",
+			"object": "model",
+			"created": 1234567890,
+			"owned_by": "organization"
+		}`)),
+	}, nil)
+
+	model, err := client.InspectOpenAI(modelName)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedLowercase, model.ID)
+}

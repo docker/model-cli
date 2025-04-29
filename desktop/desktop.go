@@ -260,6 +260,7 @@ func (c *Client) Inspect(model string) (Model, error) {
 }
 
 func (c *Client) InspectOpenAI(model string) (OpenAIModel, error) {
+	model = normalizeModelName(model)
 	modelsRoute := inference.InferencePrefix + "/v1/models"
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
