@@ -31,7 +31,7 @@ func newLogsCmd() *cobra.Command {
 			case runtime.GOOS == "darwin":
 				logFilePath = filepath.Join(homeDir, "Library/Containers/com.docker.docker/Data/log/host/inference.log")
 			case runtime.GOOS == "windows":
-				logFilePath = filepath.Join(homeDir, "AppData/Local/Docker/log/inference.log")
+				logFilePath = filepath.Join(homeDir, "AppData/Local/Docker/log/host/inference.log")
 			default:
 				return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
 			}
