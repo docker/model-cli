@@ -24,7 +24,7 @@ func NewRootCmd() *cobra.Command {
 		fmt.Println("Failed to create Docker client:", err)
 		os.Exit(1)
 	}
-	desktopClient := desktop.New(dockerClient.HTTPClient())
+	desktopClient := desktop.New(dockerClient.HTTPClient(), os.Getenv("DMR_HOST"))
 	rootCmd.AddCommand(
 		newVersionCmd(),
 		newStatusCmd(desktopClient),
