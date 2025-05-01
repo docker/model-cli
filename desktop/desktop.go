@@ -34,6 +34,7 @@ func init() {
 
 type Client struct {
 	dockerClient DockerHttpClient
+	dmrHost      string
 }
 
 //go:generate mockgen -source=desktop.go -destination=../mocks/mock_desktop.go -package=mocks DockerHttpClient
@@ -41,8 +42,11 @@ type DockerHttpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-func New(dockerClient DockerHttpClient) *Client {
-	return &Client{dockerClient}
+func New(dockerClient DockerHttpClient, dmrHost string) *Client {
+	if dmrHost != "" {
+		dockerClient = http.DefaultClient
+	}
+	return &Client{dockerClient, dmrHost}
 }
 
 type Status struct {
@@ -440,13 +444,16 @@ func (c *Client) Remove(models []string, force bool) (string, error) {
 	return modelRemoved, nil
 }
 
-func URL(path string) string {
+func URL(path string, dmrHost string) string {
+	if dmrHost != "" {
+		return fmt.Sprintf("%s%s", dmrHost, path)
+	}
 	return fmt.Sprintf("http://localhost" + inference.ExperimentalEndpointsPrefix + path)
 }
 
 // doRequest is a helper function that performs HTTP requests and handles 503 responses
 func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response, error) {
-	req, err := http.NewRequest(method, URL(path), body)
+	req, err := http.NewRequest(method, URL(path, c.dmrHost), body)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}

@@ -23,7 +23,7 @@ func TestPullHuggingFaceModel(t *testing.T) {
 	expectedLowercase := "hf.co/bartowski/llama-3.2-1b-instruct-gguf"
 
 	mockClient := mockdesktop.NewMockDockerHttpClient(ctrl)
-	client := New(mockClient)
+	client := New(mockClient, "")
 
 	mockClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 		var reqBody models.ModelCreateRequest
@@ -49,7 +49,7 @@ func TestChatHuggingFaceModel(t *testing.T) {
 	prompt := "Hello"
 
 	mockClient := mockdesktop.NewMockDockerHttpClient(ctrl)
-	client := New(mockClient)
+	client := New(mockClient, "")
 
 	mockClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 		var reqBody OpenAIChatRequest
@@ -74,7 +74,7 @@ func TestInspectHuggingFaceModel(t *testing.T) {
 	expectedLowercase := "hf.co/bartowski/llama-3.2-1b-instruct-gguf"
 
 	mockClient := mockdesktop.NewMockDockerHttpClient(ctrl)
-	client := New(mockClient)
+	client := New(mockClient, "")
 
 	mockClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 		assert.Contains(t, req.URL.Path, expectedLowercase)
@@ -106,7 +106,7 @@ func TestNonHuggingFaceModel(t *testing.T) {
 	// Test case for a non-Hugging Face model (should not be converted to lowercase)
 	modelName := "docker.io/library/llama2"
 	mockClient := mockdesktop.NewMockDockerHttpClient(ctrl)
-	client := New(mockClient)
+	client := New(mockClient, "")
 
 	mockClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 		var reqBody models.ModelCreateRequest
@@ -131,7 +131,7 @@ func TestPushHuggingFaceModel(t *testing.T) {
 	expectedLowercase := "hf.co/bartowski/llama-3.2-1b-instruct-gguf"
 
 	mockClient := mockdesktop.NewMockDockerHttpClient(ctrl)
-	client := New(mockClient)
+	client := New(mockClient, "")
 
 	mockClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 		assert.Contains(t, req.URL.Path, expectedLowercase)
@@ -153,7 +153,7 @@ func TestRemoveHuggingFaceModel(t *testing.T) {
 	expectedLowercase := "hf.co/bartowski/llama-3.2-1b-instruct-gguf"
 
 	mockClient := mockdesktop.NewMockDockerHttpClient(ctrl)
-	client := New(mockClient)
+	client := New(mockClient, "")
 
 	mockClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 		assert.Contains(t, req.URL.Path, expectedLowercase)
@@ -177,7 +177,7 @@ func TestTagHuggingFaceModel(t *testing.T) {
 	targetTag := "latest"
 
 	mockClient := mockdesktop.NewMockDockerHttpClient(ctrl)
-	client := New(mockClient)
+	client := New(mockClient, "")
 
 	mockClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 		assert.Contains(t, req.URL.Path, expectedLowercase)
@@ -199,7 +199,7 @@ func TestInspectOpenAIHuggingFaceModel(t *testing.T) {
 	expectedLowercase := "hf.co/bartowski/llama-3.2-1b-instruct-gguf"
 
 	mockClient := mockdesktop.NewMockDockerHttpClient(ctrl)
-	client := New(mockClient)
+	client := New(mockClient, "")
 
 	mockClient.EXPECT().Do(gomock.Any()).Do(func(req *http.Request) {
 		assert.Contains(t, req.URL.Path, expectedLowercase)
