@@ -40,6 +40,10 @@ type Backend interface {
 	// package providing the backend implementation should also expose a
 	// constant called Name which matches the value returned by this method.
 	Name() string
+	// UsesExternalModelManagement should return true if the backend uses an
+	// external model management system and false if the backend uses the shared
+	// model manager.
+	UsesExternalModelManagement() bool
 	// Install ensures that the backend is installed. It should return a nil
 	// error if installation succeeds or if the backend is already installed.
 	// The provided HTTP client should be used for any HTTP operations.
@@ -63,4 +67,6 @@ type Backend interface {
 	// instead load only the specified model. Backends should still respond to
 	// OpenAI API requests for other models with a 421 error code.
 	Run(ctx context.Context, socket, model string, mode BackendMode) error
+	// Status returns a description of the backend's state.
+	Status() string
 }

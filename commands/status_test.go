@@ -11,7 +11,7 @@ import (
 	"github.com/docker/cli/cli-plugins/hooks"
 	"github.com/docker/model-cli/desktop"
 	mockdesktop "github.com/docker/model-cli/mocks"
-	"github.com/docker/pinata/common/pkg/inference"
+	"github.com/docker/model-runner/pkg/inference"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 )

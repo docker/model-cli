@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	mockdesktop "github.com/docker/model-cli/mocks"
-	"github.com/docker/pinata/common/pkg/inference/models"
+	"github.com/docker/model-runner/pkg/inference/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
