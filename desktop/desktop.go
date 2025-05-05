@@ -461,6 +461,7 @@ func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response,
 		req.Header.Set("Content-Type", "application/json")
 	}
 
+	req.Header.Set("User-Agent", "docker-model-cli/"+Version)
 	resp, err := c.dockerClient.Do(req)
 	if err != nil {
 		return nil, err

@@ -8,6 +8,7 @@ import (
 	"github.com/docker/cli/cli-plugins/plugin"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/model-cli/commands"
+	"github.com/docker/model-cli/desktop"
 )
 
 func main() {
@@ -32,6 +33,6 @@ func run() error {
 	return plugin.RunPlugin(cli, rootCmd, manager.Metadata{
 		SchemaVersion: "0.1.0",
 		Vendor:        "Docker Inc.",
-		Version:       commands.Version,
+		Version:       desktop.Version,
 	})
 }
