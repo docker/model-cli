@@ -11,8 +11,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/docker/pinata/common/pkg/inference"
-	"github.com/docker/pinata/common/pkg/inference/models"
+	"github.com/docker/model-runner/pkg/inference"
+	"github.com/docker/model-runner/pkg/inference/models"
 	"github.com/docker/pinata/common/pkg/paths"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
