@@ -2,8 +2,8 @@ package commands
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	"os"
 
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
@@ -22,18 +22,26 @@ func newComposeCmd(desktopClient *desktop.Client) *cobra.Command {
 	return c
 }
 
+type Options struct {
+	Model string `json:"model,omitempty"`
+}
+
 func newUpCommand(desktopClient *desktop.Client) *cobra.Command {
-	var model string
 	c := &cobra.Command{
 		Use: "up",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if model == "" {
-				err := errors.New("options.model is required")
-				sendError(err.Error())
+			var opts Options
+			err := json.NewDecoder(os.Stdin).Decode(opts)
+			if err != nil {
+				sendError("failed to parse options")
+				return err
+			}
+			if opts.Model == "" {
+				sendError("options.model is required")
 				return err
 			}
 
-			_, _, err := desktopClient.Pull(model, func(s string) {
+			_, _, err = desktopClient.Pull(opts.Model, func(s string) {
 				sendInfo(s)
 			})
 			if err != nil {
@@ -43,17 +51,15 @@ func newUpCommand(desktopClient *desktop.Client) *cobra.Command {
 
 			// FIXME get actual URL from Docker Desktop
 			setenv("URL", "http://model-runner.docker.internal/engines/v1/")
-			setenv("MODEL", model)
+			setenv("MODEL", opts.Model)
 
 			return nil
 		},
 	}
-	c.Flags().StringVar(&model, "model", "", "model to use")
 	return c
 }
 
 func newDownCommand() *cobra.Command {
-	var model string
 	c := &cobra.Command{
 		Use: "down",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -61,7 +67,6 @@ func newDownCommand() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().StringVar(&model, "model", "", "model to use")
 	return c
 }
 
