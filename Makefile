@@ -40,6 +40,18 @@ release:
 	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w -X github.com/docker/model-cli/desktop.Version=$(VERSION)" -o dist/linux-arm64/$(PLUGIN_NAME) .
 	@echo "Release build complete: $(PLUGIN_NAME) version '$(VERSION)'"
 
+ce-release:
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Error: VERSION parameter is required. Use: make release VERSION=x.y.z"; \
+		exit 1; \
+	fi
+	@if [ "$(uname -s)" != "Linux" ]; then \
+		echo "Warning: This release target is designed for Linux"; \
+	fi
+	@echo "Building local release version '$(VERSION)'..."
+	GOOS=linux go build -ldflags="-s -w -X github.com/docker/model-cli/desktop.Version=$(VERSION)" -o dist/$(PLUGIN_NAME) .
+	@echo "Local release build complete: $(PLUGIN_NAME) version '$(VERSION)'"
+
 mock:
 	@echo "Generating mocks..."
 	@mkdir -p mocks
