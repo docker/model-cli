@@ -81,6 +81,7 @@ func NewRootCmd(cli *command.DockerCli) *cobra.Command {
 		newInspectCmd(),
 		newComposeCmd(),
 		newTagCmd(),
+		newInstallRunner(),
 	)
 	return rootCmd
 }
