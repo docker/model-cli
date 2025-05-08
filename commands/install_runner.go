@@ -19,7 +19,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const label = "com.docker.model-runner-service"
+const ModelRunnerLabel = "com.docker.model-runner-service"
 
 func newInstallRunner() *cobra.Command {
 	var modelRunnerImage, modelRunnerCtrName, modelRunnerCtrPort string
@@ -48,7 +48,7 @@ func newInstallRunner() *cobra.Command {
 				return err
 			}
 
-			ctrExists, ctrName, err := isContainerRunning(cmd, dockerClient, label)
+			ctrExists, ctrName, err := isContainerRunning(cmd, dockerClient)
 			if err != nil {
 				return err
 			}
@@ -66,7 +66,7 @@ func newInstallRunner() *cobra.Command {
 					nat.Port(modelRunnerCtrPort + "/tcp"): struct{}{},
 				},
 				Labels: map[string]string{
-					label: "true",
+					ModelRunnerLabel: "true",
 				},
 			}
 
@@ -161,10 +161,10 @@ func pullImage(cmd *cobra.Command, dockerClient *client.Client, modelRunnerImage
 	return nil
 }
 
-func isContainerRunning(cmd *cobra.Command, dockerClient *client.Client, label string) (bool, string, error) {
+func isContainerRunning(cmd *cobra.Command, dockerClient *client.Client) (bool, string, error) {
 	containers, err := dockerClient.ContainerList(cmd.Context(), container.ListOptions{
 		All:     true,
-		Filters: filters.NewArgs(filters.Arg("label", label)),
+		Filters: filters.NewArgs(filters.Arg("label", ModelRunnerLabel)),
 	})
 	if err != nil {
 		return false, "", fmt.Errorf("failed to list containers: %w", err)
