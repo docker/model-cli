@@ -38,6 +38,7 @@ func NewRootCmd() *cobra.Command {
 		newComposeCmd(desktopClient),
 		newTagCmd(desktopClient),
 		newInstallRunner(),
+		newUninstallRunner(),
 	)
 	return rootCmd
 }
