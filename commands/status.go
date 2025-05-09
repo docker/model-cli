@@ -6,11 +6,10 @@ import (
 
 	"github.com/docker/cli/cli-plugins/hooks"
 	"github.com/docker/model-cli/commands/completion"
-	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
 )
 
-func newStatusCmd(desktopClient *desktop.Client) *cobra.Command {
+func newStatusCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "status",
 		Short: "Check if the Docker Model Runner is running",

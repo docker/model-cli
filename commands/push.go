@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newPushCmd(desktopClient *desktop.Client) *cobra.Command {
+func newPushCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "push MODEL",
 		Short: "Upload a model",
