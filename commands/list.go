@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func newListCmd(desktopClient *desktop.Client) *cobra.Command {
+func newListCmd() *cobra.Command {
 	var jsonFormat, openai, quiet bool
 	c := &cobra.Command{
 		Use:     "list [OPTIONS]",

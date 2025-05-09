@@ -19,15 +19,15 @@ func main() {
 }
 
 func run() error {
-	rootCmd := commands.NewRootCmd()
+	cli, err := command.NewDockerCli()
+	if err != nil {
+		return fmt.Errorf("unable to initialize CLI: %w", err)
+	}
+
+	rootCmd := commands.NewRootCmd(cli)
 
 	if plugin.RunningStandalone() {
 		return rootCmd.Execute()
-	}
-
-	cli, err := command.NewDockerCli()
-	if err != nil {
-		return fmt.Errorf("init plugin: %w", err)
 	}
 
 	return plugin.RunPlugin(cli, rootCmd, manager.Metadata{
