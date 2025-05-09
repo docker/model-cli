@@ -13,7 +13,6 @@ import (
 
 	"github.com/docker/model-runner/pkg/inference"
 	"github.com/docker/model-runner/pkg/inference/models"
-	"github.com/docker/pinata/common/pkg/paths"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 )
@@ -28,7 +27,6 @@ type otelErrorSilencer struct{}
 func (oes *otelErrorSilencer) Handle(error) {}
 
 func init() {
-	paths.Init(paths.OnHost)
 	otel.SetErrorHandler(&otelErrorSilencer{})
 }
 
