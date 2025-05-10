@@ -4,11 +4,10 @@ import (
 	"fmt"
 
 	"github.com/docker/model-cli/commands/completion"
-	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
 )
 
-func newRemoveCmd(desktopClient *desktop.Client) *cobra.Command {
+func newRemoveCmd() *cobra.Command {
 	var force bool
 
 	c := &cobra.Command{

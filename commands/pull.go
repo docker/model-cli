@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newPullCmd(desktopClient *desktop.Client) *cobra.Command {
+func newPullCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "pull MODEL",
 		Short: "Download a model",

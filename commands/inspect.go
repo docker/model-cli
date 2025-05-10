@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newInspectCmd(desktopClient *desktop.Client) *cobra.Command {
+func newInspectCmd() *cobra.Command {
 	var openai bool
 	c := &cobra.Command{
 		Use:   "inspect MODEL",

@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newComposeCmd(desktopClient *desktop.Client) *cobra.Command {
+func newComposeCmd() *cobra.Command {
 
 	c := &cobra.Command{
 		Use: "compose EVENT",
