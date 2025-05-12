@@ -35,11 +35,13 @@ func newUninstallRunner(cli *command.DockerCli) *cobra.Command {
 				return nil
 			}
 
+			// Create a Docker client for the active context.
 			dockerClient, err := desktop.DockerClientForContext(cli, cli.CurrentContext())
 			if err != nil {
 				return fmt.Errorf("failed to create Docker client: %w", err)
 			}
 
+			// Identify any model runner container(s).
 			containers, err := dockerClient.ContainerList(cmd.Context(), container.ListOptions{
 				All:     true,
 				Filters: filters.NewArgs(filters.Arg("label", ModelRunnerLabel)),
@@ -48,6 +50,7 @@ func newUninstallRunner(cli *command.DockerCli) *cobra.Command {
 				return fmt.Errorf("failed to list containers with label: %w", err)
 			}
 
+			// Remove any active model runner container(s).
 			for _, ctr := range containers {
 				cmd.Printf("Removing container %s (%s)...\n", strings.TrimPrefix(ctr.Names[0], "/"), ctr.ID[:12])
 				err := dockerClient.ContainerRemove(cmd.Context(), ctr.ID, container.RemoveOptions{Force: true})

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"github.com/docker/cli/cli/command"
@@ -22,7 +23,8 @@ import (
 const ModelRunnerLabel = "com.docker.model-runner-service"
 
 func newInstallRunner(cli *command.DockerCli) *cobra.Command {
-	var modelRunnerImage, modelRunnerCtrName, modelRunnerCtrPort string
+	var modelRunnerImage, modelRunnerCtrName string
+	var port uint16
 	var gpu bool
 	c := &cobra.Command{
 		Use:   "install-runner",
@@ -48,15 +50,13 @@ func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 				return nil
 			}
 
+			// Create a Docker client for the active context.
 			dockerClient, err := desktop.DockerClientForContext(cli, cli.CurrentContext())
 			if err != nil {
 				return fmt.Errorf("failed to create Docker client: %w", err)
 			}
 
-			if err := pullImage(cmd, dockerClient, modelRunnerImage); err != nil {
-				return err
-			}
-
+			// Check if the model runner container is already running.
 			ctrExists, ctrName, err := isContainerRunning(cmd, dockerClient)
 			if err != nil {
 				return err
@@ -66,19 +66,25 @@ func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 				return nil
 			}
 
+			// Ensure that we have an up-to-date copy of the image.
+			if err := pullImage(cmd, dockerClient, modelRunnerImage); err != nil {
+				return err
+			}
+
+			// Set up the container configuration.
+			portStr := strconv.Itoa(int(port))
 			config := &container.Config{
 				Image: modelRunnerImage,
 				Env: []string{
-					"MODEL_RUNNER_PORT=" + modelRunnerCtrPort,
+					"MODEL_RUNNER_PORT=" + portStr,
 				},
 				ExposedPorts: nat.PortSet{
-					nat.Port(modelRunnerCtrPort + "/tcp"): struct{}{},
+					nat.Port(portStr + "/tcp"): struct{}{},
 				},
 				Labels: map[string]string{
 					ModelRunnerLabel: "true",
 				},
 			}
-
 			hostConfig := &container.HostConfig{
 				Mounts: []mount.Mount{
 					{
@@ -88,13 +94,12 @@ func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 					},
 				},
 				PortBindings: nat.PortMap{
-					nat.Port(modelRunnerCtrPort + "/tcp"): []nat.PortBinding{{HostIP: "", HostPort: modelRunnerCtrPort}},
+					nat.Port(portStr + "/tcp"): []nat.PortBinding{{HostIP: "", HostPort: portStr}},
 				},
 				RestartPolicy: container.RestartPolicy{
 					Name: "always",
 				},
 			}
-
 			if gpu {
 				hostConfig.Resources = container.Resources{
 					DeviceRequests: []container.DeviceRequest{
@@ -107,11 +112,13 @@ func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 				}
 			}
 
+			// Create the container.
 			resp, err := dockerClient.ContainerCreate(cmd.Context(), config, hostConfig, nil, nil, modelRunnerCtrName)
 			if err != nil {
 				return fmt.Errorf("failed to create container %s: %w", modelRunnerCtrName, err)
 			}
 
+			// Start the container.
 			cmd.Printf("Starting Model Runner container %s...\n", modelRunnerCtrName)
 			if err := dockerClient.ContainerStart(cmd.Context(), resp.ID, container.StartOptions{}); err != nil {
 				_ = dockerClient.ContainerRemove(cmd.Context(), resp.ID, container.RemoveOptions{Force: true})
@@ -126,7 +133,7 @@ func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 		"Docker image to use for Model Runner")
 	c.Flags().StringVar(&modelRunnerCtrName, "name", "docker-model-runner",
 		"Docker container name for Docker Model Runner")
-	c.Flags().StringVar(&modelRunnerCtrPort, "port", "12434",
+	c.Flags().Uint16Var(&port, "port", 12434,
 		"Docker container port for Docker Model Runner")
 	c.Flags().BoolVar(&gpu, "gpu", false, "Enable GPU support")
 	return c
