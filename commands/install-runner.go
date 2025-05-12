@@ -12,6 +12,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/jsonmessage"
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
@@ -139,18 +140,9 @@ func pullImage(cmd *cobra.Command, dockerClient *client.Client, modelRunnerImage
 	defer out.Close()
 
 	decoder := json.NewDecoder(out)
-	type PullResponse struct {
-		Status         string `json:"status"`
-		ProgressDetail struct {
-			Current int64 `json:"current"`
-			Total   int64 `json:"total"`
-		} `json:"progressDetail"`
-		Progress string `json:"progress"`
-		ID       string `json:"id"`
-	}
 
 	for {
-		var response PullResponse
+		var response jsonmessage.JSONMessage
 		if err := decoder.Decode(&response); err != nil {
 			if err == io.EOF {
 				break
@@ -159,7 +151,7 @@ func pullImage(cmd *cobra.Command, dockerClient *client.Client, modelRunnerImage
 		}
 
 		if response.ID != "" {
-			cmd.Printf("\r%s: %s %s", response.ID, response.Status, response.Progress)
+			cmd.Printf("\r%s: %s %s", response.ID, response.Status, response.ProgressMessage)
 		} else {
 			cmd.Println(response.Status)
 		}
