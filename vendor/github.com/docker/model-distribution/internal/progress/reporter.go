@@ -1,4 +1,4 @@
-package distribution
+package progress
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	v1 "github.com/google/go-containerregistry/pkg/v1"
+	"github.com/google/go-containerregistry/pkg/v1"
 )
 
 // ProgressMessage represents a structured message for progress reporting
@@ -17,7 +17,7 @@ type ProgressMessage struct {
 	Pulled  uint64 `json:"pulled"`  // Bytes transferred so far
 }
 
-type reporter struct {
+type Reporter struct {
 	progress chan v1.Update
 	done     chan struct{}
 	err      error
@@ -27,16 +27,16 @@ type reporter struct {
 
 type progressF func(update v1.Update) string
 
-func pullMsg(update v1.Update) string {
+func PullMsg(update v1.Update) string {
 	return fmt.Sprintf("Downloaded: %.2f MB", float64(update.Complete)/1024/1024)
 }
 
-func pushMsg(update v1.Update) string {
+func PushMsg(update v1.Update) string {
 	return fmt.Sprintf("Uploaded: %.2f MB", float64(update.Complete)/1024/1024)
 }
 
-func newProgressReporter(w io.Writer, msgF progressF) *reporter {
-	return &reporter{
+func NewProgressReporter(w io.Writer, msgF progressF) *Reporter {
+	return &Reporter{
 		out:      w,
 		progress: make(chan v1.Update),
 		done:     make(chan struct{}),
@@ -52,9 +52,9 @@ func safeUint64(n int64) uint64 {
 	return uint64(n)
 }
 
-// updates returns a channel for receiving progress updates. It is the responsibility of the caller to close
-// the channel when they are done sending updates. Should only be called once per reporter instance.
-func (r *reporter) updates() chan<- v1.Update {
+// Updates returns a channel for receiving progress Updates. It is the responsibility of the caller to close
+// the channel when they are done sending Updates. Should only be called once per Reporter instance.
+func (r *Reporter) Updates() chan<- v1.Update {
 	go func() {
 		var lastComplete int64
 		var lastUpdate time.Time
@@ -82,8 +82,8 @@ func (r *reporter) updates() chan<- v1.Update {
 	return r.progress
 }
 
-// Wait waits for the progress reporter to finish and returns any error encountered.
-func (r *reporter) Wait() error {
+// Wait waits for the progress Reporter to finish and returns any error encountered.
+func (r *Reporter) Wait() error {
 	<-r.done
 	return r.err
 }
@@ -111,16 +111,16 @@ func writeProgress(w io.Writer, msg string, total, pulled uint64) error {
 	})
 }
 
-// writeSuccess writes a success message
-func writeSuccess(w io.Writer, message string) error {
+// WriteSuccess writes a success message
+func WriteSuccess(w io.Writer, message string) error {
 	return writeProgressMessage(w, ProgressMessage{
 		Type:    "success",
 		Message: message,
 	})
 }
 
-// writeError writes an error message
-func writeError(w io.Writer, message string) error {
+// WriteError writes an error message
+func WriteError(w io.Writer, message string) error {
 	return writeProgressMessage(w, ProgressMessage{
 		Type:    "error",
 		Message: message,

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/go-containerregistry/pkg/v1"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
@@ -38,11 +38,12 @@ type ConfigFile struct {
 
 // Config describes the model.
 type Config struct {
-	Format       Format `json:"format,omitempty"`
-	Quantization string `json:"quantization,omitempty"`
-	Parameters   string `json:"parameters,omitempty"`
-	Architecture string `json:"architecture,omitempty"`
-	Size         string `json:"size,omitempty"`
+	Format       Format            `json:"format,omitempty"`
+	Quantization string            `json:"quantization,omitempty"`
+	Parameters   string            `json:"parameters,omitempty"`
+	Architecture string            `json:"architecture,omitempty"`
+	Size         string            `json:"size,omitempty"`
+	GGUF         map[string]string `json:"gguf,omitempty"`
 }
 
 // Descriptor provides metadata about the provenance of the model.

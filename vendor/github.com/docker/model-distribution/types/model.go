@@ -13,6 +13,8 @@ type Model interface {
 }
 
 type ModelArtifact interface {
-	Model
+	ID() (string, error)
+	Config() (Config, error)
+	Descriptor() (Descriptor, error)
 	v1.Image
 }
