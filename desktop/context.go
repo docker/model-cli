@@ -6,10 +6,12 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strconv"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/context/docker"
 	clientpkg "github.com/docker/docker/client"
+	"github.com/docker/model-cli/pkg/standalone"
 	"github.com/docker/model-runner/pkg/inference"
 )
 
@@ -150,7 +152,7 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 	// Compute the URL prefix based on the associated engine kind.
 	var rawURLPrefix string
 	if kind == ModelRunnerEngineKindMoby {
-		rawURLPrefix = "http://localhost:12434"
+		rawURLPrefix = "http://localhost:" + strconv.Itoa(int(standalone.DefaultControllerPort))
 	} else if kind == ModelRunnerEngineKindMobyManual {
 		rawURLPrefix = dmrHost
 	} else if kind == ModelRunnerEngineKindDesktop {

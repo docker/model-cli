@@ -17,13 +17,12 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
+	"github.com/docker/model-cli/pkg/standalone"
 	"github.com/spf13/cobra"
 )
 
-const ModelRunnerLabel = "com.docker.model-runner-service"
-
 func newInstallRunner(cli *command.DockerCli) *cobra.Command {
-	var modelRunnerImage, modelRunnerCtrName string
+	var containerName string
 	var port uint16
 	var gpu bool
 	c := &cobra.Command{
@@ -67,6 +66,10 @@ func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 			}
 
 			// Ensure that we have an up-to-date copy of the image.
+			modelRunnerImage := standalone.ControllerImage
+			if gpu {
+				modelRunnerImage = standalone.ControllerImageGPU
+			}
 			if err := pullImage(cmd, dockerClient, modelRunnerImage); err != nil {
 				return err
 			}
@@ -82,14 +85,14 @@ func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 					nat.Port(portStr + "/tcp"): struct{}{},
 				},
 				Labels: map[string]string{
-					ModelRunnerLabel: "true",
+					standalone.LabelRole: standalone.RoleController,
 				},
 			}
 			hostConfig := &container.HostConfig{
 				Mounts: []mount.Mount{
 					{
 						Type:   mount.TypeVolume,
-						Source: "model-runner-models",
+						Source: "docker-model-runner-models",
 						Target: "/models",
 					},
 				},
@@ -113,27 +116,25 @@ func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 			}
 
 			// Create the container.
-			resp, err := dockerClient.ContainerCreate(cmd.Context(), config, hostConfig, nil, nil, modelRunnerCtrName)
+			resp, err := dockerClient.ContainerCreate(cmd.Context(), config, hostConfig, nil, nil, containerName)
 			if err != nil {
-				return fmt.Errorf("failed to create container %s: %w", modelRunnerCtrName, err)
+				return fmt.Errorf("failed to create container %s: %w", containerName, err)
 			}
 
 			// Start the container.
-			cmd.Printf("Starting Model Runner container %s...\n", modelRunnerCtrName)
+			cmd.Printf("Starting Model Runner container %s...\n", containerName)
 			if err := dockerClient.ContainerStart(cmd.Context(), resp.ID, container.StartOptions{}); err != nil {
 				_ = dockerClient.ContainerRemove(cmd.Context(), resp.ID, container.RemoveOptions{Force: true})
-				return fmt.Errorf("failed to start container %s: %w", modelRunnerCtrName, err)
+				return fmt.Errorf("failed to start container %s: %w", containerName, err)
 			}
 
 			return nil
 		},
 		ValidArgsFunction: completion.NoComplete,
 	}
-	c.Flags().StringVar(&modelRunnerImage, "image", "docker/model-runner",
-		"Docker image to use for Model Runner")
-	c.Flags().StringVar(&modelRunnerCtrName, "name", "docker-model-runner",
+	c.Flags().StringVar(&containerName, "name", "docker-model-runner",
 		"Docker container name for Docker Model Runner")
-	c.Flags().Uint16Var(&port, "port", 12434,
+	c.Flags().Uint16Var(&port, "port", standalone.DefaultControllerPort,
 		"Docker container port for Docker Model Runner")
 	c.Flags().BoolVar(&gpu, "gpu", false, "Enable GPU support")
 	return c
@@ -171,7 +172,7 @@ func pullImage(cmd *cobra.Command, dockerClient *client.Client, modelRunnerImage
 func isContainerRunning(cmd *cobra.Command, dockerClient *client.Client) (bool, string, error) {
 	containers, err := dockerClient.ContainerList(cmd.Context(), container.ListOptions{
 		All:     true,
-		Filters: filters.NewArgs(filters.Arg("label", ModelRunnerLabel)),
+		Filters: filters.NewArgs(filters.Arg("label", standalone.LabelRole+"="+standalone.RoleController)),
 	})
 	if err != nil {
 		return false, "", fmt.Errorf("failed to list containers: %w", err)

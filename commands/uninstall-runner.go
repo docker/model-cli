@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
+	"github.com/docker/model-cli/pkg/standalone"
 	"github.com/spf13/cobra"
 )
 
@@ -44,7 +45,7 @@ func newUninstallRunner(cli *command.DockerCli) *cobra.Command {
 			// Identify any model runner container(s).
 			containers, err := dockerClient.ContainerList(cmd.Context(), container.ListOptions{
 				All:     true,
-				Filters: filters.NewArgs(filters.Arg("label", ModelRunnerLabel)),
+				Filters: filters.NewArgs(filters.Arg("label", standalone.LabelRole+"="+standalone.RoleController)),
 			})
 			if err != nil {
 				return fmt.Errorf("failed to list containers with label: %w", err)
