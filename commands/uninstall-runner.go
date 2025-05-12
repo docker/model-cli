@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/docker/model-cli/commands/completion"
+	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +18,24 @@ func newUninstallRunner() *cobra.Command {
 		Use:   "uninstall-runner",
 		Short: "Uninstall Docker Model Runner",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Ensure that we're running in a supported model runner context.
+			if modelRunner.EngineKind() == desktop.ModelRunnerEngineKindDesktop {
+				cmd.Printf("Standalone uninstallation not supported with Docker Desktop\n")
+				cmd.Printf("Use `docker desktop disable model-runner` instead\n")
+				// TODO: We may eventually want to auto-forward this to
+				// docker desktop disable model-runner, but we should first
+				// make install-runner forward in the same way.
+				//
+				// Comment out the following line to test with Docker Desktop.
+				return nil
+			} else if modelRunner.EngineKind() == desktop.ModelRunnerEngineKindMobyManual {
+				cmd.Printf("Standalone uninstallation not supported with DMR_HOST set\n")
+				return nil
+			} else if modelRunner.EngineKind() == desktop.ModelRunnerEngineKindCloud {
+				cmd.Printf("Standalone uninstallation not supported with Docker Cloud\n")
+				return nil
+			}
+
 			dockerClient, err := client.NewClientWithOpts(client.WithHTTPClient(modelRunner.Client().(*http.Client)))
 			if err != nil {
 				return fmt.Errorf("failed to create Docker client: %w", err)

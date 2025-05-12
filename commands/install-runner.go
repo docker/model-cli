@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os/exec"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
@@ -28,14 +27,23 @@ func newInstallRunner() *cobra.Command {
 		Use:   "install-runner",
 		Short: "Install Docker Model Runner",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Ensure that we're running in a supported model runner context.
 			if modelRunner.EngineKind() == desktop.ModelRunnerEngineKindDesktop {
-				out, err := exec.CommandContext(cmd.Context(),
-					"docker", "desktop", "enable", "model-runner").
-					CombinedOutput()
-				if err != nil {
-					return fmt.Errorf("failed to enable model runner: %s", out)
-				}
+				cmd.Printf("Standalone installation not supported with Docker Desktop\n")
+				cmd.Printf("Use `docker desktop enable model-runner` instead\n")
+				// TODO: We may eventually want to auto-forward this to
+				// docker desktop enable model-runner, but we should first make
+				// sure the CLI flags match.
+				//
 				// Comment out the following line to test with Docker Desktop.
+				// Make sure your built-in model runner is not listening on a
+				// conflicting port (12434, by default).
+				return nil
+			} else if modelRunner.EngineKind() == desktop.ModelRunnerEngineKindMobyManual {
+				cmd.Printf("Standalone installation not supported with DMR_HOST set\n")
+				return nil
+			} else if modelRunner.EngineKind() == desktop.ModelRunnerEngineKindCloud {
+				cmd.Printf("Standalone installation not required with Docker Cloud\n")
 				return nil
 			}
 
