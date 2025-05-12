@@ -129,7 +129,7 @@ func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 		},
 		ValidArgsFunction: completion.NoComplete,
 	}
-	c.Flags().StringVar(&modelRunnerImage, "image", "jacobhoward459/model-runner",
+	c.Flags().StringVar(&modelRunnerImage, "image", "docker/model-runner",
 		"Docker image to use for Model Runner")
 	c.Flags().StringVar(&modelRunnerCtrName, "name", "docker-model-runner",
 		"Docker container name for Docker Model Runner")
