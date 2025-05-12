@@ -2,11 +2,8 @@ package commands
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/docker/cli/cli/command"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
 	"github.com/docker/model-cli/pkg/standalone"
@@ -14,6 +11,7 @@ import (
 )
 
 func newUninstallRunner(cli *command.DockerCli) *cobra.Command {
+	var models, images bool
 	c := &cobra.Command{
 		Use:   "uninstall-runner",
 		Short: "Uninstall Docker Model Runner",
@@ -42,21 +40,22 @@ func newUninstallRunner(cli *command.DockerCli) *cobra.Command {
 				return fmt.Errorf("failed to create Docker client: %w", err)
 			}
 
-			// Identify any model runner container(s).
-			containers, err := dockerClient.ContainerList(cmd.Context(), container.ListOptions{
-				All:     true,
-				Filters: filters.NewArgs(filters.Arg("label", standalone.LabelRole+"="+standalone.RoleController)),
-			})
-			if err != nil {
-				return fmt.Errorf("failed to list containers with label: %w", err)
+			// Remove any model runner containers.
+			if err := standalone.PruneControllerContainers(cmd.Context(), dockerClient, cmd); err != nil {
+				return err
 			}
 
-			// Remove any active model runner container(s).
-			for _, ctr := range containers {
-				cmd.Printf("Removing container %s (%s)...\n", strings.TrimPrefix(ctr.Names[0], "/"), ctr.ID[:12])
-				err := dockerClient.ContainerRemove(cmd.Context(), ctr.ID, container.RemoveOptions{Force: true})
-				if err != nil {
-					return fmt.Errorf("failed to remove container %s: %w", ctr.Names[0], err)
+			// Remove model runner images, if requested.
+			if images {
+				if err := standalone.PruneControllerImages(cmd.Context(), dockerClient, cmd); err != nil {
+					return err
+				}
+			}
+
+			// Remove model storage, if requested.
+			if models {
+				if err := standalone.PruneModelStorageVolumes(cmd.Context(), dockerClient, cmd); err != nil {
+					return err
 				}
 			}
 
@@ -64,5 +63,7 @@ func newUninstallRunner(cli *command.DockerCli) *cobra.Command {
 		},
 		ValidArgsFunction: completion.NoComplete,
 	}
+	c.Flags().BoolVar(&models, "models", false, "Remove model storage")
+	c.Flags().BoolVar(&images, "images", false, "Remove model runner images")
 	return c
 }

@@ -1,19 +1,19 @@
 package standalone
 
 const (
-	// LabelRole is the label used to identify a Docker object's role in the
+	// labelRole is the label used to identify a Docker object's role in the
 	// standalone model runner infrastructure.
-	LabelRole = "com.docker.model-runner.role"
+	labelRole = "com.docker.model-runner.role"
 
-	// RoleController is the role label value used to identify the model runner
+	// roleController is the role label value used to identify the model runner
 	// controller container.
-	RoleController = "controller"
+	roleController = "controller"
 
-	// RoleRunner is not currently defined because model runner processes
+	// roleRunner is not currently defined because model runner processes
 	// currently execute within the controller container. This may change in a
 	// future release.
 
-	// RoleStorage is the role label value used to identify the model runner
-	// storage volume.
-	RoleStorage = "storage"
+	// roleModelStorage is the role label value used to identify the model
+	// runner model storage volume.
+	roleModelStorage = "model-storage"
 )
