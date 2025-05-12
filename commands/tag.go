@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newTagCmd(desktopClient *desktop.Client) *cobra.Command {
+func newTagCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "tag SOURCE TARGET",
 		Short: "Tag a model",

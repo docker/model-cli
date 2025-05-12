@@ -12,6 +12,7 @@ func newVersionCmd() *cobra.Command {
 		Short: "Show the Docker Model Runner version",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Printf("Docker Model Runner version %s\n", desktop.Version)
+			cmd.Printf("Docker Engine Kind: %s\n", modelRunner.EngineKind())
 		},
 		ValidArgsFunction: completion.NoComplete,
 	}

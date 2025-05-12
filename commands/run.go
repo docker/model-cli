@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newRunCmd(desktopClient *desktop.Client) *cobra.Command {
+func newRunCmd() *cobra.Command {
 	var debug bool
 
 	cmdArgs := "MODEL [PROMPT]"
