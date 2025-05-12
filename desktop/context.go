@@ -159,7 +159,8 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 			return nil, fmt.Errorf("unable to create model runner client: %w", err)
 		}
 		client = dockerClient.HTTPClient()
-	} else if kind == ModelRunnerEngineKindCloud {
+	} else {
+	    // ModelRunnerEngineKindCloud
 		dockerClient, err := dockerClientForContext(cli, cli.CurrentContext())
 		if err != nil {
 			return nil, fmt.Errorf("unable to create model runner client: %w", err)
