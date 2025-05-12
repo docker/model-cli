@@ -6,27 +6,20 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/model-distribution/internal/progress"
 	"github.com/docker/model-distribution/internal/store"
+	"github.com/docker/model-distribution/registry"
 	"github.com/docker/model-distribution/types"
-)
-
-const (
-	defaultUserAgent = "model-distribution"
 )
 
 // Client provides model distribution functionality
 type Client struct {
-	store         *store.LocalStore
-	log           *logrus.Entry
-	remoteOptions []remote.Option
+	store    *store.LocalStore
+	log      *logrus.Entry
+	registry *registry.Client
 }
 
 // GetStorePath returns the root path where models are stored
@@ -84,8 +77,8 @@ func WithUserAgent(ua string) Option {
 func defaultOptions() *options {
 	return &options{
 		logger:    logrus.NewEntry(logrus.StandardLogger()),
-		transport: remote.DefaultTransport,
-		userAgent: defaultUserAgent,
+		transport: registry.DefaultTransport,
+		userAgent: registry.DefaultUserAgent,
 	}
 }
 
@@ -111,11 +104,10 @@ func NewClient(opts ...Option) (*Client, error) {
 	return &Client{
 		store: s,
 		log:   options.logger,
-		remoteOptions: []remote.Option{
-			remote.WithAuthFromKeychain(authn.DefaultKeychain),
-			remote.WithTransport(options.transport),
-			remote.WithUserAgent(options.userAgent),
-		},
+		registry: registry.NewClient(
+			registry.WithTransport(options.transport),
+			registry.WithUserAgent(options.userAgent),
+		),
 	}, nil
 }
 
@@ -123,38 +115,18 @@ func NewClient(opts ...Option) (*Client, error) {
 func (c *Client) PullModel(ctx context.Context, reference string, progressWriter io.Writer) error {
 	c.log.Infoln("Starting model pull:", reference)
 
-	// Parse the reference
-	ref, err := name.ParseReference(reference)
+	remoteModel, err := c.registry.Model(ctx, reference)
 	if err != nil {
-		return NewReferenceError(reference, err)
-	}
-
-	// First, check the remote registry for the model's digest
-	c.log.Infoln("Checking remote registry for model:", reference)
-	opts := append([]remote.Option{remote.WithContext(ctx)}, c.remoteOptions...)
-	remoteImg, err := remote.Image(ref, opts...)
-	if err != nil {
-		errStr := err.Error()
-		if strings.Contains(errStr, "UNAUTHORIZED") {
-			return NewPullError(reference, "UNAUTHORIZED", "Authentication required for this model", err)
-		}
-		if strings.Contains(errStr, "MANIFEST_UNKNOWN") {
-			return NewPullError(reference, "MANIFEST_UNKNOWN", "Model not found", err)
-		}
-		if strings.Contains(errStr, "NAME_UNKNOWN") {
-			return NewPullError(reference, "NAME_UNKNOWN", "Repository not found", err)
-		}
-		c.log.Errorln("Failed to check remote image:", err, "reference:", reference)
-		return NewPullError(reference, "UNKNOWN", err.Error(), err)
+		return fmt.Errorf("reading model from registry: %w", err)
 	}
 
 	//Check for supported type
-	if err := checkCompat(remoteImg); err != nil {
+	if err := checkCompat(remoteModel); err != nil {
 		return err
 	}
 
 	// Get the remote image digest
-	remoteDigest, err := remoteImg.Digest()
+	remoteDigest, err := remoteModel.Digest()
 	if err != nil {
 		c.log.Errorln("Failed to get remote image digest:", err)
 		return fmt.Errorf("getting remote image digest: %w", err)
@@ -178,7 +150,7 @@ func (c *Client) PullModel(ctx context.Context, reference string, progressWriter
 
 		// Report progress for local model
 		size := fileInfo.Size()
-		err = writeSuccess(progressWriter, fmt.Sprintf("Using cached model: %.2f MB", float64(size)/1024/1024))
+		err = progress.WriteSuccess(progressWriter, fmt.Sprintf("Using cached model: %.2f MB", float64(size)/1024/1024))
 		if err != nil {
 			c.log.Warnf("Writing progress: %v", err)
 			// If we fail to write progress, don't try again
@@ -196,15 +168,15 @@ func (c *Client) PullModel(ctx context.Context, reference string, progressWriter
 
 	// Model doesn't exist in local store or digests don't match, pull from remote
 
-	pr := newProgressReporter(progressWriter, pullMsg)
+	pr := progress.NewProgressReporter(progressWriter, progress.PullMsg)
 	defer func() {
 		if err := pr.Wait(); err != nil {
 			c.log.Warnf("Failed to write progress: %v", err)
 		}
 	}()
 
-	if err = c.store.Write(remoteImg, []string{reference}, pr.updates()); err != nil {
-		if writeErr := writeError(progressWriter, fmt.Sprintf("Error: %s", err.Error())); writeErr != nil {
+	if err = c.store.Write(remoteModel, []string{reference}, pr.Updates()); err != nil {
+		if writeErr := progress.WriteError(progressWriter, fmt.Sprintf("Error: %s", err.Error())); writeErr != nil {
 			c.log.Warnf("Failed to write error message: %v", writeErr)
 			// If we fail to write error message, don't try again
 			progressWriter = nil
@@ -212,7 +184,7 @@ func (c *Client) PullModel(ctx context.Context, reference string, progressWriter
 		return fmt.Errorf("writing image to store: %w", err)
 	}
 
-	if err := writeSuccess(progressWriter, "Model pulled successfully"); err != nil {
+	if err := progress.WriteSuccess(progressWriter, "Model pulled successfully"); err != nil {
 		c.log.Warnf("Failed to write success message: %v", err)
 		// If we fail to write success message, don't try again
 		progressWriter = nil
@@ -307,9 +279,9 @@ func (c *Client) Tag(source string, target string) error {
 // PushModel pushes a tagged model from the content store to the registry.
 func (c *Client) PushModel(ctx context.Context, tag string, progressWriter io.Writer) (err error) {
 	// Parse the tag
-	ref, err := name.NewTag(tag)
+	target, err := c.registry.NewTarget(tag)
 	if err != nil {
-		return fmt.Errorf("invalid tag %q: %w", tag, err)
+		return fmt.Errorf("new tag: %w", err)
 	}
 
 	// Get the model from the store
@@ -320,36 +292,23 @@ func (c *Client) PushModel(ctx context.Context, tag string, progressWriter io.Wr
 
 	// Push the model
 	c.log.Infoln("Pushing model:", tag)
-
-	pr := newProgressReporter(progressWriter, pushMsg)
-	defer func() {
-		if err := pr.Wait(); err != nil {
-			c.log.Warnf("Failed to write progress: %v", err)
-		}
-	}()
-
-	opts := append([]remote.Option{
-		remote.WithContext(ctx),
-		remote.WithProgress(pr.updates()),
-	}, c.remoteOptions...)
-
-	if err := remote.Write(ref, mdl, opts...); err != nil {
+	if err := target.Write(ctx, mdl, progressWriter); err != nil {
 		c.log.Errorln("Failed to push image:", err, "reference:", tag)
-		if writeErr := writeError(progressWriter, fmt.Sprintf("Error: %s", err.Error())); writeErr != nil {
+		if writeErr := progress.WriteError(progressWriter, fmt.Sprintf("Error: %s", err.Error())); writeErr != nil {
 			c.log.Warnf("Failed to write error message: %v", writeErr)
 		}
 		return fmt.Errorf("pushing image: %w", err)
 	}
 
 	c.log.Infoln("Successfully pushed model:", tag)
-	if err := writeSuccess(progressWriter, "Model pushed successfully"); err != nil {
+	if err := progress.WriteSuccess(progressWriter, "Model pushed successfully"); err != nil {
 		c.log.Warnf("Failed to write success message: %v", err)
 	}
 
 	return nil
 }
 
-func checkCompat(image v1.Image) error {
+func checkCompat(image types.ModelArtifact) error {
 	manifest, err := image.Manifest()
 	if err != nil {
 		return err

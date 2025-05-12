@@ -133,13 +133,18 @@ github.com/docker/go-metrics
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
-# github.com/docker/model-distribution v0.0.0-20250423075433-587f475e591d
+# github.com/docker/model-distribution v0.0.0-20250512190053-b3792c042d57
 ## explicit; go 1.23.0
+github.com/docker/model-distribution/builder
 github.com/docker/model-distribution/distribution
+github.com/docker/model-distribution/internal/gguf
+github.com/docker/model-distribution/internal/mutate
 github.com/docker/model-distribution/internal/partial
+github.com/docker/model-distribution/internal/progress
 github.com/docker/model-distribution/internal/store
+github.com/docker/model-distribution/registry
 github.com/docker/model-distribution/types
-# github.com/docker/model-runner v0.0.0-20250430163045-4c3ffbfa5311
+# github.com/docker/model-runner v0.0.0-20250512190413-96af7b750f88
 ## explicit; go 1.23.7
 github.com/docker/model-runner/pkg/inference
 github.com/docker/model-runner/pkg/inference/models
@@ -196,16 +201,36 @@ github.com/google/uuid
 # github.com/gorilla/mux v1.8.1
 ## explicit; go 1.20
 github.com/gorilla/mux
+# github.com/gpustack/gguf-parser-go v0.14.1
+## explicit; go 1.22.0
+github.com/gpustack/gguf-parser-go
+github.com/gpustack/gguf-parser-go/util/anyx
+github.com/gpustack/gguf-parser-go/util/bytex
+github.com/gpustack/gguf-parser-go/util/funcx
+github.com/gpustack/gguf-parser-go/util/httpx
+github.com/gpustack/gguf-parser-go/util/json
+github.com/gpustack/gguf-parser-go/util/osx
+github.com/gpustack/gguf-parser-go/util/ptr
+github.com/gpustack/gguf-parser-go/util/slicex
+github.com/gpustack/gguf-parser-go/util/stringx
 # github.com/grpc-ecosystem/grpc-gateway/v2 v2.25.1
 ## explicit; go 1.22.0
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/runtime
 github.com/grpc-ecosystem/grpc-gateway/v2/utilities
+# github.com/henvic/httpretty v0.1.4
+## explicit; go 1.22
+github.com/henvic/httpretty
+github.com/henvic/httpretty/internal/color
+github.com/henvic/httpretty/internal/header
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
 # github.com/jinzhu/gorm v1.9.16
 ## explicit; go 1.12
+# github.com/json-iterator/go v1.1.12
+## explicit; go 1.12
+github.com/json-iterator/go
 # github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0
 ## explicit
 # github.com/klauspost/compress v1.18.0
@@ -239,6 +264,12 @@ github.com/moby/sys/sequential
 ## explicit; go 1.18
 github.com/moby/term
 github.com/moby/term/windows
+# github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
+## explicit
+github.com/modern-go/concurrent
+# github.com/modern-go/reflect2 v1.0.2
+## explicit; go 1.12
+github.com/modern-go/reflect2
 # github.com/morikuni/aec v1.0.0
 ## explicit
 github.com/morikuni/aec
@@ -290,9 +321,15 @@ github.com/prometheus/procfs/internal/util
 # github.com/rivo/uniseg v0.4.7
 ## explicit; go 1.18
 github.com/rivo/uniseg
+# github.com/rs/dnscache v0.0.0-20230804202142-fc85eb664529
+## explicit; go 1.12
+github.com/rs/dnscache
 # github.com/sirupsen/logrus v1.9.3
 ## explicit; go 1.13
 github.com/sirupsen/logrus
+# github.com/smallnest/ringbuffer v0.0.0-20241116012123-461381446e3d
+## explicit; go 1.19
+github.com/smallnest/ringbuffer
 # github.com/spf13/cobra v1.9.1
 ## explicit; go 1.15
 github.com/spf13/cobra
@@ -405,8 +442,22 @@ go.opentelemetry.io/proto/otlp/trace/v1
 go.uber.org/mock/gomock
 # golang.org/x/crypto v0.35.0
 ## explicit; go 1.23.0
+golang.org/x/crypto/blowfish
+golang.org/x/crypto/chacha20
+golang.org/x/crypto/curve25519
 golang.org/x/crypto/ed25519
+golang.org/x/crypto/internal/alias
+golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/pbkdf2
+golang.org/x/crypto/ssh
+golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
+# golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f
+## explicit; go 1.22.0
+golang.org/x/exp/constraints
+golang.org/x/exp/maps
+# golang.org/x/mod v0.22.0
+## explicit; go 1.22.0
+golang.org/x/mod/semver
 # golang.org/x/net v0.36.0
 ## explicit; go 1.23.0
 golang.org/x/net/http/httpguts
@@ -419,8 +470,10 @@ golang.org/x/net/trace
 # golang.org/x/sync v0.12.0
 ## explicit; go 1.23.0
 golang.org/x/sync/errgroup
+golang.org/x/sync/singleflight
 # golang.org/x/sys v0.31.0
 ## explicit; go 1.23.0
+golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -436,6 +489,44 @@ golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 # golang.org/x/time v0.9.0
 ## explicit; go 1.18
+# golang.org/x/tools v0.29.0
+## explicit; go 1.22.0
+golang.org/x/tools/cmd/stringer
+golang.org/x/tools/go/gcexportdata
+golang.org/x/tools/go/packages
+golang.org/x/tools/go/types/objectpath
+golang.org/x/tools/go/types/typeutil
+golang.org/x/tools/internal/aliases
+golang.org/x/tools/internal/event
+golang.org/x/tools/internal/event/core
+golang.org/x/tools/internal/event/keys
+golang.org/x/tools/internal/event/label
+golang.org/x/tools/internal/gcimporter
+golang.org/x/tools/internal/gocommand
+golang.org/x/tools/internal/packagesinternal
+golang.org/x/tools/internal/pkgbits
+golang.org/x/tools/internal/stdlib
+golang.org/x/tools/internal/typeparams
+golang.org/x/tools/internal/typesinternal
+golang.org/x/tools/internal/versions
+# gonum.org/v1/gonum v0.15.1
+## explicit; go 1.22
+gonum.org/v1/gonum/blas
+gonum.org/v1/gonum/blas/blas64
+gonum.org/v1/gonum/blas/cblas128
+gonum.org/v1/gonum/blas/gonum
+gonum.org/v1/gonum/floats
+gonum.org/v1/gonum/floats/scalar
+gonum.org/v1/gonum/internal/asm/c128
+gonum.org/v1/gonum/internal/asm/c64
+gonum.org/v1/gonum/internal/asm/f32
+gonum.org/v1/gonum/internal/asm/f64
+gonum.org/v1/gonum/internal/cmplx64
+gonum.org/v1/gonum/internal/math32
+gonum.org/v1/gonum/lapack
+gonum.org/v1/gonum/lapack/gonum
+gonum.org/v1/gonum/lapack/lapack64
+gonum.org/v1/gonum/mat
 # google.golang.org/genproto/googleapis/api v0.0.0-20250219182151-9fdb1cabc7b2
 ## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/api/httpbody
