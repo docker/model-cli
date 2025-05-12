@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"strings"
 
+	"github.com/docker/cli/cli/command"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
@@ -20,7 +20,7 @@ import (
 
 const ModelRunnerLabel = "com.docker.model-runner-service"
 
-func newInstallRunner() *cobra.Command {
+func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 	var modelRunnerImage, modelRunnerCtrName, modelRunnerCtrPort string
 	var noGPU bool
 	c := &cobra.Command{
@@ -47,7 +47,7 @@ func newInstallRunner() *cobra.Command {
 				return nil
 			}
 
-			dockerClient, err := client.NewClientWithOpts(client.WithHTTPClient(modelRunner.Client().(*http.Client)))
+			dockerClient, err := desktop.DockerClientForContext(cli, cli.CurrentContext())
 			if err != nil {
 				return fmt.Errorf("failed to create Docker client: %w", err)
 			}

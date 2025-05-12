@@ -58,8 +58,8 @@ func isCloudContext(cli *command.DockerCli) bool {
 	return ok
 }
 
-// dockerClientForContext creates a Docker client for the specified context.
-func dockerClientForContext(cli *command.DockerCli, name string) (*clientpkg.Client, error) {
+// DockerClientForContext creates a Docker client for the specified context.
+func DockerClientForContext(cli *command.DockerCli, name string) (*clientpkg.Client, error) {
 	c, err := cli.ContextStore().GetMetadata(name)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load context metadata: %w", err)
@@ -168,13 +168,13 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 	if kind == ModelRunnerEngineKindMoby || kind == ModelRunnerEngineKindMobyManual {
 		client = http.DefaultClient
 	} else if kind == ModelRunnerEngineKindDesktop {
-		dockerClient, err := dockerClientForContext(cli, "desktop-linux")
+		dockerClient, err := DockerClientForContext(cli, "desktop-linux")
 		if err != nil {
 			return nil, fmt.Errorf("unable to create model runner client: %w", err)
 		}
 		client = dockerClient.HTTPClient()
 	} else { // ModelRunnerEngineKindCloud
-		dockerClient, err := dockerClientForContext(cli, cli.CurrentContext())
+		dockerClient, err := DockerClientForContext(cli, cli.CurrentContext())
 		if err != nil {
 			return nil, fmt.Errorf("unable to create model runner client: %w", err)
 		}
