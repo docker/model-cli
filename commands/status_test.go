@@ -78,14 +78,16 @@ func TestStatus(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			client := mockdesktop.NewMockDockerHttpClient(ctrl)
+			modelRunner = desktop.NewContextForMock(client)
+			desktopClient = desktop.New(modelRunner)
 
-			req, err := http.NewRequest(http.MethodGet, desktop.URL(inference.ModelsPrefix, ""), nil)
+			req, err := http.NewRequest(http.MethodGet, modelRunner.URL(inference.ModelsPrefix), nil)
 			require.NoError(t, err)
 			req.Header.Set("User-Agent", "docker-model-cli/"+desktop.Version)
 			client.EXPECT().Do(req).Return(test.doResponse, test.doErr)
 
 			if test.doResponse != nil && test.doResponse.StatusCode == http.StatusOK {
-				req, err = http.NewRequest(http.MethodGet, desktop.URL(inference.InferencePrefix+"/status", ""), nil)
+				req, err = http.NewRequest(http.MethodGet, modelRunner.URL(inference.InferencePrefix+"/status"), nil)
 				require.NoError(t, err)
 				req.Header.Set("User-Agent", "docker-model-cli/"+desktop.Version)
 				client.EXPECT().Do(req).Return(&http.Response{Body: mockBody}, test.doErr)
@@ -99,7 +101,7 @@ func TestStatus(t *testing.T) {
 			}
 			defer func() { osExit = originalOsExit }()
 
-			cmd := newStatusCmd(desktop.New(client, ""))
+			cmd := newStatusCmd()
 			buf := new(bytes.Buffer)
 			cmd.SetOut(buf)
 			cmd.SetErr(buf)

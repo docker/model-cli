@@ -118,6 +118,20 @@ type ModelRunnerContext struct {
 	client DockerHttpClient
 }
 
+// NewContextForMock is a ModelRunnerContext constructor exposed only for the
+// purposes of mock testing.
+func NewContextForMock(client DockerHttpClient) *ModelRunnerContext {
+	urlPrefix, err := url.Parse("http://localhost" + inference.ExperimentalEndpointsPrefix)
+	if err != nil {
+		panic("error occurred while parsing known-good URL")
+	}
+	return &ModelRunnerContext{
+		kind:      ModelRunnerEngineKindDesktop,
+		urlPrefix: urlPrefix,
+		client:    client,
+	}
+}
+
 // DetectContext determines the current Docker Model Runner context.
 func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 	// Check for an explicit endpoint setting.
