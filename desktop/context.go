@@ -141,8 +141,7 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 		rawURLPrefix = dmrHost
 	} else if kind == ModelRunnerEngineKindDesktop {
 		rawURLPrefix = "http://localhost" + inference.ExperimentalEndpointsPrefix
-	} else {
-                // ModelRunnerEngineKindCloud
+	} else { // ModelRunnerEngineKindCloud
 		rawURLPrefix = "http://localhost/"
 	}
 	urlPrefix, err := url.Parse(rawURLPrefix)
@@ -160,8 +159,7 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 			return nil, fmt.Errorf("unable to create model runner client: %w", err)
 		}
 		client = dockerClient.HTTPClient()
-	} else {
-	    // ModelRunnerEngineKindCloud
+	} else { // ModelRunnerEngineKindCloud
 		dockerClient, err := dockerClientForContext(cli, cli.CurrentContext())
 		if err != nil {
 			return nil, fmt.Errorf("unable to create model runner client: %w", err)
