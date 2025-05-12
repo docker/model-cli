@@ -81,11 +81,13 @@ func TestStatus(t *testing.T) {
 
 			req, err := http.NewRequest(http.MethodGet, desktop.URL(inference.ModelsPrefix, ""), nil)
 			require.NoError(t, err)
+			req.Header.Set("User-Agent", "docker-model-cli/"+desktop.Version)
 			client.EXPECT().Do(req).Return(test.doResponse, test.doErr)
 
 			if test.doResponse != nil && test.doResponse.StatusCode == http.StatusOK {
 				req, err = http.NewRequest(http.MethodGet, desktop.URL(inference.InferencePrefix+"/status", ""), nil)
 				require.NoError(t, err)
+				req.Header.Set("User-Agent", "docker-model-cli/"+desktop.Version)
 				client.EXPECT().Do(req).Return(&http.Response{Body: mockBody}, test.doErr)
 			}
 
