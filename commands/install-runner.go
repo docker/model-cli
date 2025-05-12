@@ -22,7 +22,7 @@ const ModelRunnerLabel = "com.docker.model-runner-service"
 
 func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 	var modelRunnerImage, modelRunnerCtrName, modelRunnerCtrPort string
-	var noGPU bool
+	var gpu bool
 	c := &cobra.Command{
 		Use:   "install-runner",
 		Short: "Install Docker Model Runner",
@@ -94,7 +94,7 @@ func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 				},
 			}
 
-			if !noGPU {
+			if gpu {
 				hostConfig.Resources = container.Resources{
 					DeviceRequests: []container.DeviceRequest{
 						{
@@ -127,7 +127,7 @@ func newInstallRunner(cli *command.DockerCli) *cobra.Command {
 		"Docker container name for Docker Model Runner")
 	c.Flags().StringVar(&modelRunnerCtrPort, "port", "12434",
 		"Docker container port for Docker Model Runner")
-	c.Flags().BoolVar(&noGPU, "no-gpu", false, "Disable GPU support")
+	c.Flags().BoolVar(&gpu, "gpu", false, "Enable GPU support")
 	return c
 }
 
