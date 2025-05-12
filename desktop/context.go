@@ -142,6 +142,7 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 	} else if kind == ModelRunnerEngineKindDesktop {
 		rawURLPrefix = "http://localhost" + inference.ExperimentalEndpointsPrefix
 	} else {
+                // ModelRunnerEngineKindCloud
 		rawURLPrefix = "http://localhost/"
 	}
 	urlPrefix, err := url.Parse(rawURLPrefix)
