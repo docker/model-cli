@@ -20,14 +20,14 @@ func newUninstallRunner() *cobra.Command {
 				// TODO: We may eventually want to auto-forward this to
 				// docker desktop disable model-runner, but we should first
 				// make install-runner forward in the same way.
-				cmd.Printf("Standalone uninstallation not supported with Docker Desktop\n")
-				cmd.Printf("Use `docker desktop disable model-runner` instead\n")
+				cmd.Println("Standalone uninstallation not supported with Docker Desktop")
+				cmd.Println("Use `docker desktop disable model-runner` instead")
 				return nil
 			} else if kind == desktop.ModelRunnerEngineKindMobyManual {
-				cmd.Printf("Standalone uninstallation not supported with MODEL_RUNNER_HOST set\n")
+				cmd.Println("Standalone uninstallation not supported with MODEL_RUNNER_HOST set")
 				return nil
 			} else if kind == desktop.ModelRunnerEngineKindCloud {
-				cmd.Printf("Standalone uninstallation not supported with Docker Cloud\n")
+				cmd.Println("Standalone uninstallation not supported with Docker Cloud")
 				return nil
 			}
 
