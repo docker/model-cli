@@ -14,7 +14,7 @@ func newComposeCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use: "compose EVENT",
 	}
-	c.AddCommand(newUpCommand(desktopClient))
+	c.AddCommand(newUpCommand())
 	c.AddCommand(newDownCommand())
 	c.Hidden = true
 	c.PersistentFlags().String("project-name", "", "compose project name") // unused by model
@@ -22,7 +22,7 @@ func newComposeCmd() *cobra.Command {
 	return c
 }
 
-func newUpCommand(desktopClient *desktop.Client) *cobra.Command {
+func newUpCommand() *cobra.Command {
 	var model string
 	c := &cobra.Command{
 		Use: "up",
@@ -33,6 +33,11 @@ func newUpCommand(desktopClient *desktop.Client) *cobra.Command {
 				return err
 			}
 
+			if err := ensureStandaloneRunnerAvailable(cmd.Context(), nil); err != nil {
+				sendErrorf("Failed to initialize standalone model runner: %v", err)
+				return fmt.Errorf("Failed to initialize standalone model runner: %w", err)
+			}
+
 			_, _, err := desktopClient.Pull(model, func(s string) {
 				sendInfo(s)
 			})
@@ -41,8 +46,15 @@ func newUpCommand(desktopClient *desktop.Client) *cobra.Command {
 				return fmt.Errorf("Failed to pull model: %v\n", err)
 			}
 
-			// FIXME get actual URL from Docker Desktop
-			setenv("URL", "http://model-runner.docker.internal/engines/v1/")
+			if kind := modelRunner.EngineKind(); kind == desktop.ModelRunnerEngineKindDesktop {
+				// TODO: Get the actual URL from Docker Desktop via some API.
+				setenv("URL", "http://model-runner.docker.internal/engines/v1/")
+			} else if kind == desktop.ModelRunnerEngineKindMobyManual {
+				setenv("URL", modelRunner.URL("/engines/v1/"))
+			} else if kind == desktop.ModelRunnerEngineKindMoby || kind == desktop.ModelRunnerEngineKindCloud {
+				// TODO: Find a more robust solution in Moby-like environments.
+				setenv("URL", "http://172.17.0.1:12434/engines/v1/")
+			}
 			setenv("MODEL", model)
 
 			return nil

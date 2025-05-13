@@ -6,10 +6,12 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"strconv"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/context/docker"
 	clientpkg "github.com/docker/docker/client"
+	"github.com/docker/model-cli/pkg/standalone"
 	"github.com/docker/model-runner/pkg/inference"
 )
 
@@ -58,8 +60,8 @@ func isCloudContext(cli *command.DockerCli) bool {
 	return ok
 }
 
-// dockerClientForContext creates a Docker client for the specified context.
-func dockerClientForContext(cli *command.DockerCli, name string) (*clientpkg.Client, error) {
+// DockerClientForContext creates a Docker client for the specified context.
+func DockerClientForContext(cli *command.DockerCli, name string) (*clientpkg.Client, error) {
 	c, err := cli.ContextStore().GetMetadata(name)
 	if err != nil {
 		return nil, fmt.Errorf("unable to load context metadata: %w", err)
@@ -80,8 +82,8 @@ const (
 	// the Model CLI command is responsible for managing a Model Runner.
 	ModelRunnerEngineKindMoby ModelRunnerEngineKind = iota
 	// ModelRunnerEngineKindMobyManual represents a non-Desktop/Cloud engine
-	// that's explicitly targeted by a DMR_HOST environment variable on which
-	// the user is responsible for managing a Model Runner.
+	// that's explicitly targeted by a MODEL_RUNNER_HOST environment variable on
+	// which the user is responsible for managing a Model Runner.
 	ModelRunnerEngineKindMobyManual
 	// ModelRunnerEngineKindDesktop represents a Docker Desktop engine. It only
 	// refers to a Docker Desktop Linux engine, i.e. not a Windows container
@@ -135,14 +137,21 @@ func NewContextForMock(client DockerHttpClient) *ModelRunnerContext {
 // DetectContext determines the current Docker Model Runner context.
 func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 	// Check for an explicit endpoint setting.
-	dmrHost := os.Getenv("DMR_HOST")
+	modelRunnerHost := os.Getenv("MODEL_RUNNER_HOST")
+
+	// Check if we're treating Docker Desktop as regular Moby. This is only for
+	// testing purposes.
+	treatDesktopAsMoby := os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") != ""
 
 	// Detect the associated engine type.
 	kind := ModelRunnerEngineKindMoby
-	if dmrHost != "" {
+	if modelRunnerHost != "" {
 		kind = ModelRunnerEngineKindMobyManual
 	} else if isDesktopContext(cli) {
 		kind = ModelRunnerEngineKindDesktop
+		if treatDesktopAsMoby {
+			kind = ModelRunnerEngineKindMoby
+		}
 	} else if isCloudContext(cli) {
 		kind = ModelRunnerEngineKindCloud
 	}
@@ -150,11 +159,14 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 	// Compute the URL prefix based on the associated engine kind.
 	var rawURLPrefix string
 	if kind == ModelRunnerEngineKindMoby {
-		rawURLPrefix = "http://localhost:12434"
+		rawURLPrefix = "http://localhost:" + strconv.Itoa(int(standalone.DefaultControllerPort))
 	} else if kind == ModelRunnerEngineKindMobyManual {
-		rawURLPrefix = dmrHost
+		rawURLPrefix = modelRunnerHost
 	} else if kind == ModelRunnerEngineKindDesktop {
 		rawURLPrefix = "http://localhost" + inference.ExperimentalEndpointsPrefix
+		if treatDesktopAsMoby {
+			rawURLPrefix = "http://localhost:" + strconv.Itoa(int(standalone.DefaultControllerPort))
+		}
 	} else { // ModelRunnerEngineKindCloud
 		rawURLPrefix = "http://localhost/"
 	}
@@ -168,13 +180,16 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 	if kind == ModelRunnerEngineKindMoby || kind == ModelRunnerEngineKindMobyManual {
 		client = http.DefaultClient
 	} else if kind == ModelRunnerEngineKindDesktop {
-		dockerClient, err := dockerClientForContext(cli, "desktop-linux")
+		dockerClient, err := DockerClientForContext(cli, "desktop-linux")
 		if err != nil {
 			return nil, fmt.Errorf("unable to create model runner client: %w", err)
 		}
 		client = dockerClient.HTTPClient()
+		if treatDesktopAsMoby {
+			client = http.DefaultClient
+		}
 	} else { // ModelRunnerEngineKindCloud
-		dockerClient, err := dockerClientForContext(cli, cli.CurrentContext())
+		dockerClient, err := DockerClientForContext(cli, cli.CurrentContext())
 		if err != nil {
 			return nil, fmt.Errorf("unable to create model runner client: %w", err)
 		}
