@@ -5,9 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/docker/model-cli/desktop"
+	"github.com/docker/model-cli/pkg/standalone"
 	"github.com/spf13/cobra"
 )
 
@@ -51,7 +53,7 @@ func newUpCommand() *cobra.Command {
 				_ = setenv("URL", modelRunner.URL("/engines/v1/"))
 			} else if kind == desktop.ModelRunnerEngineKindMoby || kind == desktop.ModelRunnerEngineKindCloud {
 				// TODO: Find a more robust solution in Moby-like environments.
-				_ = setenv("URL", "http://172.17.0.1:12434/engines/v1/")
+				_ = setenv("URL", "http://host.docker.internal:"+strconv.Itoa(int(standalone.DefaultControllerPort))+"/engines/v1/")
 			}
 			return nil
 		},
