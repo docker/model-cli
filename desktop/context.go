@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 	"strconv"
+	"strings"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/context/docker"
@@ -211,7 +212,13 @@ func (c *ModelRunnerContext) EngineKind() ModelRunnerEngineKind {
 
 // URL constructs a URL string appropriate for the model runner.
 func (c *ModelRunnerContext) URL(path string) string {
-	return c.urlPrefix.JoinPath(path).String()
+	components := strings.Split(path, "?")
+	result := c.urlPrefix.JoinPath(components[0]).String()
+	if len(components) > 1 {
+		components[0] = result
+		result = strings.Join(components, "?")
+	}
+	return result
 }
 
 // Client returns an HTTP client appropriate for accessing the model runner.
