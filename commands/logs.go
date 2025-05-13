@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,7 +10,11 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/pkg/stdcopy"
 	"github.com/docker/model-cli/commands/completion"
+	"github.com/docker/model-cli/desktop"
+	"github.com/docker/model-cli/pkg/standalone"
 	"github.com/nxadm/tail"
 	"github.com/spf13/cobra"
 	"golang.org/x/sync/errgroup"
@@ -23,6 +28,32 @@ func newLogsCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			homeDir, err := os.UserHomeDir()
 			if err != nil {
+				return err
+			}
+
+			// If we're running in standalone mode, then print the container
+			// logs.
+			if modelRunner.EngineKind() == desktop.ModelRunnerEngineKindMoby {
+				dockerClient, err := desktop.DockerClientForContext(dockerCLI, dockerCLI.CurrentContext())
+				if err != nil {
+					return fmt.Errorf("failed to create Docker client: %w", err)
+				}
+				ctrID, _, err := standalone.FindControllerContainer(cmd.Context(), dockerClient)
+				if err != nil {
+					return fmt.Errorf("unable to identify Model Runner container: %w", err)
+				} else if ctrID == "" {
+					return errors.New("unable to identify Model Runner container")
+				}
+				log, err := dockerClient.ContainerLogs(cmd.Context(), ctrID, container.LogsOptions{
+					ShowStdout: true,
+					ShowStderr: true,
+					Follow:     follow,
+				})
+				if err != nil {
+					return fmt.Errorf("unable to query Model Runner container logs: %w", err)
+				}
+				defer log.Close()
+				_, err = stdcopy.StdCopy(os.Stdout, os.Stderr, log)
 				return err
 			}
 
