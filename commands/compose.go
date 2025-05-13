@@ -34,7 +34,8 @@ func newUpCommand(desktopClient *desktop.Client) *cobra.Command {
 			}
 
 			if err := ensureStandaloneRunnerAvailable(cmd.Context(), nil); err != nil {
-				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
+				sendErrorf("Failed to initialize standalone model runner: %w", err)
+				return fmt.Errorf("Failed to initialize standalone model runner: %w", err)
 			}
 
 			_, _, err := desktopClient.Pull(model, func(s string) {
@@ -45,8 +46,15 @@ func newUpCommand(desktopClient *desktop.Client) *cobra.Command {
 				return fmt.Errorf("Failed to pull model: %v\n", err)
 			}
 
-			// FIXME get actual URL from Docker Desktop
-			setenv("URL", "http://model-runner.docker.internal/engines/v1/")
+			if kind := modelRunner.EngineKind(); kind == desktop.ModelRunnerEngineKindDesktop {
+				// TODO: Get the actual URL from Docker Desktop via some API.
+				setenv("URL", "http://model-runner.docker.internal/engines/v1/")
+			} else if kind == desktop.ModelRunnerEngineKindMobyManual {
+				setenv("URL", modelRunner.URL("/engines/v1/"))
+			} else if kind == desktop.ModelRunnerEngineKindMoby || kind == desktop.ModelRunnerEngineKindCloud {
+				// TODO: Find a more robust solution in Moby-like environments.
+				setenv("URL", "http://172.17.0.1:12434/engines/v1/")
+			}
 			setenv("MODEL", model)
 
 			return nil

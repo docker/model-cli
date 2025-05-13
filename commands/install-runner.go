@@ -76,17 +76,17 @@ func newInstallRunner() *cobra.Command {
 		Short: "Install Docker Model Runner",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Ensure that we're running in a supported model runner context.
-			if modelRunner.EngineKind() == desktop.ModelRunnerEngineKindDesktop {
+			if kind := modelRunner.EngineKind(); kind == desktop.ModelRunnerEngineKindDesktop {
 				// TODO: We may eventually want to auto-forward this to
 				// docker desktop enable model-runner, but we should first make
 				// sure the CLI flags match.
 				cmd.Printf("Standalone installation not supported with Docker Desktop\n")
 				cmd.Printf("Use `docker desktop enable model-runner` instead\n")
 				return nil
-			} else if modelRunner.EngineKind() == desktop.ModelRunnerEngineKindMobyManual {
+			} else if kind == desktop.ModelRunnerEngineKindMobyManual {
 				cmd.Printf("Standalone installation not supported with DMR_HOST set\n")
 				return nil
-			} else if modelRunner.EngineKind() == desktop.ModelRunnerEngineKindCloud {
+			} else if kind == desktop.ModelRunnerEngineKindCloud {
 				cmd.Printf("Standalone installation not required with Docker Cloud\n")
 				return nil
 			}
