@@ -53,7 +53,7 @@ func newUpCommand() *cobra.Command {
 				_ = setenv("URL", modelRunner.URL("/engines/v1/"))
 			} else if kind == desktop.ModelRunnerEngineKindMoby || kind == desktop.ModelRunnerEngineKindCloud {
 				// TODO: Find a more robust solution in Moby-like environments.
-				_ = setenv("URL", "http://host.docker.internal:"+strconv.Itoa(int(standalone.DefaultControllerPort))+"/engines/v1/")
+				_ = setenv("URL", "http://host.docker.internal:"+strconv.Itoa(standalone.DefaultControllerPort)+"/engines/v1/")
 			}
 			return nil
 		},
