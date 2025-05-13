@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
@@ -65,6 +66,10 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 	if err := standalone.CreateControllerContainer(ctx, dockerClient, standalone.DefaultControllerPort, false, modelStorageVolume, printer); err != nil {
 		return fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 	}
+
+	// Give the model runner one second to start.
+	time.Sleep(1 * time.Second)
+
 	return nil
 }
 

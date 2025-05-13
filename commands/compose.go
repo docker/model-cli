@@ -14,7 +14,7 @@ func newComposeCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use: "compose EVENT",
 	}
-	c.AddCommand(newUpCommand(desktopClient))
+	c.AddCommand(newUpCommand())
 	c.AddCommand(newDownCommand())
 	c.Hidden = true
 	c.PersistentFlags().String("project-name", "", "compose project name") // unused by model
@@ -22,7 +22,7 @@ func newComposeCmd() *cobra.Command {
 	return c
 }
 
-func newUpCommand(desktopClient *desktop.Client) *cobra.Command {
+func newUpCommand() *cobra.Command {
 	var model string
 	c := &cobra.Command{
 		Use: "up",
