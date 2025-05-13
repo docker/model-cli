@@ -60,7 +60,7 @@ func newUninstallRunner() *cobra.Command {
 		},
 		ValidArgsFunction: completion.NoComplete,
 	}
-	c.Flags().BoolVar(&models, "models", false, "Remove model storage")
-	c.Flags().BoolVar(&images, "images", false, "Remove docker/model-runner images")
+	c.Flags().BoolVar(&models, "models", false, "Remove model storage volume")
+	c.Flags().BoolVar(&images, "images", false, "Remove "+standalone.ControllerImage+" images")
 	return c
 }

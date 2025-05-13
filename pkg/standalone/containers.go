@@ -41,9 +41,9 @@ func FindControllerContainer(ctx context.Context, dockerClient *client.Client) (
 func CreateControllerContainer(ctx context.Context, dockerClient *client.Client, port uint16, gpu bool, modelStorageVolume string, printer StatusPrinter) error {
 	// Set up the container configuration.
 	portStr := strconv.Itoa(int(port))
-	imageName := controllerImage
+	imageName := ControllerImage + ":" + controllerImageTagCPU
 	if gpu {
-		imageName = controllerImageGPU
+		imageName = ControllerImage + ":" + controllerImageTagGPU
 	}
 	config := &container.Config{
 		Image: imageName,

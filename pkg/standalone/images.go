@@ -12,19 +12,22 @@ import (
 )
 
 const (
-	// controllerImage is the default image used for the controller container.
-	controllerImage = "docker/model-runner:latest"
-	// controllerImageGPU is the image used for the controller container when
-	// GPU support is requested.
-	controllerImageGPU = "docker/model-runner:latest-cuda"
+	// ControllerImage is the image used for the controller container.
+	ControllerImage = "docker/model-runner"
+	// controllerImageTagCPU is the image tag used for the controller container
+	// when running with the CPU backend.
+	controllerImageTagCPU = "latest"
+	// controllerImageTagGPU is the image tag used for the controller container
+	// when running with the GPU backend.
+	controllerImageTagGPU = "latest-cuda"
 )
 
 // EnsureControllerImage ensures that the controller container image is pulled.
 func EnsureControllerImage(ctx context.Context, dockerClient *client.Client, gpu bool, printer StatusPrinter) error {
 	// Determine the target image.
-	imageName := controllerImage
+	imageName := ControllerImage + ":" + controllerImageTagCPU
 	if gpu {
-		imageName = controllerImageGPU
+		imageName = ControllerImage + ":" + controllerImageTagGPU
 	}
 
 	// Perform the pull.
@@ -58,13 +61,15 @@ func EnsureControllerImage(ctx context.Context, dockerClient *client.Client, gpu
 // PruneControllerImages removes any unused controller container images.
 func PruneControllerImages(ctx context.Context, dockerClient *client.Client, printer StatusPrinter) error {
 	// Remove the standard image, if present.
-	if _, err := dockerClient.ImageRemove(ctx, controllerImage, image.RemoveOptions{}); err == nil {
-		printer.Println("Removed image", controllerImage)
+	imageNameCPU := ControllerImage + ":" + controllerImageTagCPU
+	if _, err := dockerClient.ImageRemove(ctx, imageNameCPU, image.RemoveOptions{}); err == nil {
+		printer.Println("Removed image", imageNameCPU)
 	}
 
 	// Remove the GPU image, if present.
-	if _, err := dockerClient.ImageRemove(ctx, controllerImageGPU, image.RemoveOptions{}); err == nil {
-		printer.Println("Removed image", controllerImageGPU)
+	imageNameGPU := ControllerImage + ":" + controllerImageTagGPU
+	if _, err := dockerClient.ImageRemove(ctx, imageNameGPU, image.RemoveOptions{}); err == nil {
+		printer.Println("Removed image", imageNameGPU)
 	}
 	return nil
 }
