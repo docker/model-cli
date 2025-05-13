@@ -82,8 +82,7 @@ type packageOptions struct {
 }
 
 func packageModel(cmd *cobra.Command, tag string, opts packageOptions) error {
-	// Parse the reference
-	cmd.PrintErrln("Packaging model %q\n", tag)
+	cmd.PrintErrf("Packaging model %q\n", tag)
 	target, err := registry.NewClient(
 		registry.WithUserAgent("docker-model-cli/" + desktop.Version),
 	).NewTarget(tag)
