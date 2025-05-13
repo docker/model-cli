@@ -111,18 +111,18 @@ func newInstallRunner() *cobra.Command {
 
 			// Ensure that we have an up-to-date copy of the image.
 			if err := standalone.EnsureControllerImage(cmd.Context(), dockerClient, gpu, cmd); err != nil {
-				return err
+				return fmt.Errorf("unable to pull latest standalone model runner image: %w", err)
 			}
 
 			// Ensure that we have a model storage volume.
 			modelStorageVolume, err := standalone.EnsureModelStorageVolume(cmd.Context(), dockerClient, cmd)
 			if err != nil {
-				return err
+				return fmt.Errorf("unable to initialize standalone model storage: %w", err)
 			}
 
 			// Create the model runner container.
 			if err := standalone.CreateControllerContainer(cmd.Context(), dockerClient, port, gpu, modelStorageVolume, cmd); err != nil {
-				return err
+				return fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 			}
 
 			return nil
