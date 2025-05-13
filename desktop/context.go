@@ -82,8 +82,8 @@ const (
 	// the Model CLI command is responsible for managing a Model Runner.
 	ModelRunnerEngineKindMoby ModelRunnerEngineKind = iota
 	// ModelRunnerEngineKindMobyManual represents a non-Desktop/Cloud engine
-	// that's explicitly targeted by a DMR_HOST environment variable on which
-	// the user is responsible for managing a Model Runner.
+	// that's explicitly targeted by a MODEL_RUNNER_HOST environment variable on
+	// which the user is responsible for managing a Model Runner.
 	ModelRunnerEngineKindMobyManual
 	// ModelRunnerEngineKindDesktop represents a Docker Desktop engine. It only
 	// refers to a Docker Desktop Linux engine, i.e. not a Windows container
@@ -137,7 +137,7 @@ func NewContextForMock(client DockerHttpClient) *ModelRunnerContext {
 // DetectContext determines the current Docker Model Runner context.
 func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 	// Check for an explicit endpoint setting.
-	dmrHost := os.Getenv("DMR_HOST")
+	modelRunnerHost := os.Getenv("MODEL_RUNNER_HOST")
 
 	// Check if we're treating Docker Desktop as regular Moby. This is only for
 	// testing purposes.
@@ -145,7 +145,7 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 
 	// Detect the associated engine type.
 	kind := ModelRunnerEngineKindMoby
-	if dmrHost != "" {
+	if modelRunnerHost != "" {
 		kind = ModelRunnerEngineKindMobyManual
 	} else if isDesktopContext(cli) {
 		kind = ModelRunnerEngineKindDesktop
@@ -161,7 +161,7 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 	if kind == ModelRunnerEngineKindMoby {
 		rawURLPrefix = "http://localhost:" + strconv.Itoa(int(standalone.DefaultControllerPort))
 	} else if kind == ModelRunnerEngineKindMobyManual {
-		rawURLPrefix = dmrHost
+		rawURLPrefix = modelRunnerHost
 	} else if kind == ModelRunnerEngineKindDesktop {
 		rawURLPrefix = "http://localhost" + inference.ExperimentalEndpointsPrefix
 		if treatDesktopAsMoby {

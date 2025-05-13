@@ -84,7 +84,7 @@ func newInstallRunner() *cobra.Command {
 				cmd.Printf("Use `docker desktop enable model-runner` instead\n")
 				return nil
 			} else if kind == desktop.ModelRunnerEngineKindMobyManual {
-				cmd.Printf("Standalone installation not supported with DMR_HOST set\n")
+				cmd.Printf("Standalone installation not supported with MODEL_RUNNER_HOST set\n")
 				return nil
 			} else if kind == desktop.ModelRunnerEngineKindCloud {
 				cmd.Printf("Standalone installation not required with Docker Cloud\n")
