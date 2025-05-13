@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
@@ -23,49 +25,43 @@ func newComposeCmd() *cobra.Command {
 }
 
 func newUpCommand() *cobra.Command {
-	var model string
+	var models []string
 	c := &cobra.Command{
 		Use: "up",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if model == "" {
+			if len(models) == 0 {
 				err := errors.New("options.model is required")
-				sendError(err.Error())
+				_ = sendError(err.Error())
 				return err
 			}
 
 			if err := ensureStandaloneRunnerAvailable(cmd.Context(), nil); err != nil {
-				sendErrorf("Failed to initialize standalone model runner: %v", err)
+				_ = sendErrorf("Failed to initialize standalone model runner: %v", err)
 				return fmt.Errorf("Failed to initialize standalone model runner: %w", err)
 			}
 
-			_, _, err := desktopClient.Pull(model, func(s string) {
-				sendInfo(s)
-			})
-			if err != nil {
-				sendErrorf("Failed to pull model: %v", err)
-				return fmt.Errorf("Failed to pull model: %v\n", err)
+			if err := downloadModelsOnlyIfNotFound(desktopClient, models); err != nil {
+				return err
 			}
 
 			if kind := modelRunner.EngineKind(); kind == desktop.ModelRunnerEngineKindDesktop {
 				// TODO: Get the actual URL from Docker Desktop via some API.
-				setenv("URL", "http://model-runner.docker.internal/engines/v1/")
+				_ = setenv("URL", "http://model-runner.docker.internal/engines/v1/")
 			} else if kind == desktop.ModelRunnerEngineKindMobyManual {
-				setenv("URL", modelRunner.URL("/engines/v1/"))
+				_ = setenv("URL", modelRunner.URL("/engines/v1/"))
 			} else if kind == desktop.ModelRunnerEngineKindMoby || kind == desktop.ModelRunnerEngineKindCloud {
 				// TODO: Find a more robust solution in Moby-like environments.
-				setenv("URL", "http://172.17.0.1:12434/engines/v1/")
+				_ = setenv("URL", "http://172.17.0.1:12434/engines/v1/")
 			}
-			setenv("MODEL", model)
-
 			return nil
 		},
 	}
-	c.Flags().StringVar(&model, "model", "", "model to use")
+	c.Flags().StringArrayVar(&models, "model", nil, "model to use")
 	return c
 }
 
 func newDownCommand() *cobra.Command {
-	var model string
+	var model []string
 	c := &cobra.Command{
 		Use: "down",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -73,8 +69,41 @@ func newDownCommand() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().StringVar(&model, "model", "", "model to use")
+	c.Flags().StringArrayVar(&model, "model", nil, "model to use")
 	return c
+}
+
+func downloadModelsOnlyIfNotFound(desktopClient *desktop.Client, models []string) error {
+	modelsDownloaded, err := desktopClient.List()
+	if err != nil {
+		_ = sendErrorf("Failed to get models list: %v", err)
+		return err
+	}
+	for _, model := range models {
+		// Download the model if not already present in the local model store
+		if !slices.ContainsFunc(modelsDownloaded, func(m desktop.Model) bool {
+			if model == m.ID {
+				return true
+			}
+			for _, tag := range m.Tags {
+				if tag == model {
+					return true
+				}
+			}
+			return false
+		}) {
+			_, _, err = desktopClient.Pull(model, func(s string) {
+				_ = sendInfo(s)
+			})
+			if err != nil {
+				_ = sendErrorf("Failed to pull model: %v", err)
+				return fmt.Errorf("Failed to pull model: %v\n", err)
+			}
+		}
+
+	}
+	_ = setenv("MODEL", strings.Join(models, ","))
+	return nil
 }
 
 type jsonMessage struct {
