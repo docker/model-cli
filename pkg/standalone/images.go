@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -59,20 +58,12 @@ func EnsureControllerImage(ctx context.Context, dockerClient *client.Client, gpu
 // PruneControllerImages removes any unused controller container images.
 func PruneControllerImages(ctx context.Context, dockerClient *client.Client, printer StatusPrinter) error {
 	// Remove the standard image, if present.
-	_, err := dockerClient.ImageRemove(ctx, controllerImage, image.RemoveOptions{})
-	if err != nil && !strings.Contains(err.Error(), "No such image") {
-		return err
-	}
-	if err == nil {
+	if _, err := dockerClient.ImageRemove(ctx, controllerImage, image.RemoveOptions{}); err == nil {
 		printer.Println("Removed image", controllerImage)
 	}
 
 	// Remove the GPU image, if present.
-	_, err = dockerClient.ImageRemove(ctx, controllerImageGPU, image.RemoveOptions{})
-	if err != nil && !strings.Contains(err.Error(), "No such image") {
-		return err
-	}
-	if err == nil {
+	if _, err := dockerClient.ImageRemove(ctx, controllerImageGPU, image.RemoveOptions{}); err == nil {
 		printer.Println("Removed image", controllerImageGPU)
 	}
 	return nil
