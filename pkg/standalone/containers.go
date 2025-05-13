@@ -73,15 +73,8 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 		},
 	}
 	if gpu {
-		hostConfig.Resources = container.Resources{
-			DeviceRequests: []container.DeviceRequest{
-				{
-					Driver:       "nvidia",
-					Count:        -1,
-					Capabilities: [][]string{{"gpu"}},
-				},
-			},
-		}
+		hostConfig.Runtime = "nvidia"
+		hostConfig.DeviceRequests = []container.DeviceRequest{{Count: -1, Capabilities: [][]string{{"gpu"}}}}
 	}
 
 	// Create the container.
