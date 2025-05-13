@@ -23,6 +23,9 @@ func newListCmd() *cobra.Command {
 			if openai && quiet {
 				return fmt.Errorf("--quiet flag cannot be used with --openai flag")
 			}
+			if err := ensureStandaloneRunnerAvailable(cmd.Context(), nil); err != nil {
+				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
+			}
 			models, err := listModels(openai, desktopClient, quiet, jsonFormat)
 			if err != nil {
 				return err

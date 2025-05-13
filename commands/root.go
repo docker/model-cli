@@ -10,6 +10,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// dockerCLI is the Docker CLI environment associated with the command.
+var dockerCLI *command.DockerCli
+
 // modelRunner is the model runner context. It is initialized by the root
 // command's PersistentPreRunE.
 var modelRunner *desktop.ModelRunnerContext
@@ -41,10 +44,11 @@ func NewRootCmd(cli *command.DockerCli) *cobra.Command {
 			} else if err := plugin.PersistentPreRunE(cmd, args); err != nil {
 				return err
 			}
+			dockerCLI = cli
 
 			// Detect the model runner context and create a client for it.
 			var err error
-			modelRunner, err = desktop.DetectContext(cli)
+			modelRunner, err = desktop.DetectContext(dockerCLI)
 			if err != nil {
 				return fmt.Errorf("unable to detect model runner context: %w", err)
 			}
@@ -81,8 +85,8 @@ func NewRootCmd(cli *command.DockerCli) *cobra.Command {
 		newInspectCmd(),
 		newComposeCmd(),
 		newTagCmd(),
-		newInstallRunner(cli),
-		newUninstallRunner(cli),
+		newInstallRunner(),
+		newUninstallRunner(),
 	)
 	return rootCmd
 }

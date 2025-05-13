@@ -139,12 +139,19 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 	// Check for an explicit endpoint setting.
 	dmrHost := os.Getenv("DMR_HOST")
 
+	// Check if we're treating Docker Desktop as regular Moby. This is only for
+	// testing purposes.
+	treatDesktopAsMoby := os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") != ""
+
 	// Detect the associated engine type.
 	kind := ModelRunnerEngineKindMoby
 	if dmrHost != "" {
 		kind = ModelRunnerEngineKindMobyManual
 	} else if isDesktopContext(cli) {
 		kind = ModelRunnerEngineKindDesktop
+		if treatDesktopAsMoby {
+			kind = ModelRunnerEngineKindMoby
+		}
 	} else if isCloudContext(cli) {
 		kind = ModelRunnerEngineKindCloud
 	}
@@ -157,6 +164,9 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 		rawURLPrefix = dmrHost
 	} else if kind == ModelRunnerEngineKindDesktop {
 		rawURLPrefix = "http://localhost" + inference.ExperimentalEndpointsPrefix
+		if treatDesktopAsMoby {
+			rawURLPrefix = "http://localhost:" + strconv.Itoa(int(standalone.DefaultControllerPort))
+		}
 	} else { // ModelRunnerEngineKindCloud
 		rawURLPrefix = "http://localhost/"
 	}
@@ -175,6 +185,9 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 			return nil, fmt.Errorf("unable to create model runner client: %w", err)
 		}
 		client = dockerClient.HTTPClient()
+		if treatDesktopAsMoby {
+			client = http.DefaultClient
+		}
 	} else { // ModelRunnerEngineKindCloud
 		dockerClient, err := DockerClientForContext(cli, cli.CurrentContext())
 		if err != nil {

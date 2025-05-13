@@ -15,7 +15,7 @@ const modelStorageVolumeName = "docker-model-runner-models"
 // EnsureModelStorageVolume ensures that a model storage volume exists, creating
 // it if necessary. It returns the name of the storage volume or any error that
 // occurred.
-func EnsureModelStorageVolume(ctx context.Context, dockerClient *client.Client) (string, error) {
+func EnsureModelStorageVolume(ctx context.Context, dockerClient *client.Client, printer StatusPrinter) (string, error) {
 	// Try to identify the storage volume.
 	volumes, err := dockerClient.VolumeList(ctx, volume.ListOptions{
 		Filters: filters.NewArgs(
@@ -33,6 +33,7 @@ func EnsureModelStorageVolume(ctx context.Context, dockerClient *client.Client) 
 	}
 
 	// Create the volume.
+	printer.Printf("Creating model storage volume %s...\n", modelStorageVolumeName)
 	volume, err := dockerClient.VolumeCreate(ctx, volume.CreateOptions{
 		Name: modelStorageVolumeName,
 		Labels: map[string]string{

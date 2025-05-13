@@ -33,6 +33,10 @@ func newRunCmd() *cobra.Command {
 				}
 			}
 
+			if err := ensureStandaloneRunnerAvailable(cmd.Context(), cmd); err != nil {
+				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
+			}
+
 			modelDetail, err := desktopClient.Inspect(model)
 			if err != nil {
 				if !errors.Is(err, desktop.ErrNotFound) {

@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/docker/cli/cli-plugins/hooks"
@@ -14,6 +15,9 @@ func newStatusCmd() *cobra.Command {
 		Use:   "status",
 		Short: "Check if the Docker Model Runner is running",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := ensureStandaloneRunnerAvailable(cmd.Context(), cmd); err != nil {
+				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
+			}
 			status := desktopClient.Status()
 			if status.Error != nil {
 				return handleClientError(status.Error, "Failed to get Docker Model Runner status")

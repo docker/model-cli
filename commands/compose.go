@@ -33,6 +33,10 @@ func newUpCommand(desktopClient *desktop.Client) *cobra.Command {
 				return err
 			}
 
+			if err := ensureStandaloneRunnerAvailable(cmd.Context(), nil); err != nil {
+				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
+			}
+
 			_, _, err := desktopClient.Pull(model, func(s string) {
 				sendInfo(s)
 			})
