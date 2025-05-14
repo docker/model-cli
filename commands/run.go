@@ -89,7 +89,7 @@ func newRunCmd() *cobra.Command {
 			}
 			return nil
 		},
-		ValidArgsFunction: completion.ModelNames(desktopClient, 1),
+		ValidArgsFunction: completion.ModelNames(getDesktopClient, 1),
 	}
 	c.Args = func(cmd *cobra.Command, args []string) error {
 		if len(args) < 1 {

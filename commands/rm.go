@@ -37,7 +37,7 @@ func newRemoveCmd() *cobra.Command {
 			}
 			return nil
 		},
-		ValidArgsFunction: completion.ModelNames(desktopClient, -1),
+		ValidArgsFunction: completion.ModelNames(getDesktopClient, -1),
 	}
 
 	c.Flags().BoolVarP(&force, "force", "f", false, "Forcefully remove the model")

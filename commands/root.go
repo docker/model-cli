@@ -13,13 +13,31 @@ import (
 // dockerCLI is the Docker CLI environment associated with the command.
 var dockerCLI *command.DockerCli
 
+// getDockerCLI is an accessor for dockerCLI that can be passed to other
+// packages.
+func getDockerCLI() *command.DockerCli {
+	return dockerCLI
+}
+
 // modelRunner is the model runner context. It is initialized by the root
 // command's PersistentPreRunE.
 var modelRunner *desktop.ModelRunnerContext
 
+// getModelRunner is an accessor for modelRunner that can be passed to other
+// packages.
+func getModelRunner() *desktop.ModelRunnerContext {
+	return modelRunner
+}
+
 // desktopClient is the model runner client. It is initialized by the root
 // command's PersistentPreRunE.
 var desktopClient *desktop.Client
+
+// getDesktopClient is an accessor for desktopClient that can be passed to other
+// packages.
+func getDesktopClient() *desktop.Client {
+	return desktopClient
+}
 
 func NewRootCmd(cli *command.DockerCli) *cobra.Command {
 	// If we're running in standalone mode, then we're responsible for
