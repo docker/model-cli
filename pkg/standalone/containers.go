@@ -11,6 +11,7 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	gpupkg "github.com/docker/model-cli/pkg/gpu"
 )
 
 // controllerContainerName is the name to use for the controller container.
@@ -22,7 +23,12 @@ const controllerContainerName = "docker-model-runner"
 func FindControllerContainer(ctx context.Context, dockerClient *client.Client) (string, string, error) {
 	// Identify all controller containers.
 	containers, err := dockerClient.ContainerList(ctx, container.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("label", labelRole+"="+roleController)),
+		Filters: filters.NewArgs(
+			// Don't include a value on this first label selector; Docker Cloud
+			// middleware only shows these containers if no value is queried.
+			filters.Arg("label", labelDesktopService),
+			filters.Arg("label", labelRole+"="+roleController),
+		),
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("unable to identify model runner containers: %w", err)
@@ -38,13 +44,18 @@ func FindControllerContainer(ctx context.Context, dockerClient *client.Client) (
 }
 
 // CreateControllerContainer creates and starts a controller container.
-func CreateControllerContainer(ctx context.Context, dockerClient *client.Client, port uint16, gpu bool, modelStorageVolume string, printer StatusPrinter) error {
+func CreateControllerContainer(ctx context.Context, dockerClient *client.Client, port uint16, gpu gpupkg.GPUSupport, modelStorageVolume string, printer StatusPrinter) error {
+	// Determine the target image.
+	var imageName string
+	switch gpu {
+	case gpupkg.GPUSupportCUDA:
+		imageName = ControllerImage + ":" + controllerImageTagCUDA
+	default:
+		imageName = ControllerImage + ":" + controllerImageTagCPU
+	}
+
 	// Set up the container configuration.
 	portStr := strconv.Itoa(int(port))
-	imageName := ControllerImage + ":" + controllerImageTagCPU
-	if gpu {
-		imageName = ControllerImage + ":" + controllerImageTagGPU
-	}
 	config := &container.Config{
 		Image: imageName,
 		Env: []string{
@@ -54,7 +65,8 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 			nat.Port(portStr + "/tcp"): struct{}{},
 		},
 		Labels: map[string]string{
-			labelRole: roleController,
+			labelDesktopService: serviceModelRunner,
+			labelRole:           roleController,
 		},
 	}
 	hostConfig := &container.HostConfig{
@@ -72,7 +84,7 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 			Name: "always",
 		},
 	}
-	if gpu {
+	if gpu == gpupkg.GPUSupportCUDA {
 		hostConfig.Runtime = "nvidia"
 		hostConfig.DeviceRequests = []container.DeviceRequest{{Count: -1, Capabilities: [][]string{{"gpu"}}}}
 	}
@@ -97,8 +109,13 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 func PruneControllerContainers(ctx context.Context, dockerClient *client.Client, printer StatusPrinter) error {
 	// Identify all controller containers.
 	containers, err := dockerClient.ContainerList(ctx, container.ListOptions{
-		All:     true,
-		Filters: filters.NewArgs(filters.Arg("label", labelRole+"="+roleController)),
+		All: true,
+		Filters: filters.NewArgs(
+			// Don't include a value on this first label selector; Docker Cloud
+			// middleware only shows these containers if no value is queried.
+			filters.Arg("label", labelDesktopService),
+			filters.Arg("label", labelRole+"="+roleController),
+		),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to identify model runner containers: %w", err)

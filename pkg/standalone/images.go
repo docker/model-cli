@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 	"github.com/docker/docker/pkg/jsonmessage"
+	gpupkg "github.com/docker/model-cli/pkg/gpu"
 )
 
 const (
@@ -17,17 +18,20 @@ const (
 	// controllerImageTagCPU is the image tag used for the controller container
 	// when running with the CPU backend.
 	controllerImageTagCPU = "latest"
-	// controllerImageTagGPU is the image tag used for the controller container
-	// when running with the GPU backend.
-	controllerImageTagGPU = "latest-cuda"
+	// controllerImageTagCUDA is the image tag used for the controller container
+	// when running with the CUDA GPU backend.
+	controllerImageTagCUDA = "latest-cuda"
 )
 
 // EnsureControllerImage ensures that the controller container image is pulled.
-func EnsureControllerImage(ctx context.Context, dockerClient *client.Client, gpu bool, printer StatusPrinter) error {
+func EnsureControllerImage(ctx context.Context, dockerClient *client.Client, gpu gpupkg.GPUSupport, printer StatusPrinter) error {
 	// Determine the target image.
-	imageName := ControllerImage + ":" + controllerImageTagCPU
-	if gpu {
-		imageName = ControllerImage + ":" + controllerImageTagGPU
+	var imageName string
+	switch gpu {
+	case gpupkg.GPUSupportCUDA:
+		imageName = ControllerImage + ":" + controllerImageTagCUDA
+	default:
+		imageName = ControllerImage + ":" + controllerImageTagCPU
 	}
 
 	// Perform the pull.
@@ -66,10 +70,10 @@ func PruneControllerImages(ctx context.Context, dockerClient *client.Client, pri
 		printer.Println("Removed image", imageNameCPU)
 	}
 
-	// Remove the GPU image, if present.
-	imageNameGPU := ControllerImage + ":" + controllerImageTagGPU
-	if _, err := dockerClient.ImageRemove(ctx, imageNameGPU, image.RemoveOptions{}); err == nil {
-		printer.Println("Removed image", imageNameGPU)
+	// Remove the CUDA GPU image, if present.
+	imageNameCUDA := ControllerImage + ":" + controllerImageTagCUDA
+	if _, err := dockerClient.ImageRemove(ctx, imageNameCUDA, image.RemoveOptions{}); err == nil {
+		printer.Println("Removed image", imageNameCUDA)
 	}
 	return nil
 }
