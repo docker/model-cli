@@ -9,6 +9,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	gpupkg "github.com/docker/model-cli/pkg/gpu"
@@ -41,6 +42,22 @@ func FindControllerContainer(ctx context.Context, dockerClient *client.Client) (
 		containerName = strings.TrimPrefix(containers[0].Names[0], "/")
 	}
 	return containers[0].ID, containerName, nil
+}
+
+// determineBridgeGatewayIP attempts to identify the engine's host gateway IP
+// address on the bridge network. It may return an empty IP address even with a
+// nil error if no IP could be identified.
+func determineBridgeGatewayIP(ctx context.Context, dockerClient *client.Client) (string, error) {
+	bridge, err := dockerClient.NetworkInspect(ctx, "bridge", network.InspectOptions{})
+	if err != nil {
+		return "", err
+	}
+	for _, config := range bridge.IPAM.Config {
+		if config.Gateway != "" {
+			return config.Gateway, nil
+		}
+	}
+	return "", nil
 }
 
 // CreateControllerContainer creates and starts a controller container.
@@ -77,12 +94,16 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 				Target: "/models",
 			},
 		},
-		PortBindings: nat.PortMap{
-			nat.Port(portStr + "/tcp"): []nat.PortBinding{{HostIP: "", HostPort: portStr}},
-		},
 		RestartPolicy: container.RestartPolicy{
 			Name: "always",
 		},
+	}
+	portBindings := []nat.PortBinding{{HostIP: "127.0.0.1", HostPort: portStr}}
+	if bridgeGatewayIP, err := determineBridgeGatewayIP(ctx, dockerClient); err == nil && bridgeGatewayIP != "" {
+		portBindings = append(portBindings, nat.PortBinding{HostIP: bridgeGatewayIP, HostPort: portStr})
+	}
+	hostConfig.PortBindings = nat.PortMap{
+		nat.Port(portStr + "/tcp"): portBindings,
 	}
 	if gpu == gpupkg.GPUSupportCUDA {
 		hostConfig.Runtime = "nvidia"
