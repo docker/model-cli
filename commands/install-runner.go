@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -13,11 +14,40 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// noopPrinter is used to silence auto-install progress if desired.
 type noopPrinter struct{}
 
 func (*noopPrinter) Printf(format string, args ...any) {}
 
 func (*noopPrinter) Println(args ...any) {}
+
+const (
+	// installWaitTries controls how many times the automatic installation will
+	// try to reach the model runner while waiting for it to be ready.
+	installWaitTries = 20
+	// installWaitRetryInterval controls the interval at which automatic
+	// installation will try to reach the model runner while waiting for it to
+	// be ready.
+	installWaitRetryInterval = 500 * time.Millisecond
+)
+
+// waitForStandaloneRunnerAfterInstall waits for a standalone model runner
+// container to come online after installation. The CPU version can take about a
+// second to start serving requests once the container has started, the CUDA
+// version can take several seconds.
+func waitForStandaloneRunnerAfterInstall(ctx context.Context) error {
+	for tries := installWaitTries; tries > 0; tries-- {
+		if status := desktopClient.Status(); status.Error == nil && status.Running {
+			return nil
+		}
+		select {
+		case <-time.After(installWaitRetryInterval):
+		case <-ctx.Done():
+			return errors.New("cancelled waiting for standalone model runner to initialize")
+		}
+	}
+	return errors.New("standalone model runner took too long to initialize")
+}
 
 // ensureStandaloneRunnerAvailable is a utility function that other commands can
 // use to initialize a default standalone model runner. It is a no-op in
@@ -77,10 +107,8 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 		return fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 	}
 
-	// Give the model runner one second to start.
-	time.Sleep(1 * time.Second)
-
-	return nil
+	// Poll until we get a response from the model runner.
+	return waitForStandaloneRunnerAfterInstall(ctx)
 }
 
 func newInstallRunner() *cobra.Command {
@@ -150,7 +178,8 @@ func newInstallRunner() *cobra.Command {
 				return fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 			}
 
-			return nil
+			// Poll until we get a response from the model runner.
+			return waitForStandaloneRunnerAfterInstall(cmd.Context())
 		},
 		ValidArgsFunction: completion.NoComplete,
 	}
