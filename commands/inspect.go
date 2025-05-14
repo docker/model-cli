@@ -34,7 +34,7 @@ func newInspectCmd() *cobra.Command {
 			cmd.Print(inspectedModel)
 			return nil
 		},
-		ValidArgsFunction: completion.ModelNames(desktopClient, 1),
+		ValidArgsFunction: completion.ModelNames(getDesktopClient, 1),
 	}
 	c.Flags().BoolVar(&openai, "openai", false, "List model in an OpenAI format")
 	return c

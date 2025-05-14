@@ -10,12 +10,17 @@ func NoComplete(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCo
 }
 
 // ModelNames offers completion for models present within the local store.
-func ModelNames(desktopClient *desktop.Client, limit int) cobra.CompletionFunc {
+func ModelNames(desktopClient func() *desktop.Client, limit int) cobra.CompletionFunc {
 	return func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		// HACK: Invoke rootCmd's PersistentPreRunE, which is needed for context
+		// detection and client initialization. This function isn't invoked
+		// automatically on autocompletion paths.
+		cmd.Parent().PersistentPreRunE(cmd, args)
+
 		if limit > 0 && len(args) >= limit {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		models, err := desktopClient.List()
+		models, err := desktopClient().List()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}
