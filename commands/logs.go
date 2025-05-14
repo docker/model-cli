@@ -33,7 +33,10 @@ func newLogsCmd() *cobra.Command {
 
 			// If we're running in standalone mode, then print the container
 			// logs.
-			if modelRunner.EngineKind() == desktop.ModelRunnerEngineKindMoby {
+			engineKind := modelRunner.EngineKind()
+			useStandaloneLogs := engineKind == desktop.ModelRunnerEngineKindMoby ||
+				engineKind == desktop.ModelRunnerEngineKindCloud
+			if useStandaloneLogs {
 				dockerClient, err := desktop.DockerClientForContext(dockerCLI, dockerCLI.CurrentContext())
 				if err != nil {
 					return fmt.Errorf("failed to create Docker client: %w", err)
