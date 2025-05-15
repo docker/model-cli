@@ -96,7 +96,11 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 	}
 
 	// Create the model runner container.
-	if err := standalone.CreateControllerContainer(ctx, dockerClient, standalone.DefaultControllerPort, gpu, modelStorageVolume, printer); err != nil {
+	port := uint16(standalone.DefaultControllerPortMoby)
+	if engineKind == desktop.ModelRunnerEngineKindCloud {
+		port = standalone.DefaultControllerPortCloud
+	}
+	if err := standalone.CreateControllerContainer(ctx, dockerClient, port, gpu, modelStorageVolume, printer); err != nil {
 		return fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 	}
 
@@ -112,16 +116,29 @@ func newInstallRunner() *cobra.Command {
 		Short: "Install Docker Model Runner",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Ensure that we're running in a supported model runner context.
-			if kind := modelRunner.EngineKind(); kind == desktop.ModelRunnerEngineKindDesktop {
+			engineKind := modelRunner.EngineKind()
+			if engineKind == desktop.ModelRunnerEngineKindDesktop {
 				// TODO: We may eventually want to auto-forward this to
 				// docker desktop enable model-runner, but we should first make
 				// sure the CLI flags match.
 				cmd.Println("Standalone installation not supported with Docker Desktop")
 				cmd.Println("Use `docker desktop enable model-runner` instead")
 				return nil
-			} else if kind == desktop.ModelRunnerEngineKindMobyManual {
+			} else if engineKind == desktop.ModelRunnerEngineKindMobyManual {
 				cmd.Println("Standalone installation not supported with MODEL_RUNNER_HOST set")
 				return nil
+			}
+
+			// HACK: If we're in a Cloud context, then we need to use a
+			// different default port because it conflicts with Docker Desktop's
+			// default model runner host-side port. Unfortunately we can't make
+			// the port flag default dynamic (at least not easily) because of
+			// when context detection happens. So assume that a default value
+			// indicates that we want the Cloud default port. This is less
+			// problematic in Cloud since the UX there is mostly invisible.
+			if engineKind == desktop.ModelRunnerEngineKindCloud &&
+				port == standalone.DefaultControllerPortMoby {
+				port = standalone.DefaultControllerPortCloud
 			}
 
 			// Create a Docker client for the active context.
@@ -176,7 +193,7 @@ func newInstallRunner() *cobra.Command {
 		},
 		ValidArgsFunction: completion.NoComplete,
 	}
-	c.Flags().Uint16Var(&port, "port", standalone.DefaultControllerPort,
+	c.Flags().Uint16Var(&port, "port", standalone.DefaultControllerPortMoby,
 		"Docker container port for Docker Model Runner")
 	c.Flags().StringVar(&gpuMode, "gpu", "auto", "Specify GPU support (none|auto|cuda)")
 	return c
