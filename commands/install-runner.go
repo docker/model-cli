@@ -14,13 +14,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// noopPrinter is used to silence auto-install progress if desired.
-type noopPrinter struct{}
-
-func (*noopPrinter) Printf(format string, args ...any) {}
-
-func (*noopPrinter) Println(args ...any) {}
-
 const (
 	// installWaitTries controls how many times the automatic installation will
 	// try to reach the model runner while waiting for it to be ready.
@@ -68,7 +61,7 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 
 	// Ensure that the output printer is non-nil.
 	if printer == nil {
-		printer = &noopPrinter{}
+		printer = standalone.NoopPrinter()
 	}
 
 	// Create a Docker client for the active context.

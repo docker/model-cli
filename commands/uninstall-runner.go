@@ -35,7 +35,7 @@ func newUninstallRunner() *cobra.Command {
 			}
 
 			// Remove any model runner containers.
-			if err := standalone.PruneControllerContainers(cmd.Context(), dockerClient, cmd); err != nil {
+			if err := standalone.PruneControllerContainers(cmd.Context(), dockerClient, false, cmd); err != nil {
 				return fmt.Errorf("unable to remove model runner container(s): %w", err)
 			}
 

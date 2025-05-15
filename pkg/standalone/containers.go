@@ -22,6 +22,11 @@ const controllerContainerName = "docker-model-runner"
 // returns the ID of the container (if found), the container name (if any), or
 // any error that occurred.
 func FindControllerContainer(ctx context.Context, dockerClient *client.Client) (string, string, error) {
+	// Before listing, prune any stopped controller containers.
+	if err := PruneControllerContainers(ctx, dockerClient, true, NoopPrinter()); err != nil {
+		return "", "", fmt.Errorf("unable to prune stopped model runner containers: %w", err)
+	}
+
 	// Identify all controller containers.
 	containers, err := dockerClient.ContainerList(ctx, container.ListOptions{
 		Filters: filters.NewArgs(
@@ -127,7 +132,7 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 
 // PruneControllerContainers stops and removes any model runner controller
 // containers.
-func PruneControllerContainers(ctx context.Context, dockerClient *client.Client, printer StatusPrinter) error {
+func PruneControllerContainers(ctx context.Context, dockerClient *client.Client, skipRunning bool, printer StatusPrinter) error {
 	// Identify all controller containers.
 	containers, err := dockerClient.ContainerList(ctx, container.ListOptions{
 		All: true,
@@ -144,6 +149,9 @@ func PruneControllerContainers(ctx context.Context, dockerClient *client.Client,
 
 	// Remove all controller containers.
 	for _, ctr := range containers {
+		if skipRunning && ctr.State == "running" {
+			continue
+		}
 		if len(ctr.Names) > 0 {
 			printer.Printf("Removing container %s (%s)...\n", strings.TrimPrefix(ctr.Names[0], "/"), ctr.ID[:12])
 		} else {
