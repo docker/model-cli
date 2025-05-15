@@ -7,6 +7,7 @@ import (
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/commands/formatter"
 	"github.com/docker/model-cli/desktop"
+	"github.com/docker/model-cli/pkg/standalone"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"os"
@@ -23,7 +24,13 @@ func newListCmd() *cobra.Command {
 			if openai && quiet {
 				return fmt.Errorf("--quiet flag cannot be used with --openai flag")
 			}
-			if err := ensureStandaloneRunnerAvailable(cmd.Context(), nil); err != nil {
+			// If we're doing an automatic install, only show the installation
+			// status if it won't corrupt machine-readable output.
+			var standaloneInstallPrinter standalone.StatusPrinter
+			if !jsonFormat && !openai && !quiet {
+				standaloneInstallPrinter = cmd
+			}
+			if err := ensureStandaloneRunnerAvailable(cmd.Context(), standaloneInstallPrinter); err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
 			models, err := listModels(openai, desktopClient, quiet, jsonFormat)
