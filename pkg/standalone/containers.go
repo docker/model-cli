@@ -9,8 +9,10 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	gpupkg "github.com/docker/model-cli/pkg/gpu"
 )
 
 // controllerContainerName is the name to use for the controller container.
@@ -20,9 +22,19 @@ const controllerContainerName = "docker-model-runner"
 // returns the ID of the container (if found), the container name (if any), or
 // any error that occurred.
 func FindControllerContainer(ctx context.Context, dockerClient *client.Client) (string, string, error) {
+	// Before listing, prune any stopped controller containers.
+	if err := PruneControllerContainers(ctx, dockerClient, true, NoopPrinter()); err != nil {
+		return "", "", fmt.Errorf("unable to prune stopped model runner containers: %w", err)
+	}
+
 	// Identify all controller containers.
 	containers, err := dockerClient.ContainerList(ctx, container.ListOptions{
-		Filters: filters.NewArgs(filters.Arg("label", labelRole+"="+roleController)),
+		Filters: filters.NewArgs(
+			// Don't include a value on this first label selector; Docker Cloud
+			// middleware only shows these containers if no value is queried.
+			filters.Arg("label", labelDesktopService),
+			filters.Arg("label", labelRole+"="+roleController),
+		),
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("unable to identify model runner containers: %w", err)
@@ -37,14 +49,35 @@ func FindControllerContainer(ctx context.Context, dockerClient *client.Client) (
 	return containers[0].ID, containerName, nil
 }
 
+// determineBridgeGatewayIP attempts to identify the engine's host gateway IP
+// address on the bridge network. It may return an empty IP address even with a
+// nil error if no IP could be identified.
+func determineBridgeGatewayIP(ctx context.Context, dockerClient *client.Client) (string, error) {
+	bridge, err := dockerClient.NetworkInspect(ctx, "bridge", network.InspectOptions{})
+	if err != nil {
+		return "", err
+	}
+	for _, config := range bridge.IPAM.Config {
+		if config.Gateway != "" {
+			return config.Gateway, nil
+		}
+	}
+	return "", nil
+}
+
 // CreateControllerContainer creates and starts a controller container.
-func CreateControllerContainer(ctx context.Context, dockerClient *client.Client, port uint16, gpu bool, modelStorageVolume string, printer StatusPrinter) error {
+func CreateControllerContainer(ctx context.Context, dockerClient *client.Client, port uint16, gpu gpupkg.GPUSupport, modelStorageVolume string, printer StatusPrinter) error {
+	// Determine the target image.
+	var imageName string
+	switch gpu {
+	case gpupkg.GPUSupportCUDA:
+		imageName = ControllerImage + ":" + controllerImageTagCUDA
+	default:
+		imageName = ControllerImage + ":" + controllerImageTagCPU
+	}
+
 	// Set up the container configuration.
 	portStr := strconv.Itoa(int(port))
-	imageName := ControllerImage + ":" + controllerImageTagCPU
-	if gpu {
-		imageName = ControllerImage + ":" + controllerImageTagGPU
-	}
 	config := &container.Config{
 		Image: imageName,
 		Env: []string{
@@ -54,7 +87,8 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 			nat.Port(portStr + "/tcp"): struct{}{},
 		},
 		Labels: map[string]string{
-			labelRole: roleController,
+			labelDesktopService: serviceModelRunner,
+			labelRole:           roleController,
 		},
 	}
 	hostConfig := &container.HostConfig{
@@ -65,14 +99,18 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 				Target: "/models",
 			},
 		},
-		PortBindings: nat.PortMap{
-			nat.Port(portStr + "/tcp"): []nat.PortBinding{{HostIP: "", HostPort: portStr}},
-		},
 		RestartPolicy: container.RestartPolicy{
 			Name: "always",
 		},
 	}
-	if gpu {
+	portBindings := []nat.PortBinding{{HostIP: "127.0.0.1", HostPort: portStr}}
+	if bridgeGatewayIP, err := determineBridgeGatewayIP(ctx, dockerClient); err == nil && bridgeGatewayIP != "" {
+		portBindings = append(portBindings, nat.PortBinding{HostIP: bridgeGatewayIP, HostPort: portStr})
+	}
+	hostConfig.PortBindings = nat.PortMap{
+		nat.Port(portStr + "/tcp"): portBindings,
+	}
+	if gpu == gpupkg.GPUSupportCUDA {
 		hostConfig.Runtime = "nvidia"
 		hostConfig.DeviceRequests = []container.DeviceRequest{{Count: -1, Capabilities: [][]string{{"gpu"}}}}
 	}
@@ -94,11 +132,16 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 
 // PruneControllerContainers stops and removes any model runner controller
 // containers.
-func PruneControllerContainers(ctx context.Context, dockerClient *client.Client, printer StatusPrinter) error {
+func PruneControllerContainers(ctx context.Context, dockerClient *client.Client, skipRunning bool, printer StatusPrinter) error {
 	// Identify all controller containers.
 	containers, err := dockerClient.ContainerList(ctx, container.ListOptions{
-		All:     true,
-		Filters: filters.NewArgs(filters.Arg("label", labelRole+"="+roleController)),
+		All: true,
+		Filters: filters.NewArgs(
+			// Don't include a value on this first label selector; Docker Cloud
+			// middleware only shows these containers if no value is queried.
+			filters.Arg("label", labelDesktopService),
+			filters.Arg("label", labelRole+"="+roleController),
+		),
 	})
 	if err != nil {
 		return fmt.Errorf("unable to identify model runner containers: %w", err)
@@ -106,6 +149,9 @@ func PruneControllerContainers(ctx context.Context, dockerClient *client.Client,
 
 	// Remove all controller containers.
 	for _, ctr := range containers {
+		if skipRunning && ctr.State == "running" {
+			continue
+		}
 		if len(ctr.Names) > 0 {
 			printer.Printf("Removing container %s (%s)...\n", strings.TrimPrefix(ctr.Names[0], "/"), ctr.ID[:12])
 		} else {

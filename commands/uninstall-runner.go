@@ -26,9 +26,6 @@ func newUninstallRunner() *cobra.Command {
 			} else if kind == desktop.ModelRunnerEngineKindMobyManual {
 				cmd.Println("Standalone uninstallation not supported with MODEL_RUNNER_HOST set")
 				return nil
-			} else if kind == desktop.ModelRunnerEngineKindCloud {
-				cmd.Println("Standalone uninstallation not supported with Docker Cloud")
-				return nil
 			}
 
 			// Create a Docker client for the active context.
@@ -38,7 +35,7 @@ func newUninstallRunner() *cobra.Command {
 			}
 
 			// Remove any model runner containers.
-			if err := standalone.PruneControllerContainers(cmd.Context(), dockerClient, cmd); err != nil {
+			if err := standalone.PruneControllerContainers(cmd.Context(), dockerClient, false, cmd); err != nil {
 				return fmt.Errorf("unable to remove model runner container(s): %w", err)
 			}
 

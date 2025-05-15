@@ -37,7 +37,8 @@ func EnsureModelStorageVolume(ctx context.Context, dockerClient *client.Client, 
 	volume, err := dockerClient.VolumeCreate(ctx, volume.CreateOptions{
 		Name: modelStorageVolumeName,
 		Labels: map[string]string{
-			labelRole: roleModelStorage,
+			labelDesktopService: serviceModelRunner,
+			labelRole:           roleModelStorage,
 		},
 	})
 	if err != nil {

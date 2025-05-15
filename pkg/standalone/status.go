@@ -7,3 +7,17 @@ type StatusPrinter interface {
 	// Println should perform line-based printing.
 	Println(args ...any)
 }
+
+// noopPrinter is used to silence auto-install progress if desired.
+type noopPrinter struct{}
+
+// Printf implements StatusPrinter.Printf.
+func (*noopPrinter) Printf(format string, args ...any) {}
+
+// Println implements StatusPrinter.Println.
+func (*noopPrinter) Println(args ...any) {}
+
+// NoopPrinter returns a StatusPrinter that does nothing.
+func NoopPrinter() StatusPrinter {
+	return &noopPrinter{}
+}

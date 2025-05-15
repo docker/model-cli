@@ -2,28 +2,55 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
+	gpupkg "github.com/docker/model-cli/pkg/gpu"
 	"github.com/docker/model-cli/pkg/standalone"
 	"github.com/spf13/cobra"
 )
 
-type noopPrinter struct{}
+const (
+	// installWaitTries controls how many times the automatic installation will
+	// try to reach the model runner while waiting for it to be ready.
+	installWaitTries = 20
+	// installWaitRetryInterval controls the interval at which automatic
+	// installation will try to reach the model runner while waiting for it to
+	// be ready.
+	installWaitRetryInterval = 500 * time.Millisecond
+)
 
-func (*noopPrinter) Printf(format string, args ...any) {}
-
-func (*noopPrinter) Println(args ...any) {}
+// waitForStandaloneRunnerAfterInstall waits for a standalone model runner
+// container to come online after installation. The CPU version can take about a
+// second to start serving requests once the container has started, the CUDA
+// version can take several seconds.
+func waitForStandaloneRunnerAfterInstall(ctx context.Context) error {
+	for tries := installWaitTries; tries > 0; tries-- {
+		if status := desktopClient.Status(); status.Error == nil && status.Running {
+			return nil
+		}
+		select {
+		case <-time.After(installWaitRetryInterval):
+		case <-ctx.Done():
+			return errors.New("cancelled waiting for standalone model runner to initialize")
+		}
+	}
+	return errors.New("standalone model runner took too long to initialize")
+}
 
 // ensureStandaloneRunnerAvailable is a utility function that other commands can
 // use to initialize a default standalone model runner. It is a no-op in
 // unsupported contexts or if automatic installs have been disabled.
 func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.StatusPrinter) error {
 	// If we're not in a supported model runner context, then don't do anything.
-	if modelRunner.EngineKind() != desktop.ModelRunnerEngineKindMoby {
+	engineKind := modelRunner.EngineKind()
+	standaloneSupported := engineKind == desktop.ModelRunnerEngineKindMoby ||
+		engineKind == desktop.ModelRunnerEngineKindCloud
+	if !standaloneSupported {
 		return nil
 	}
 
@@ -34,7 +61,7 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 
 	// Ensure that the output printer is non-nil.
 	if printer == nil {
-		printer = &noopPrinter{}
+		printer = standalone.NoopPrinter()
 	}
 
 	// Create a Docker client for the active context.
@@ -51,8 +78,14 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 		return nil
 	}
 
+	// Automatically determine GPU support.
+	gpu, err := gpupkg.ProbeGPUSupport(ctx, dockerClient)
+	if err != nil {
+		return fmt.Errorf("unable to probe GPU support: %w", err)
+	}
+
 	// Ensure that we have an up-to-date copy of the image.
-	if err := standalone.EnsureControllerImage(ctx, dockerClient, false, printer); err != nil {
+	if err := standalone.EnsureControllerImage(ctx, dockerClient, gpu, printer); err != nil {
 		return fmt.Errorf("unable to pull latest standalone model runner image: %w", err)
 	}
 
@@ -63,19 +96,17 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 	}
 
 	// Create the model runner container.
-	if err := standalone.CreateControllerContainer(ctx, dockerClient, standalone.DefaultControllerPort, false, modelStorageVolume, printer); err != nil {
+	if err := standalone.CreateControllerContainer(ctx, dockerClient, standalone.DefaultControllerPort, gpu, modelStorageVolume, printer); err != nil {
 		return fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 	}
 
-	// Give the model runner one second to start.
-	time.Sleep(1 * time.Second)
-
-	return nil
+	// Poll until we get a response from the model runner.
+	return waitForStandaloneRunnerAfterInstall(ctx)
 }
 
 func newInstallRunner() *cobra.Command {
 	var port uint16
-	var gpu bool
+	var gpuMode string
 	c := &cobra.Command{
 		Use:   "install-runner",
 		Short: "Install Docker Model Runner",
@@ -90,9 +121,6 @@ func newInstallRunner() *cobra.Command {
 				return nil
 			} else if kind == desktop.ModelRunnerEngineKindMobyManual {
 				cmd.Println("Standalone installation not supported with MODEL_RUNNER_HOST set")
-				return nil
-			} else if kind == desktop.ModelRunnerEngineKindCloud {
-				cmd.Println("Standalone installation not required with Docker Cloud")
 				return nil
 			}
 
@@ -114,6 +142,19 @@ func newInstallRunner() *cobra.Command {
 				return nil
 			}
 
+			// Determine GPU support.
+			var gpu gpupkg.GPUSupport
+			if gpuMode == "auto" {
+				gpu, err = gpupkg.ProbeGPUSupport(cmd.Context(), dockerClient)
+				if err != nil {
+					return fmt.Errorf("unable to probe GPU support: %w", err)
+				}
+			} else if gpuMode == "cuda" {
+				gpu = gpupkg.GPUSupportCUDA
+			} else if gpuMode != "none" {
+				return fmt.Errorf("unknown GPU specification: %q", gpuMode)
+			}
+
 			// Ensure that we have an up-to-date copy of the image.
 			if err := standalone.EnsureControllerImage(cmd.Context(), dockerClient, gpu, cmd); err != nil {
 				return fmt.Errorf("unable to pull latest standalone model runner image: %w", err)
@@ -130,12 +171,13 @@ func newInstallRunner() *cobra.Command {
 				return fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 			}
 
-			return nil
+			// Poll until we get a response from the model runner.
+			return waitForStandaloneRunnerAfterInstall(cmd.Context())
 		},
 		ValidArgsFunction: completion.NoComplete,
 	}
 	c.Flags().Uint16Var(&port, "port", standalone.DefaultControllerPort,
 		"Docker container port for Docker Model Runner")
-	c.Flags().BoolVar(&gpu, "gpu", false, "Enable GPU support")
+	c.Flags().StringVar(&gpuMode, "gpu", "auto", "Specify GPU support (none|auto|cuda)")
 	return c
 }
