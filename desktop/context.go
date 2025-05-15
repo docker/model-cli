@@ -159,14 +159,16 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 
 	// Compute the URL prefix based on the associated engine kind.
 	var rawURLPrefix string
-	if kind == ModelRunnerEngineKindMoby || kind == ModelRunnerEngineKindCloud {
-		rawURLPrefix = "http://localhost:" + strconv.Itoa(int(standalone.DefaultControllerPort))
+	if kind == ModelRunnerEngineKindMoby {
+		rawURLPrefix = "http://localhost:" + strconv.Itoa(standalone.DefaultControllerPortMoby)
+	} else if kind == ModelRunnerEngineKindCloud {
+		rawURLPrefix = "http://localhost:" + strconv.Itoa(standalone.DefaultControllerPortCloud)
 	} else if kind == ModelRunnerEngineKindMobyManual {
 		rawURLPrefix = modelRunnerHost
 	} else { // ModelRunnerEngineKindDesktop
 		rawURLPrefix = "http://localhost" + inference.ExperimentalEndpointsPrefix
 		if treatDesktopAsMoby {
-			rawURLPrefix = "http://localhost:" + strconv.Itoa(int(standalone.DefaultControllerPort))
+			rawURLPrefix = "http://localhost:" + strconv.Itoa(standalone.DefaultControllerPortMoby)
 		}
 	}
 	urlPrefix, err := url.Parse(rawURLPrefix)
