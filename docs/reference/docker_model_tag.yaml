@@ -7,7 +7,7 @@ plink: docker_model.yaml
 deprecated: false
 hidden: false
 experimental: false
-experimentalcli: false
+experimentalcli: true
 kubernetes: false
 swarm: false
 
