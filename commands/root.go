@@ -83,6 +83,8 @@ func NewRootCmd(cli *command.DockerCli) *cobra.Command {
 		TraverseChildren: plugin.RunningStandalone(),
 	}
 
+	markCommandExperimental(rootCmd)
+
 	// Initialize client options and register their flags if running in
 	// standalone mode.
 	if plugin.RunningStandalone() {
@@ -108,4 +110,17 @@ func NewRootCmd(cli *command.DockerCli) *cobra.Command {
 		newUninstallRunner(),
 	)
 	return rootCmd
+}
+
+const annotationExperimentalCLI = "experimentalCLI"
+
+func markCommandExperimental(c *cobra.Command) {
+	if _, ok := c.Annotations[annotationExperimentalCLI]; ok {
+		return
+	}
+	if c.Annotations == nil {
+		c.Annotations = make(map[string]string)
+	}
+	c.Annotations[annotationExperimentalCLI] = ""
+	c.Short += " (EXPERIMENTAL)"
 }

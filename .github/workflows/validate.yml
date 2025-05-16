@@ -1,0 +1,53 @@
+name: validate
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+      - 'v[0-9]*'
+    tags:
+      - 'v*'
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      targets: ${{ steps.generate.outputs.targets }}
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v4
+      -
+        name: List targets
+        id: generate
+        uses: docker/bake-action/subaction/list-targets@v6
+        with:
+          target: validate
+
+  validate:
+    runs-on: ubuntu-24.04
+    needs:
+      - prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.prepare.outputs.targets) }}
+    steps:
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-flags: --debug
+      -
+        name: Validate
+        uses: docker/bake-action@v6
+        with:
+          targets: ${{ matrix.target }}

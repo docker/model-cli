@@ -1,4 +1,4 @@
-.PHONY: all build clean link mock unit-tests
+.PHONY: all build clean link mock unit-tests docs
 
 BINARY_NAME=model-cli
 
@@ -67,3 +67,10 @@ clean:
 	@echo "Cleaning up..."
 	@rm -f $(BINARY_NAME)
 	@echo "Cleaned!"
+
+docs:
+	$(eval $@_TMP_OUT := $(shell mktemp -d -t model-cli-output.XXXXXXXXXX))
+	docker buildx bake --set "*.output=type=local,dest=$($@_TMP_OUT)" update-docs
+	rm -rf ./docs/reference/*
+	cp -R "$($@_TMP_OUT)"/* ./docs/reference/
+	rm -rf "$($@_TMP_OUT)"/*
