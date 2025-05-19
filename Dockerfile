@@ -19,6 +19,7 @@ RUN --mount=target=. \
 
 FROM base AS docs-build
 COPY --from=docs-gen /out/docsgen /usr/bin
+ENV DOCKER_CLI_PLUGIN_ORIGINAL_CLI_COMMAND="model"
 ARG DOCS_FORMATS
 RUN --mount=target=/context \
     --mount=target=.,type=tmpfs <<EOT
