@@ -499,6 +499,49 @@ func (c *Client) DF() (DiskUsage, error) {
 	return df, nil
 }
 
+// UnloadRequest to be imported from docker/model-runner when https://github.com/docker/model-runner/pull/46 is merged.
+type UnloadRequest struct {
+	All     bool   `json:"all"`
+	Backend string `json:"backend"`
+	Model   string `json:"model"`
+}
+
+// UnloadResponse to be imported from docker/model-runner when https://github.com/docker/model-runner/pull/46 is merged.
+type UnloadResponse struct {
+	UnloadedRunners int `json:"unloaded_runners"`
+}
+
+func (c *Client) Unload(req UnloadRequest) (UnloadResponse, error) {
+	unloadPath := inference.InferencePrefix + "/unload"
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return UnloadResponse{}, fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	resp, err := c.doRequest(http.MethodPost, unloadPath, bytes.NewReader(jsonData))
+	if err != nil {
+		return UnloadResponse{}, c.handleQueryError(err, unloadPath)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return UnloadResponse{}, fmt.Errorf("unloading failed with status %s: %s", resp.Status, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return UnloadResponse{}, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var unloadResp UnloadResponse
+	if err := json.Unmarshal(body, &unloadResp); err != nil {
+		return UnloadResponse{}, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+
+	return unloadResp, nil
+}
+
 // doRequest is a helper function that performs HTTP requests and handles 503 responses
 func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest(method, c.modelRunner.URL(path), body)
