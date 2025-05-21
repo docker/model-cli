@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/docker/model-runner/pkg/inference"
 	"github.com/docker/model-runner/pkg/inference/models"
@@ -436,6 +437,39 @@ func (c *Client) Remove(models []string, force bool) (string, error) {
 		modelRemoved += fmt.Sprintf("Model %s removed successfully\n", model)
 	}
 	return modelRemoved, nil
+}
+
+// BackendStatus to be imported from docker/model-runner when https://github.com/docker/model-runner/pull/42 is merged.
+type BackendStatus struct {
+	// BackendName is the name of the backend
+	BackendName string `json:"backend_name"`
+	// ModelName is the name of the model loaded in the backend
+	ModelName string `json:"model_name"`
+	// Mode is the mode the backend is operating in
+	Mode string `json:"mode"`
+	// LastUsed represents when this backend was last used (if it's idle)
+	LastUsed time.Time `json:"last_used,omitempty"`
+}
+
+func (c *Client) PS() ([]BackendStatus, error) {
+	psPath := inference.InferencePrefix + "/ps"
+	resp, err := c.doRequest(http.MethodGet, psPath, nil)
+	if err != nil {
+		return []BackendStatus{}, c.handleQueryError(err, psPath)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return []BackendStatus{}, fmt.Errorf("failed to list running models: %s", resp.Status)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var ps []BackendStatus
+	if err := json.Unmarshal(body, &ps); err != nil {
+		return []BackendStatus{}, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+
+	return ps, nil
 }
 
 // doRequest is a helper function that performs HTTP requests and handles 503 responses
