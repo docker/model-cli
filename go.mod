@@ -4,7 +4,9 @@ go 1.23.7
 
 require (
 	github.com/docker/cli v28.0.1+incompatible
+	github.com/docker/cli-docs-tool v0.10.0
 	github.com/docker/docker v28.0.1+incompatible
+	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/docker/model-distribution v0.0.0-20250512190053-b3792c042d57
 	github.com/docker/model-runner v0.0.0-20250512190413-96af7b750f88
@@ -13,6 +15,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pkg/errors v0.9.1
 	github.com/spf13/cobra v1.9.1
+	github.com/spf13/pflag v1.0.6
 	github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/otel v1.35.0
 	go.uber.org/mock v0.5.0
@@ -30,13 +33,13 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/stargz-snapshotter/estargz v0.16.3 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
 	github.com/creack/pty v1.1.24 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.3 // indirect
 	github.com/docker/go v1.5.1-1.0.20160303222718-d30aec9fd63c // indirect
-	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-metrics v0.0.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
@@ -75,9 +78,9 @@ require (
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/dnscache v0.0.0-20230804202142-fc85eb664529 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smallnest/ringbuffer v0.0.0-20241116012123-461381446e3d // indirect
-	github.com/spf13/pflag v1.0.6 // indirect
 	github.com/theupdateframework/notary v0.7.1-0.20210315103452-bf96a202a09a // indirect
 	github.com/vbatts/tar-split v0.11.6 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
