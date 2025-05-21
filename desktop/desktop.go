@@ -542,6 +542,22 @@ func (c *Client) Unload(req UnloadRequest) (UnloadResponse, error) {
 	return unloadResp, nil
 }
 
+func (c *Client) Prune() error {
+	prunePath := inference.ModelsPrefix + "/prune"
+	resp, err := c.doRequest(http.MethodDelete, prunePath, nil)
+	if err != nil {
+		return c.handleQueryError(err, prunePath)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("pruning failed with status %s: %s", resp.Status, string(body))
+	}
+
+	return nil
+}
+
 // doRequest is a helper function that performs HTTP requests and handles 503 responses
 func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest(method, c.modelRunner.URL(path), body)

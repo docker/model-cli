@@ -109,6 +109,7 @@ func NewRootCmd(cli *command.DockerCli) *cobra.Command {
 		newPSCmd(),
 		newDFCmd(),
 		newUnloadCmd(),
+		newPruneCmd(),
 	)
 	return rootCmd
 }
