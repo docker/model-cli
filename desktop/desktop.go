@@ -472,6 +472,33 @@ func (c *Client) PS() ([]BackendStatus, error) {
 	return ps, nil
 }
 
+// DiskUsage to be imported from docker/model-runner when https://github.com/docker/model-runner/pull/45 is merged.
+type DiskUsage struct {
+	ModelsDiskUsage         float64 `json:"models_disk_usage"`
+	DefaultBackendDiskUsage float64 `json:"default_backend_disk_usage"`
+}
+
+func (c *Client) DF() (DiskUsage, error) {
+	dfPath := inference.InferencePrefix + "/df"
+	resp, err := c.doRequest(http.MethodGet, dfPath, nil)
+	if err != nil {
+		return DiskUsage{}, c.handleQueryError(err, dfPath)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return DiskUsage{}, fmt.Errorf("failed to get disk usage: %s", resp.Status)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var df DiskUsage
+	if err := json.Unmarshal(body, &df); err != nil {
+		return DiskUsage{}, fmt.Errorf("failed to unmarshal response body: %w", err)
+	}
+
+	return df, nil
+}
+
 // doRequest is a helper function that performs HTTP requests and handles 503 responses
 func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequest(method, c.modelRunner.URL(path), body)
