@@ -1,7 +1,7 @@
 # docker model rm
 
 <!---MARKER_GEN_START-->
-Remove models downloaded from Docker Hub
+Remove local models downloaded from Docker Hub
 
 ### Options
 

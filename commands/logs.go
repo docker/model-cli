@@ -125,7 +125,7 @@ func newLogsCmd() *cobra.Command {
 		},
 		ValidArgsFunction: completion.NoComplete,
 	}
-	c.Flags().BoolVarP(&follow, "follow", "f", false, "Follow log output")
-	c.Flags().BoolVar(&noEngines, "no-engines", false, "Skip inference engines logs")
+	c.Flags().BoolVarP(&follow, "follow", "f", false, "View logs with real-time streaming")
+	c.Flags().BoolVar(&noEngines, "no-engines", false, "Exclude inference engine logs from the output")
 	return c
 }

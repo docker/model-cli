@@ -1,7 +1,7 @@
 # docker model list
 
 <!---MARKER_GEN_START-->
-List the available models that can be run with the Docker Model Runner
+List the models pulled to your local environment
 
 ### Aliases
 

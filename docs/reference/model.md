@@ -6,7 +6,7 @@ Docker Model Runner (EXPERIMENTAL)
 ### Subcommands
 
 | Name                                            | Description                                                            |
-|:------------------------------------------------|:-----------------------------------------------------------------------|
+| :---------------------------------------------- | :--------------------------------------------------------------------- |
 | [`df`](model_df.md)                             | Show Docker Model Runner disk usage                                    |
 | [`inspect`](model_inspect.md)                   | Display detailed information on one model                              |
 | [`install-runner`](model_install-runner.md)     | Install Docker Model Runner                                            |
@@ -28,3 +28,7 @@ Docker Model Runner (EXPERIMENTAL)
 
 <!---MARKER_GEN_END-->
 
+## Description
+
+Use Docker Model Runner to run and interract with AI models directly from the command line.
+For more information, see the [documentation](https://docs.docker.com/model-runner/)
