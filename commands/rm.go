@@ -12,7 +12,7 @@ func newRemoveCmd() *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "rm [MODEL...]",
-		Short: "Remove models downloaded from Docker Hub",
+		Short: "Remove local models downloaded from Docker Hub",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
 				return fmt.Errorf(

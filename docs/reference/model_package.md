@@ -1,7 +1,7 @@
 # docker model package
 
 <!---MARKER_GEN_START-->
-package a model
+Package a GGUF file into a Docker model OCI artifact, with optional licenses, and pushes it to the specified registry
 
 ### Options
 

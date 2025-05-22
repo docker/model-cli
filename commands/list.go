@@ -19,7 +19,7 @@ func newListCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:     "list [OPTIONS]",
 		Aliases: []string{"ls"},
-		Short:   "List the available models that can be run with the Docker Model Runner",
+		Short:   "List the models pulled to your local environment",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if openai && quiet {
 				return fmt.Errorf("--quiet flag cannot be used with --openai flag")

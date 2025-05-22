@@ -11,7 +11,7 @@ import (
 func newPushCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use:   "push MODEL",
-		Short: "Upload a model",
+		Short: "Push a model to Docker Hub",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return fmt.Errorf(

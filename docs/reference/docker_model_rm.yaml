@@ -1,6 +1,6 @@
 command: docker model rm
-short: Remove models downloaded from Docker Hub
-long: Remove models downloaded from Docker Hub
+short: Remove local models downloaded from Docker Hub
+long: Remove local models downloaded from Docker Hub
 usage: docker model rm [MODEL...]
 pname: docker model
 plink: docker_model.yaml

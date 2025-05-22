@@ -18,7 +18,7 @@ func newRunCmd() *cobra.Command {
 	cmdArgs := "MODEL [PROMPT]"
 	c := &cobra.Command{
 		Use:   "run " + cmdArgs,
-		Short: "Run a model with the Docker Model Runner",
+		Short: "Run a model and interact with it using a submitted prompt or chat mode",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			model := args[0]
 			prompt := ""

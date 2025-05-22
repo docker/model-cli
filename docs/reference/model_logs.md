@@ -5,10 +5,10 @@ Fetch the Docker Model Runner logs
 
 ### Options
 
-| Name             | Type   | Default | Description                 |
-|:-----------------|:-------|:--------|:----------------------------|
-| `-f`, `--follow` | `bool` |         | Follow log output           |
-| `--no-engines`   | `bool` |         | Skip inference engines logs |
+| Name             | Type   | Default | Description                                   |
+|:-----------------|:-------|:--------|:----------------------------------------------|
+| `-f`, `--follow` | `bool` |         | View logs with real-time streaming            |
+| `--no-engines`   | `bool` |         | Exclude inference engine logs from the output |
 
 
 <!---MARKER_GEN_END-->
