@@ -98,9 +98,9 @@ const (
 func (k ModelRunnerEngineKind) String() string {
 	switch k {
 	case ModelRunnerEngineKindMoby:
-		return "Moby"
+		return "Docker Engine"
 	case ModelRunnerEngineKindMobyManual:
-		return "Moby (Manual Install)"
+		return "Docker Engine (Manual Install)"
 	case ModelRunnerEngineKindDesktop:
 		return "Docker Desktop"
 	case ModelRunnerEngineKindCloud:
