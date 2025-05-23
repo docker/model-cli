@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -8,7 +9,9 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"runtime"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/pkg/stdcopy"
@@ -60,14 +63,29 @@ func newLogsCmd() *cobra.Command {
 				return err
 			}
 
-			var logFilePath string
+			var serviceLogPath string
+			var runtimeLogPath string
 			switch {
 			case runtime.GOOS == "darwin":
-				logFilePath = filepath.Join(homeDir, "Library/Containers/com.docker.docker/Data/log/host/inference.log")
+				serviceLogPath = filepath.Join(homeDir, "Library/Containers/com.docker.docker/Data/log/host/inference.log")
+				runtimeLogPath = filepath.Join(homeDir, "Library/Containers/com.docker.docker/Data/log/host/inference-llama.cpp-server.log")
 			case runtime.GOOS == "windows":
-				logFilePath = filepath.Join(homeDir, "AppData/Local/Docker/log/host/inference.log")
+				serviceLogPath = filepath.Join(homeDir, "AppData/Local/Docker/log/host/inference.log")
+				runtimeLogPath = filepath.Join(homeDir, "AppData/Local/Docker/log/host/inference-llama.cpp-server.log")
 			default:
 				return fmt.Errorf("unsupported OS: %s", runtime.GOOS)
+			}
+
+			if noEngines {
+				err = printMergedLog(serviceLogPath, "")
+				if err != nil {
+					return err
+				}
+			} else {
+				err = printMergedLog(serviceLogPath, runtimeLogPath)
+				if err != nil {
+					return err
+				}
 			}
 
 			ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
@@ -77,7 +95,7 @@ func newLogsCmd() *cobra.Command {
 
 			g.Go(func() error {
 				t, err := tail.TailFile(
-					logFilePath, tail.Config{Follow: follow, ReOpen: follow},
+					serviceLogPath, tail.Config{Location: &tail.SeekInfo{Offset: 0, Whence: io.SeekEnd}, Follow: follow, ReOpen: follow},
 				)
 				if err != nil {
 					return err
@@ -100,8 +118,7 @@ func newLogsCmd() *cobra.Command {
 				// and the engines logs have not been skipped by setting `--no-engines`.
 				g.Go(func() error {
 					t, err := tail.TailFile(
-						filepath.Join(filepath.Dir(logFilePath), "inference-llama.cpp-server.log"),
-						tail.Config{Location: &tail.SeekInfo{Offset: 0, Whence: io.SeekEnd}, Follow: follow, ReOpen: follow},
+						runtimeLogPath, tail.Config{Location: &tail.SeekInfo{Offset: 0, Whence: io.SeekEnd}, Follow: follow, ReOpen: follow},
 					)
 					if err != nil {
 						return err
@@ -128,4 +145,82 @@ func newLogsCmd() *cobra.Command {
 	c.Flags().BoolVarP(&follow, "follow", "f", false, "Follow log output")
 	c.Flags().BoolVar(&noEngines, "no-engines", false, "Skip inference engines logs")
 	return c
+}
+
+var timestampRe = regexp.MustCompile(`\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\].*`)
+
+const timeFmt = "2006-01-02T15:04:05.000000000Z"
+
+func printTillFirstTimestamp(logScanner *bufio.Scanner) (time.Time, string) {
+	if logScanner == nil {
+		return time.Time{}, ""
+	}
+
+	for logScanner.Scan() {
+		text := logScanner.Text()
+		match := timestampRe.FindStringSubmatch(text)
+		if len(match) == 2 {
+			timestamp, err := time.Parse(timeFmt, match[1])
+			if err != nil {
+				println(text)
+				continue
+			}
+			return timestamp, text
+		} else {
+			println(text)
+		}
+	}
+	return time.Time{}, ""
+}
+
+func printMergedLog(logPath1, logPath2 string) error {
+	var logScanner1 *bufio.Scanner
+	if logPath1 != "" {
+		logFile1, err := os.Open(logPath1)
+		if err == nil {
+			defer logFile1.Close()
+			logScanner1 = bufio.NewScanner(logFile1)
+		}
+	}
+
+	var logScanner2 *bufio.Scanner
+	if logPath2 != "" {
+		logFile2, err := os.Open(logPath2)
+		if err == nil {
+			defer logFile2.Close()
+			logScanner2 = bufio.NewScanner(logFile2)
+		}
+	}
+
+	var timestamp1 time.Time
+	var timestamp2 time.Time
+	var log1Line string
+	var log2Name string
+
+	timestamp1, log1Line = printTillFirstTimestamp(logScanner1)
+	timestamp2, log2Name = printTillFirstTimestamp(logScanner2)
+
+	for log1Line != "" && log2Name != "" {
+		for log1Line != "" && timestamp1.Before(timestamp2) {
+			println(log1Line)
+			timestamp1, log1Line = printTillFirstTimestamp(logScanner1)
+		}
+		for log2Name != "" && timestamp2.Before(timestamp1) {
+			println(log2Name)
+			timestamp2, log2Name = printTillFirstTimestamp(logScanner2)
+		}
+	}
+
+	if log1Line != "" {
+		for logScanner1.Scan() {
+			println(logScanner1.Text())
+		}
+	}
+	if log2Name != "" {
+		for logScanner2.Scan() {
+			println(logScanner2.Text())
+		}
+	}
+
+	return nil
 }
