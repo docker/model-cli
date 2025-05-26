@@ -474,8 +474,8 @@ func (c *Client) PS() ([]BackendStatus, error) {
 
 // DiskUsage to be imported from docker/model-runner when https://github.com/docker/model-runner/pull/45 is merged.
 type DiskUsage struct {
-	ModelsDiskUsage         float64 `json:"models_disk_usage"`
-	DefaultBackendDiskUsage float64 `json:"default_backend_disk_usage"`
+	ModelsDiskUsage         int64 `json:"models_disk_usage"`
+	DefaultBackendDiskUsage int64 `json:"default_backend_disk_usage"`
 }
 
 func (c *Client) DF() (DiskUsage, error) {
