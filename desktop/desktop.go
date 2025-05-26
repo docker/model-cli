@@ -501,9 +501,9 @@ func (c *Client) DF() (DiskUsage, error) {
 
 // UnloadRequest to be imported from docker/model-runner when https://github.com/docker/model-runner/pull/46 is merged.
 type UnloadRequest struct {
-	All     bool   `json:"all"`
-	Backend string `json:"backend"`
-	Model   string `json:"model"`
+	All     bool     `json:"all"`
+	Backend string   `json:"backend"`
+	Models  []string `json:"models"`
 }
 
 // UnloadResponse to be imported from docker/model-runner when https://github.com/docker/model-runner/pull/46 is merged.
