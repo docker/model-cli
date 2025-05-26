@@ -12,16 +12,12 @@ func newUnloadCmd() *cobra.Command {
 	var all bool
 	var backend string
 
-	cmdArgs := "(MODEL [--backend BACKEND] | --all)"
+	cmdArgs := "(MODEL [MODEL ...] [--backend BACKEND] | --all)"
 	c := &cobra.Command{
 		Use:   "unload " + cmdArgs,
 		Short: "Unload running models",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			var model string
-			if len(args) > 0 {
-				model = args[0]
-			}
-			unloadResp, err := desktopClient.Unload(desktop.UnloadRequest{All: all, Backend: backend, Model: model})
+		RunE: func(cmd *cobra.Command, models []string) error {
+			unloadResp, err := desktopClient.Unload(desktop.UnloadRequest{All: all, Backend: backend, Models: models})
 			if err != nil {
 				err = handleClientError(err, "Failed to unload models")
 				return handleNotRunningError(err)
@@ -57,9 +53,6 @@ func newUnloadCmd() *cobra.Command {
 					"Usage:  docker model unload " + cmdArgs + "\n\n" +
 					"See 'docker model unload --help' for more information.",
 			)
-		}
-		if len(args) > 1 {
-			return fmt.Errorf("too many arguments, expected " + cmdArgs)
 		}
 		return nil
 	}
