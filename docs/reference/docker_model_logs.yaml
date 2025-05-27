@@ -9,7 +9,7 @@ options:
       shorthand: f
       value_type: bool
       default_value: "false"
-      description: Follow log output
+      description: View logs with real-time streaming
       deprecated: false
       hidden: false
       experimental: false
@@ -19,7 +19,7 @@ options:
     - option: no-engines
       value_type: bool
       default_value: "false"
-      description: Skip inference engines logs
+      description: Exclude inference engine logs from the output
       deprecated: false
       hidden: false
       experimental: false

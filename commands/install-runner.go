@@ -113,7 +113,7 @@ func newInstallRunner() *cobra.Command {
 	var gpuMode string
 	c := &cobra.Command{
 		Use:   "install-runner",
-		Short: "Install Docker Model Runner",
+		Short: "Install Docker Model Runner (Docker Engine only)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Ensure that we're running in a supported model runner context.
 			engineKind := modelRunner.EngineKind()
