@@ -66,7 +66,7 @@ func determineBridgeGatewayIP(ctx context.Context, dockerClient *client.Client) 
 }
 
 // CreateControllerContainer creates and starts a controller container.
-func CreateControllerContainer(ctx context.Context, dockerClient *client.Client, port uint16, gpu gpupkg.GPUSupport, modelStorageVolume string, printer StatusPrinter) error {
+func CreateControllerContainer(ctx context.Context, dockerClient *client.Client, port uint16, doNotTrack bool, gpu gpupkg.GPUSupport, modelStorageVolume string, printer StatusPrinter) error {
 	// Determine the target image.
 	var imageName string
 	switch gpu {
@@ -78,11 +78,13 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 
 	// Set up the container configuration.
 	portStr := strconv.Itoa(int(port))
+	env := []string{"MODEL_RUNNER_PORT=" + portStr}
+	if doNotTrack {
+		env = append(env, "DO_NOT_TRACK=1")
+	}
 	config := &container.Config{
 		Image: imageName,
-		Env: []string{
-			"MODEL_RUNNER_PORT=" + portStr,
-		},
+		Env:   env,
 		ExposedPorts: nat.PortSet{
 			nat.Port(portStr + "/tcp"): struct{}{},
 		},

@@ -100,7 +100,7 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 	if engineKind == desktop.ModelRunnerEngineKindCloud {
 		port = standalone.DefaultControllerPortCloud
 	}
-	if err := standalone.CreateControllerContainer(ctx, dockerClient, port, gpu, modelStorageVolume, printer); err != nil {
+	if err := standalone.CreateControllerContainer(ctx, dockerClient, port, false, gpu, modelStorageVolume, printer); err != nil {
 		return fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 	}
 
@@ -111,6 +111,7 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 func newInstallRunner() *cobra.Command {
 	var port uint16
 	var gpuMode string
+	var doNotTrack bool
 	c := &cobra.Command{
 		Use:   "install-runner",
 		Short: "Install Docker Model Runner",
@@ -182,9 +183,8 @@ func newInstallRunner() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("unable to initialize standalone model storage: %w", err)
 			}
-
 			// Create the model runner container.
-			if err := standalone.CreateControllerContainer(cmd.Context(), dockerClient, port, gpu, modelStorageVolume, cmd); err != nil {
+			if err := standalone.CreateControllerContainer(cmd.Context(), dockerClient, port, doNotTrack, gpu, modelStorageVolume, cmd); err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 			}
 
@@ -196,5 +196,6 @@ func newInstallRunner() *cobra.Command {
 	c.Flags().Uint16Var(&port, "port", standalone.DefaultControllerPortMoby,
 		"Docker container port for Docker Model Runner")
 	c.Flags().StringVar(&gpuMode, "gpu", "auto", "Specify GPU support (none|auto|cuda)")
+	c.Flags().BoolVar(&doNotTrack, "do-not-track", false, "Do not track models usage in Docker Model Runner")
 	return c
 }
