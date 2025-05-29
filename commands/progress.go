@@ -37,7 +37,7 @@ func NewProgressTracker() *ProgressTracker {
 }
 
 // UpdateLayer updates the progress for a specific layer
-func (pt *ProgressTracker) UpdateLayer(layerID string, size, current uint64, message string) {
+func (pt *ProgressTracker) UpdateLayer(layerID string, size, current uint64, message *desktop.ProgressMessage) {
 	pt.mutex.Lock()
 	defer pt.mutex.Unlock()
 
@@ -48,14 +48,12 @@ func (pt *ProgressTracker) UpdateLayer(layerID string, size, current uint64, mes
 	// Determine status from message
 	status := "Downloading"
 	complete := false
-	if strings.Contains(message, "complete") || strings.Contains(message, "Complete") {
-		status = "Download complete"
-		complete = true
-		current = size // Ensure current equals size when complete
-	} else if strings.Contains(message, "Extracting") || strings.Contains(message, "extracting") {
-		status = "Extracting"
-	} else if strings.Contains(message, "Pull complete") {
+	if message.Type == "success" {
 		status = "Pull complete"
+		complete = true
+		current = size
+	} else if message.Type == "error" {
+		status = "Pull failed"
 		complete = true
 		current = size
 	}
@@ -178,20 +176,32 @@ func (pt *ProgressTracker) formatLayerProgress(layer *LayerState) string {
 		return fmt.Sprintf("%s: %s", layer.ID, layer.Status)
 	}
 
-	// Format sizes in MB
-	currentMB := float64(layer.Current) / 1024 / 1024
-	sizeMB := float64(layer.Size) / 1024 / 1024
+	// Format sizes in MB or GB based on size
+	var currentStr, sizeStr string
+	const gbThreshold = 1024 * 1024 * 1024 // 1GB in bytes
+
+	if layer.Size >= gbThreshold {
+		currentGB := float64(layer.Current) / 1024 / 1024 / 1024
+		sizeGB := float64(layer.Size) / 1024 / 1024 / 1024
+		currentStr = fmt.Sprintf("%.2fGB", currentGB)
+		sizeStr = fmt.Sprintf("%.2fGB", sizeGB)
+	} else {
+		currentMB := float64(layer.Current) / 1024 / 1024
+		sizeMB := float64(layer.Size) / 1024 / 1024
+		currentStr = fmt.Sprintf("%.2fMB", currentMB)
+		sizeStr = fmt.Sprintf("%.2fMB", sizeMB)
+	}
 
 	// Check terminal width to decide format
 	termWidth := getTerminalWidth()
 	// Minimum width needed for progress bar format:
-	// "layerID: Status [===>  ] currentMB/sizeMB"
+	// "layerID: Status [===>  ] current/size"
 	// Estimate: 12 + 2 + 12 + 3 + 50 + 3 + 20 = ~102 characters
 	minWidthForProgressBar := 100
 
 	if termWidth < minWidthForProgressBar {
 		// Use simple format when terminal is too narrow
-		return fmt.Sprintf("%s: %s  %.2fMB/%.2fMB", layer.ID, layer.Status, currentMB, sizeMB)
+		return fmt.Sprintf("%s: %s  %s/%s", layer.ID, layer.Status, currentStr, sizeStr)
 	}
 
 	// Calculate progress percentage
@@ -213,12 +223,12 @@ func (pt *ProgressTracker) formatLayerProgress(layer *LayerState) string {
 	}
 	bar += strings.Repeat(" ", barWidth-len(bar))
 
-	return fmt.Sprintf("%s: %s [%s] %.2fMB/%.2fMB",
+	return fmt.Sprintf("%s: %s [%s] %s/%s",
 		layer.ID,
 		layer.Status,
 		bar,
-		currentMB,
-		sizeMB,
+		currentStr,
+		sizeStr,
 	)
 }
 
@@ -230,7 +240,7 @@ func MultiLayerTUIProgress() (func(*desktop.ProgressMessage), *ProgressTracker) 
 		if msg.Type == "progress" {
 			if msg.Layer.ID != "" && msg.Layer.Size > 0 {
 				// Use layer-specific information when available
-				tracker.UpdateLayer(msg.Layer.ID, msg.Layer.Size, msg.Layer.Current, msg.Message)
+				tracker.UpdateLayer(msg.Layer.ID, msg.Layer.Size, msg.Layer.Current, msg)
 			} else {
 				// Fallback: use simple progress display for backward compatibility
 				// Clear the line and show the progress message

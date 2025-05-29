@@ -3,6 +3,8 @@ package commands
 import (
 	"strings"
 	"testing"
+
+	"github.com/docker/model-cli/desktop"
 )
 
 func TestFormatLayerProgress(t *testing.T) {
@@ -95,7 +97,10 @@ func TestProgressTrackerBasicFunctionality(t *testing.T) {
 	}
 
 	// Add a layer
-	tracker.UpdateLayer("sha256:1a12b4ea7c0c123456789", 100*1024*1024, 50*1024*1024, "Downloading")
+	tracker.UpdateLayer("sha256:1a12b4ea7c0c123456789", 100*1024*1024, 50*1024*1024, &desktop.ProgressMessage{
+		Type:    "progress",
+		Message: "Downloading",
+	})
 
 	// Test that tracker now has layers
 	if !tracker.HasLayers() {
