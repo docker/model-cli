@@ -85,7 +85,20 @@ func (pt *ProgressTracker) Stop() {
 	defer pt.mutex.Unlock()
 	pt.isActive = false
 
-	pt.showFinalState()
+	// If we have layers, show the final state
+	if len(pt.layers) > 0 {
+		pt.showFinalState()
+	} else {
+		// If no layers (fallback mode), just add a newline to complete the progress line
+		fmt.Println()
+	}
+}
+
+// HasLayers returns true if the tracker has any layers
+func (pt *ProgressTracker) HasLayers() bool {
+	pt.mutex.RLock()
+	defer pt.mutex.RUnlock()
+	return len(pt.layers) > 0
 }
 
 // showFinalState displays the final completion status for all layers
@@ -186,20 +199,6 @@ func (pt *ProgressTracker) formatLayerProgress(layer *LayerState) string {
 		currentMB,
 		sizeMB,
 	)
-}
-
-// formatBytes formats bytes into human-readable format
-func formatBytes(bytes uint64) string {
-	const unit = 1024
-	if bytes < unit {
-		return fmt.Sprintf("%d B", bytes)
-	}
-	div, exp := uint64(unit), 0
-	for n := bytes / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	return fmt.Sprintf("%.1f %cB", float64(bytes)/float64(div), "KMGTPE"[exp])
 }
 
 // MultiLayerTUIProgress creates a progress function that handles multiple layers
