@@ -39,20 +39,30 @@ func pullModel(cmd *cobra.Command, desktopClient *desktop.Client, model string) 
 
 	response, progressShown, err := desktopClient.Pull(model, progressFunc)
 
-	// Stop the progress tracker and clear display
+	// Stop the progress tracker and show final completion state
 	tracker.Stop()
-
-	// Add a newline before any output (success or error) if progress was shown.
-	if progressShown {
-		cmd.Println()
-	}
 
 	if err != nil {
 		return handleNotRunningError(handleClientError(err, "Failed to pull model"))
 	}
 
-	cmd.Println(response)
+	// Show completion summary
+	showPullCompletionSummary(cmd, model, response, progressShown)
 	return nil
+}
+
+// showPullCompletionSummary displays the completion summary
+func showPullCompletionSummary(cmd *cobra.Command, model string, response string, progressShown bool) {
+	// Add spacing if progress was shown
+	if progressShown {
+		cmd.Println()
+	}
+
+	// Show status message
+	cmd.Printf("Status: %s\n", response)
+
+	// Show the model reference
+	cmd.Println(model)
 }
 
 func TUIProgress(message string) {

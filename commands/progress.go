@@ -79,12 +79,37 @@ func (pt *ProgressTracker) UpdateLayer(layerID string, size, current uint64, mes
 	pt.render()
 }
 
-// Stop stops the progress tracker and clears the display
+// Stop stops the progress tracker and shows final completion state
 func (pt *ProgressTracker) Stop() {
 	pt.mutex.Lock()
 	defer pt.mutex.Unlock()
 	pt.isActive = false
+
+	pt.showFinalState()
+}
+
+// showFinalState displays the final completion status for all layers
+func (pt *ProgressTracker) showFinalState() {
+	if len(pt.layers) == 0 {
+		return
+	}
+
+	// Clear current progress display
 	pt.clearLines()
+
+	// Sort layers by ID for consistent display order
+	var layerIDs []string
+	for id := range pt.layers {
+		layerIDs = append(layerIDs, id)
+	}
+	sort.Strings(layerIDs)
+
+	// Show final status for each layer
+	for _, id := range layerIDs {
+		layer := pt.layers[id]
+		// Force all layers to show as "Pull complete" in final state
+		fmt.Printf("%s: Pull complete\n", layer.ID)
+	}
 }
 
 // clearLines clears the previously printed progress lines
