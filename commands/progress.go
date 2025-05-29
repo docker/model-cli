@@ -2,11 +2,13 @@ package commands
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"sync"
 
 	"github.com/docker/model-cli/desktop"
+	"golang.org/x/term"
 )
 
 // LayerState represents the state of a layer download
@@ -88,9 +90,6 @@ func (pt *ProgressTracker) Stop() {
 	// If we have layers, show the final state
 	if len(pt.layers) > 0 {
 		pt.showFinalState()
-	} else {
-		// If no layers (fallback mode), just add a newline to complete the progress line
-		fmt.Println()
 	}
 }
 
@@ -163,10 +162,36 @@ func (pt *ProgressTracker) render() {
 	pt.lastLines = lines
 }
 
+// getTerminalWidth returns the terminal width, or 80 as default
+func getTerminalWidth() int {
+	width, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		// Default to 80 columns if we can't detect terminal size
+		return 80
+	}
+	return width
+}
+
 // formatLayerProgress formats a single layer's progress line
 func (pt *ProgressTracker) formatLayerProgress(layer *LayerState) string {
 	if layer.Complete {
 		return fmt.Sprintf("%s: %s", layer.ID, layer.Status)
+	}
+
+	// Format sizes in MB
+	currentMB := float64(layer.Current) / 1024 / 1024
+	sizeMB := float64(layer.Size) / 1024 / 1024
+
+	// Check terminal width to decide format
+	termWidth := getTerminalWidth()
+	// Minimum width needed for progress bar format:
+	// "layerID: Status [===>  ] currentMB/sizeMB"
+	// Estimate: 12 + 2 + 12 + 3 + 50 + 3 + 20 = ~102 characters
+	minWidthForProgressBar := 100
+
+	if termWidth < minWidthForProgressBar {
+		// Use simple format when terminal is too narrow
+		return fmt.Sprintf("%s: %s  %.2fMB/%.2fMB", layer.ID, layer.Status, currentMB, sizeMB)
 	}
 
 	// Calculate progress percentage
@@ -188,11 +213,7 @@ func (pt *ProgressTracker) formatLayerProgress(layer *LayerState) string {
 	}
 	bar += strings.Repeat(" ", barWidth-len(bar))
 
-	// Format sizes in MB
-	currentMB := float64(layer.Current) / 1024 / 1024
-	sizeMB := float64(layer.Size) / 1024 / 1024
-
-	return fmt.Sprintf("%s: %s [%s] %.3fMB/%.2fMB",
+	return fmt.Sprintf("%s: %s [%s] %.2fMB/%.2fMB",
 		layer.ID,
 		layer.Status,
 		bar,

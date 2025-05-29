@@ -47,7 +47,7 @@ func pullModel(cmd *cobra.Command, desktopClient *desktop.Client, model string) 
 	}
 
 	// Show "Pulling from" header
-	cmd.Printf("%s: Pulling from %s\n", tag, tag.Context().String())
+	cmd.Printf("%s: Pulling from %s\n", tag.TagStr(), tag.RepositoryStr())
 
 	// Create multi-layer progress tracker
 	progressFunc, tracker := MultiLayerTUIProgress()
@@ -61,13 +61,13 @@ func pullModel(cmd *cobra.Command, desktopClient *desktop.Client, model string) 
 		return handleNotRunningError(handleClientError(err, "Failed to pull model"))
 	}
 
-	// Show Docker-like completion summary
-	showPullCompletionSummary(cmd, model, tag.Context().String(), tag.TagStr(), response, progressShown, tracker)
+	// Show completion summary
+	showPullCompletionSummary(cmd, tag, response, progressShown, tracker)
 	return nil
 }
 
-// showPullCompletionSummary displays the completion summary like Docker
-func showPullCompletionSummary(cmd *cobra.Command, model string, modelName string, tag string, response string, progressShown bool, tracker *ProgressTracker) {
+// showPullCompletionSummary displays the completion summary
+func showPullCompletionSummary(cmd *cobra.Command, reference name.Reference, response string, progressShown bool, tracker *ProgressTracker) {
 	// Determine if this was a fresh download or already up to date
 	isAlreadyUpToDate := !progressShown && !tracker.HasLayers()
 
@@ -78,13 +78,13 @@ func showPullCompletionSummary(cmd *cobra.Command, model string, modelName strin
 
 	// Show status message - modify based on whether model was already present
 	if isAlreadyUpToDate {
-		cmd.Printf("Status: Model is up to date for %s:%s\n", modelName, tag)
+		cmd.Printf("Status: Model is up to date for %s\n", reference.String())
 	} else {
 		cmd.Printf("Status: %s\n", response)
 	}
 
 	// Show the fully qualified model reference
-	cmd.Println(model)
+	cmd.Println(reference.Name())
 }
 
 func TUIProgress(message string) {
