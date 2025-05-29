@@ -97,8 +97,8 @@ func downloadModelsOnlyIfNotFound(desktopClient *desktop.Client, models []string
 			}
 			return false
 		}) {
-			_, _, err = desktopClient.Pull(model, func(s string) {
-				_ = sendInfo(s)
+			_, _, err = desktopClient.Pull(model, func(msg *desktop.ProgressMessage) {
+				_ = sendInfo(msg.Message)
 			})
 			if err != nil {
 				_ = sendErrorf("Failed to pull model: %v", err)
