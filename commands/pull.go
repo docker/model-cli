@@ -34,7 +34,13 @@ func newPullCmd() *cobra.Command {
 }
 
 func pullModel(cmd *cobra.Command, desktopClient *desktop.Client, model string) error {
-	response, progressShown, err := desktopClient.Pull(model, TUIProgress)
+	// Create multi-layer progress tracker
+	progressFunc, tracker := MultiLayerTUIProgress()
+
+	response, progressShown, err := desktopClient.Pull(model, progressFunc)
+
+	// Stop the progress tracker and clear display
+	tracker.Stop()
 
 	// Add a newline before any output (success or error) if progress was shown.
 	if progressShown {

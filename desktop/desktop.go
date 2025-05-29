@@ -99,7 +99,7 @@ func (c *Client) Status() Status {
 	}
 }
 
-func (c *Client) Pull(model string, progress func(string)) (string, bool, error) {
+func (c *Client) Pull(model string, progress func(*ProgressMessage)) (string, bool, error) {
 	model = normalizeHuggingFaceModelName(model)
 	jsonData, err := json.Marshal(models.ModelCreateRequest{From: model})
 	if err != nil {
@@ -149,7 +149,7 @@ func (c *Client) Pull(model string, progress func(string)) (string, bool, error)
 		// Handle different message types
 		switch progressMsg.Type {
 		case "progress":
-			progress(progressMsg.Message)
+			progress(&progressMsg)
 			progressShown = true
 		case "error":
 			return "", progressShown, fmt.Errorf("error pulling model: %s", progressMsg.Message)
