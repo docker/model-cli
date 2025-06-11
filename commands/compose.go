@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/docker/model-cli/desktop"
+	"github.com/docker/model-runner/pkg/inference/backends/llamacpp"
+	"github.com/docker/model-runner/pkg/inference/scheduling"
 	"github.com/spf13/cobra"
 )
 
@@ -26,6 +28,9 @@ func newComposeCmd() *cobra.Command {
 
 func newUpCommand() *cobra.Command {
 	var models []string
+	var ctxSize int64
+	var rawRuntimeFlags string
+	var backend string
 	c := &cobra.Command{
 		Use: "up",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -33,6 +38,14 @@ func newUpCommand() *cobra.Command {
 				err := errors.New("options.model is required")
 				_ = sendError(err.Error())
 				return err
+			}
+
+			sendInfo("Initializing model runner...")
+			if ctxSize != 4096 {
+				sendInfo(fmt.Sprintf("Setting context size to %d", ctxSize))
+			}
+			if rawRuntimeFlags != "" {
+				sendInfo("Setting raw runtime flags to " + rawRuntimeFlags)
 			}
 
 			kind := modelRunner.EngineKind()
@@ -48,6 +61,19 @@ func newUpCommand() *cobra.Command {
 
 			if err := downloadModelsOnlyIfNotFound(desktopClient, models); err != nil {
 				return err
+			}
+
+			for _, model := range models {
+				if err := desktopClient.ConfigureBackend(scheduling.ConfigureRequest{
+					Model:           model,
+					ContextSize:     ctxSize,
+					RawRuntimeFlags: rawRuntimeFlags,
+				}); err != nil {
+					configErrFmtString := "failed to configure backend for model %s with context-size %d and runtime-flags %s"
+					_ = sendErrorf(configErrFmtString+": %v", model, ctxSize, rawRuntimeFlags, err)
+					return fmt.Errorf(configErrFmtString+": %w", model, ctxSize, rawRuntimeFlags, err)
+				}
+				sendInfo("Successfully configured backend for model " + model)
 			}
 
 			switch kind {
@@ -66,6 +92,9 @@ func newUpCommand() *cobra.Command {
 		},
 	}
 	c.Flags().StringArrayVar(&models, "model", nil, "model to use")
+	c.Flags().Int64Var(&ctxSize, "context-size", -1, "context size for the model")
+	c.Flags().StringVar(&rawRuntimeFlags, "runtime-flags", "", "raw runtime flags to pass to the inference engine")
+	c.Flags().StringVar(&backend, "backend", llamacpp.Name, "inference backend to use")
 	return c
 }
 
