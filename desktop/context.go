@@ -167,9 +167,6 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 		rawURLPrefix = modelRunnerHost
 	} else { // ModelRunnerEngineKindDesktop
 		rawURLPrefix = "http://localhost" + inference.ExperimentalEndpointsPrefix
-		if treatDesktopAsMoby {
-			rawURLPrefix = "http://localhost:" + strconv.Itoa(standalone.DefaultControllerPortMoby)
-		}
 	}
 	urlPrefix, err := url.Parse(rawURLPrefix)
 	if err != nil {
@@ -184,9 +181,6 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 			return nil, fmt.Errorf("unable to create model runner client: %w", err)
 		}
 		client = dockerClient.HTTPClient()
-		if treatDesktopAsMoby {
-			client = http.DefaultClient
-		}
 	} else {
 		client = http.DefaultClient
 	}
