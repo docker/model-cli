@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/docker/model-cli/desktop"
-	"github.com/docker/model-cli/pkg/standalone"
 	"github.com/spf13/cobra"
 )
 
@@ -37,26 +35,31 @@ func newUpCommand() *cobra.Command {
 				return err
 			}
 
-			if err := ensureStandaloneRunnerAvailable(cmd.Context(), nil); err != nil {
+			kind := modelRunner.EngineKind()
+			standalone, err := ensureStandaloneRunnerAvailable(cmd.Context(), nil)
+			if err != nil {
 				_ = sendErrorf("Failed to initialize standalone model runner: %v", err)
 				return fmt.Errorf("Failed to initialize standalone model runner: %w", err)
+			} else if (kind == desktop.ModelRunnerEngineKindMoby || kind == desktop.ModelRunnerEngineKindCloud) &&
+				standalone == nil || standalone.gatewayIP == "" || standalone.gatewayPort == 0 {
+				return errors.New("unable to determine standalone runner endpoint")
 			}
 
 			if err := downloadModelsOnlyIfNotFound(desktopClient, models); err != nil {
 				return err
 			}
 
-			if kind := modelRunner.EngineKind(); kind == desktop.ModelRunnerEngineKindDesktop {
-				// TODO: Get the actual URL from Docker Desktop via some API.
+			switch kind {
+			case desktop.ModelRunnerEngineKindDesktop:
 				_ = setenv("URL", "http://model-runner.docker.internal/engines/v1/")
-			} else if kind == desktop.ModelRunnerEngineKindMobyManual {
+			case desktop.ModelRunnerEngineKindMobyManual:
 				_ = setenv("URL", modelRunner.URL("/engines/v1/"))
-			} else if kind == desktop.ModelRunnerEngineKindMoby {
-				// TODO: Use more robust detection in Moby-like environments.
-				_ = setenv("URL", "http://host.docker.internal:"+strconv.Itoa(standalone.DefaultControllerPortMoby)+"/engines/v1/")
-			} else if kind == desktop.ModelRunnerEngineKindCloud {
-				// TODO: Use more robust detection in Cloud environments.
-				_ = setenv("URL", "http://host.docker.internal:"+strconv.Itoa(standalone.DefaultControllerPortCloud)+"/engines/v1/")
+			case desktop.ModelRunnerEngineKindCloud:
+				fallthrough
+			case desktop.ModelRunnerEngineKindMoby:
+				_ = setenv("URL", fmt.Sprintf("http://%s:%d/engines/v1", standalone.gatewayIP, standalone.gatewayPort))
+			default:
+				return fmt.Errorf("unhandled engine kind: %v", kind)
 			}
 			return nil
 		},

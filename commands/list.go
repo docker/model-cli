@@ -30,7 +30,7 @@ func newListCmd() *cobra.Command {
 			if !jsonFormat && !openai && !quiet {
 				standaloneInstallPrinter = cmd
 			}
-			if err := ensureStandaloneRunnerAvailable(cmd.Context(), standaloneInstallPrinter); err != nil {
+			if _, err := ensureStandaloneRunnerAvailable(cmd.Context(), standaloneInstallPrinter); err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
 			models, err := listModels(openai, desktopClient, quiet, jsonFormat)
