@@ -3,6 +3,7 @@ package standalone
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -106,8 +107,11 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 		},
 	}
 	portBindings := []nat.PortBinding{{HostIP: "127.0.0.1", HostPort: portStr}}
-	if bridgeGatewayIP, err := determineBridgeGatewayIP(ctx, dockerClient); err == nil && bridgeGatewayIP != "" {
-		portBindings = append(portBindings, nat.PortBinding{HostIP: bridgeGatewayIP, HostPort: portStr})
+	if os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") != "1" {
+		// Don't bind the bridge gateway IP if we're treating Docker Desktop as Moby.
+		if bridgeGatewayIP, err := determineBridgeGatewayIP(ctx, dockerClient); err == nil && bridgeGatewayIP != "" {
+			portBindings = append(portBindings, nat.PortBinding{HostIP: bridgeGatewayIP, HostPort: portStr})
+		}
 	}
 	hostConfig.PortBindings = nat.PortMap{
 		nat.Port(portStr + "/tcp"): portBindings,

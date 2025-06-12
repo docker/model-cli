@@ -142,7 +142,7 @@ func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
 
 	// Check if we're treating Docker Desktop as regular Moby. This is only for
 	// testing purposes.
-	treatDesktopAsMoby := os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") != ""
+	treatDesktopAsMoby := os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") == "1"
 
 	// Detect the associated engine type.
 	kind := ModelRunnerEngineKindMoby
