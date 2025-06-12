@@ -49,13 +49,17 @@ func newUpCommand() *cobra.Command {
 				return err
 			}
 
-			if kind == desktop.ModelRunnerEngineKindDesktop {
-				// TODO: Get the actual URL from Docker Desktop via some API.
+			switch kind {
+			case desktop.ModelRunnerEngineKindDesktop:
 				_ = setenv("URL", "http://model-runner.docker.internal/engines/v1/")
-			} else if kind == desktop.ModelRunnerEngineKindMobyManual {
+			case desktop.ModelRunnerEngineKindMobyManual:
 				_ = setenv("URL", modelRunner.URL("/engines/v1/"))
-			} else if kind == desktop.ModelRunnerEngineKindMoby || kind == desktop.ModelRunnerEngineKindCloud {
+			case desktop.ModelRunnerEngineKindCloud:
+				fallthrough
+			case desktop.ModelRunnerEngineKindMoby:
 				_ = setenv("URL", fmt.Sprintf("http://%s:%d/engines/v1", standalone.gatewayIP, standalone.gatewayPort))
+			default:
+				return fmt.Errorf("unhandled engine kind: %v", kind)
 			}
 			return nil
 		},
