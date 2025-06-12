@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/commands/formatter"
 	"github.com/docker/model-cli/desktop"
@@ -10,6 +11,7 @@ import (
 
 func newInspectCmd() *cobra.Command {
 	var openai bool
+	var remote bool
 	c := &cobra.Command{
 		Use:   "inspect MODEL",
 		Short: "Display detailed information on one model",
@@ -24,10 +26,13 @@ func newInspectCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if openai && remote {
+				return fmt.Errorf("--openai and --remote flags are not compatible")
+			}
 			if err := ensureStandaloneRunnerAvailable(cmd.Context(), cmd); err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
-			inspectedModel, err := inspectModel(args, openai, desktopClient)
+			inspectedModel, err := inspectModel(args, openai, remote, desktopClient)
 			if err != nil {
 				return err
 			}
@@ -37,10 +42,11 @@ func newInspectCmd() *cobra.Command {
 		ValidArgsFunction: completion.ModelNames(getDesktopClient, 1),
 	}
 	c.Flags().BoolVar(&openai, "openai", false, "List model in an OpenAI format")
+	c.Flags().BoolVarP(&remote, "remote", "r", false, "Show info for remote models")
 	return c
 }
 
-func inspectModel(args []string, openai bool, desktopClient *desktop.Client) (string, error) {
+func inspectModel(args []string, openai bool, remote bool, desktopClient *desktop.Client) (string, error) {
 	modelName := args[0]
 	if openai {
 		model, err := desktopClient.InspectOpenAI(modelName)
@@ -50,7 +56,7 @@ func inspectModel(args []string, openai bool, desktopClient *desktop.Client) (st
 		}
 		return formatter.ToStandardJSON(model)
 	}
-	model, err := desktopClient.Inspect(modelName)
+	model, err := desktopClient.Inspect(modelName, remote)
 	if err != nil {
 		err = handleClientError(err, "Failed to get model "+modelName)
 		return "", handleNotRunningError(err)

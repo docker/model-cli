@@ -37,7 +37,7 @@ func newRunCmd() *cobra.Command {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
 
-			modelDetail, err := desktopClient.Inspect(model)
+			modelDetail, err := desktopClient.Inspect(model, false)
 			if err != nil {
 				if !errors.Is(err, desktop.ErrNotFound) {
 					return handleNotRunningError(handleClientError(err, "Failed to list models"))

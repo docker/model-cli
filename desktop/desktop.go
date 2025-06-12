@@ -234,7 +234,7 @@ func (c *Client) ListOpenAI() (OpenAIModelList, error) {
 	return modelsJson, nil
 }
 
-func (c *Client) Inspect(model string) (Model, error) {
+func (c *Client) Inspect(model string, remote bool) (Model, error) {
 	model = normalizeHuggingFaceModelName(model)
 	if model != "" {
 		if !strings.Contains(strings.Trim(model, "/"), "/") {
@@ -246,7 +246,7 @@ func (c *Client) Inspect(model string) (Model, error) {
 			model = modelId
 		}
 	}
-	rawResponse, err := c.listRaw(fmt.Sprintf("%s/%s", inference.ModelsPrefix, model), model)
+	rawResponse, err := c.listRawWithQuery(fmt.Sprintf("%s/%s", inference.ModelsPrefix, model), model, remote)
 	if err != nil {
 		return Model{}, err
 	}
@@ -280,6 +280,14 @@ func (c *Client) InspectOpenAI(model string) (OpenAIModel, error) {
 }
 
 func (c *Client) listRaw(route string, model string) ([]byte, error) {
+	return c.listRawWithQuery(route, model, false)
+}
+
+func (c *Client) listRawWithQuery(route string, model string, remote bool) ([]byte, error) {
+	if remote {
+		route += "?remote=true"
+	}
+
 	resp, err := c.doRequest(http.MethodGet, route, nil)
 	if err != nil {
 		return nil, c.handleQueryError(err, route)
@@ -298,7 +306,6 @@ func (c *Client) listRaw(route string, model string) ([]byte, error) {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 	return body, nil
-
 }
 
 func (c *Client) fullModelID(id string) (string, error) {
