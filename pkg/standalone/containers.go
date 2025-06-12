@@ -19,12 +19,12 @@ import (
 const controllerContainerName = "docker-model-runner"
 
 // FindControllerContainer searches for a running controller container. It
-// returns the ID of the container (if found), the container name (if any), or
-// any error that occurred.
-func FindControllerContainer(ctx context.Context, dockerClient *client.Client) (string, string, error) {
+// returns the ID of the container (if found), the container name (if any), the
+// full container summary (if found), or any error that occurred.
+func FindControllerContainer(ctx context.Context, dockerClient *client.Client) (string, string, container.Summary, error) {
 	// Before listing, prune any stopped controller containers.
 	if err := PruneControllerContainers(ctx, dockerClient, true, NoopPrinter()); err != nil {
-		return "", "", fmt.Errorf("unable to prune stopped model runner containers: %w", err)
+		return "", "", container.Summary{}, fmt.Errorf("unable to prune stopped model runner containers: %w", err)
 	}
 
 	// Identify all controller containers.
@@ -37,16 +37,16 @@ func FindControllerContainer(ctx context.Context, dockerClient *client.Client) (
 		),
 	})
 	if err != nil {
-		return "", "", fmt.Errorf("unable to identify model runner containers: %w", err)
+		return "", "", container.Summary{}, fmt.Errorf("unable to identify model runner containers: %w", err)
 	}
 	if len(containers) == 0 {
-		return "", "", nil
+		return "", "", container.Summary{}, nil
 	}
 	var containerName string
 	if len(containers[0].Names) > 0 {
 		containerName = strings.TrimPrefix(containers[0].Names[0], "/")
 	}
-	return containers[0].ID, containerName, nil
+	return containers[0].ID, containerName, containers[0], nil
 }
 
 // determineBridgeGatewayIP attempts to identify the engine's host gateway IP

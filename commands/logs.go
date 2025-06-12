@@ -44,7 +44,7 @@ func newLogsCmd() *cobra.Command {
 				if err != nil {
 					return fmt.Errorf("failed to create Docker client: %w", err)
 				}
-				ctrID, _, err := standalone.FindControllerContainer(cmd.Context(), dockerClient)
+				ctrID, _, _, err := standalone.FindControllerContainer(cmd.Context(), dockerClient)
 				if err != nil {
 					return fmt.Errorf("unable to identify Model Runner container: %w", err)
 				} else if ctrID == "" {

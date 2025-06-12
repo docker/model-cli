@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
 	gpupkg "github.com/docker/model-cli/pkg/gpu"
@@ -42,21 +43,49 @@ func waitForStandaloneRunnerAfterInstall(ctx context.Context) error {
 	return errors.New("standalone model runner took too long to initialize")
 }
 
+// standaloneRunner encodes the standalone runner configuration, if one exists.
+type standaloneRunner struct {
+	// hostPort is the port that the runner is listening to on the host.
+	hostPort uint16
+	// gatewayIP is the gateway IP address that the runner is listening on.
+	gatewayIP string
+	// gatewayPort is the gateway port that the runner is listening on.
+	gatewayPort uint16
+}
+
+// inspectStandaloneRunner inspects a standalone runner container and extracts
+// its configuration.
+func inspectStandaloneRunner(container container.Summary) *standaloneRunner {
+	result := &standaloneRunner{}
+	for _, port := range container.Ports {
+		if port.IP == "127.0.0.1" {
+			result.hostPort = port.PublicPort
+		} else {
+			// We don't really have a good way of knowing what the gateway IP
+			// address is, but in the standard standalone configuration we only
+			// bind to two interfaces: 127.0.0.1 and the gateway interface.
+			result.gatewayIP = port.IP
+			result.gatewayPort = port.PublicPort
+		}
+	}
+	return result
+}
+
 // ensureStandaloneRunnerAvailable is a utility function that other commands can
 // use to initialize a default standalone model runner. It is a no-op in
 // unsupported contexts or if automatic installs have been disabled.
-func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.StatusPrinter) error {
+func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.StatusPrinter) (*standaloneRunner, error) {
 	// If we're not in a supported model runner context, then don't do anything.
 	engineKind := modelRunner.EngineKind()
 	standaloneSupported := engineKind == desktop.ModelRunnerEngineKindMoby ||
 		engineKind == desktop.ModelRunnerEngineKindCloud
 	if !standaloneSupported {
-		return nil
+		return nil, nil
 	}
 
 	// If automatic installation has been disabled, then don't do anything.
 	if os.Getenv("MODEL_RUNNER_NO_AUTO_INSTALL") != "" {
-		return nil
+		return nil, nil
 	}
 
 	// Ensure that the output printer is non-nil.
@@ -67,32 +96,32 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 	// Create a Docker client for the active context.
 	dockerClient, err := desktop.DockerClientForContext(dockerCLI, dockerCLI.CurrentContext())
 	if err != nil {
-		return fmt.Errorf("failed to create Docker client: %w", err)
+		return nil, fmt.Errorf("failed to create Docker client: %w", err)
 	}
 
 	// Check if a model runner container exists.
-	container, _, err := standalone.FindControllerContainer(ctx, dockerClient)
+	containerID, _, container, err := standalone.FindControllerContainer(ctx, dockerClient)
 	if err != nil {
-		return fmt.Errorf("unable to identify existing standalone model runner: %w", err)
-	} else if container != "" {
-		return nil
+		return nil, fmt.Errorf("unable to identify existing standalone model runner: %w", err)
+	} else if containerID != "" {
+		return inspectStandaloneRunner(container), nil
 	}
 
 	// Automatically determine GPU support.
 	gpu, err := gpupkg.ProbeGPUSupport(ctx, dockerClient)
 	if err != nil {
-		return fmt.Errorf("unable to probe GPU support: %w", err)
+		return nil, fmt.Errorf("unable to probe GPU support: %w", err)
 	}
 
 	// Ensure that we have an up-to-date copy of the image.
 	if err := standalone.EnsureControllerImage(ctx, dockerClient, gpu, printer); err != nil {
-		return fmt.Errorf("unable to pull latest standalone model runner image: %w", err)
+		return nil, fmt.Errorf("unable to pull latest standalone model runner image: %w", err)
 	}
 
 	// Ensure that we have a model storage volume.
 	modelStorageVolume, err := standalone.EnsureModelStorageVolume(ctx, dockerClient, printer)
 	if err != nil {
-		return fmt.Errorf("unable to initialize standalone model storage: %w", err)
+		return nil, fmt.Errorf("unable to initialize standalone model storage: %w", err)
 	}
 
 	// Create the model runner container.
@@ -101,11 +130,28 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 		port = standalone.DefaultControllerPortCloud
 	}
 	if err := standalone.CreateControllerContainer(ctx, dockerClient, port, false, gpu, modelStorageVolume, printer); err != nil {
-		return fmt.Errorf("unable to initialize standalone model runner container: %w", err)
+		return nil, fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 	}
 
 	// Poll until we get a response from the model runner.
-	return waitForStandaloneRunnerAfterInstall(ctx)
+	if err := waitForStandaloneRunnerAfterInstall(ctx); err != nil {
+		return nil, err
+	}
+
+	// Find the runner container.
+	//
+	// TODO: We should actually find this before calling
+	// waitForStandaloneRunnerAfterInstall (or have CreateControllerContainer
+	// return the container information), and probably pass the target
+	// information info waitForStandaloneRunnerAfterInstall, but let's wait
+	// until we do listener port customization / detection in the next PR.
+	containerID, _, container, err = standalone.FindControllerContainer(ctx, dockerClient)
+	if err != nil {
+		return nil, fmt.Errorf("unable to identify existing standalone model runner: %w", err)
+	} else if containerID == "" {
+		return nil, errors.New("standalone model runner not found after installation")
+	}
+	return inspectStandaloneRunner(container), nil
 }
 
 func newInstallRunner() *cobra.Command {
@@ -149,7 +195,7 @@ func newInstallRunner() *cobra.Command {
 			}
 
 			// Check if an active model runner container already exists.
-			if ctrID, ctrName, err := standalone.FindControllerContainer(cmd.Context(), dockerClient); err != nil {
+			if ctrID, ctrName, _, err := standalone.FindControllerContainer(cmd.Context(), dockerClient); err != nil {
 				return err
 			} else if ctrID != "" {
 				if ctrName != "" {
