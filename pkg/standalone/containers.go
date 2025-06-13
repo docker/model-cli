@@ -2,9 +2,12 @@ package standalone
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -17,6 +20,11 @@ import (
 
 // controllerContainerName is the name to use for the controller container.
 const controllerContainerName = "docker-model-runner"
+
+// concurrentInstallMatcher matches error message that indicate a concurrent
+// standalone model runner installation is taking place. It extracts the ID of
+// the conflicting container in a capture group.
+var concurrentInstallMatcher = regexp.MustCompile(`is already in use by container "([a-z0-9]+)"`)
 
 // FindControllerContainer searches for a running controller container. It
 // returns the ID of the container (if found), the container name (if any), the
@@ -63,6 +71,28 @@ func determineBridgeGatewayIP(ctx context.Context, dockerClient *client.Client) 
 		}
 	}
 	return "", nil
+}
+
+// waitForContainerToStart waits for a container to start.
+func waitForContainerToStart(ctx context.Context, dockerClient *client.Client, containerID string) error {
+	// Unfortunately the Docker API's /containers/{id}/wait API (and the
+	// corresponding Client.ContainerWait method) don't allow waiting for
+	// container startup, so instead we'll take a polling approach.
+	for i := 5; i > 0; i-- {
+		if status, err := dockerClient.ContainerInspect(ctx, containerID); err != nil {
+			return fmt.Errorf("unable to inspect container (%s): %w", containerID[:12], err)
+		} else if status.State.Status == "running" {
+			return nil
+		}
+		if i > 1 {
+			select {
+			case <-time.After(1 * time.Second):
+			case <-ctx.Done():
+				return errors.New("waiting cancelled")
+			}
+		}
+	}
+	return errors.New("timed out")
 }
 
 // CreateControllerContainer creates and starts a controller container.
@@ -117,9 +147,17 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 		hostConfig.DeviceRequests = []container.DeviceRequest{{Count: -1, Capabilities: [][]string{{"gpu"}}}}
 	}
 
-	// Create the container.
+	// Create the container. If we detect that a concurrent installation is in
+	// progress, then we wait for whichever install process creates the
+	// container first and then wait for its container to be ready.
 	resp, err := dockerClient.ContainerCreate(ctx, config, hostConfig, nil, nil, controllerContainerName)
 	if err != nil {
+		if match := concurrentInstallMatcher.FindStringSubmatch(err.Error()); match != nil {
+			if err := waitForContainerToStart(ctx, dockerClient, match[1]); err != nil {
+				return fmt.Errorf("failed waiting for concurrent installation: %w", err)
+			}
+			return nil
+		}
 		return fmt.Errorf("failed to create container %s: %w", controllerContainerName, err)
 	}
 
