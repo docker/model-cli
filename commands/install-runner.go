@@ -126,10 +126,12 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 
 	// Create the model runner container.
 	port := uint16(standalone.DefaultControllerPortMoby)
+	environment := "moby"
 	if engineKind == desktop.ModelRunnerEngineKindCloud {
 		port = standalone.DefaultControllerPortCloud
+		environment = "cloud"
 	}
-	if err := standalone.CreateControllerContainer(ctx, dockerClient, port, false, gpu, modelStorageVolume, printer); err != nil {
+	if err := standalone.CreateControllerContainer(ctx, dockerClient, port, environment, false, gpu, modelStorageVolume, printer); err != nil {
 		return nil, fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 	}
 
@@ -188,6 +190,12 @@ func newInstallRunner() *cobra.Command {
 				port = standalone.DefaultControllerPortCloud
 			}
 
+			// Set the appropriate environment.
+			environment := "moby"
+			if engineKind == desktop.ModelRunnerEngineKindCloud {
+				environment = "cloud"
+			}
+
 			// Create a Docker client for the active context.
 			dockerClient, err := desktop.DockerClientForContext(dockerCLI, dockerCLI.CurrentContext())
 			if err != nil {
@@ -230,7 +238,7 @@ func newInstallRunner() *cobra.Command {
 				return fmt.Errorf("unable to initialize standalone model storage: %w", err)
 			}
 			// Create the model runner container.
-			if err := standalone.CreateControllerContainer(cmd.Context(), dockerClient, port, doNotTrack, gpu, modelStorageVolume, cmd); err != nil {
+			if err := standalone.CreateControllerContainer(cmd.Context(), dockerClient, port, environment, doNotTrack, gpu, modelStorageVolume, cmd); err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 			}
 
