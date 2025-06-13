@@ -40,8 +40,9 @@ func newUpCommand() *cobra.Command {
 			if err != nil {
 				_ = sendErrorf("Failed to initialize standalone model runner: %v", err)
 				return fmt.Errorf("Failed to initialize standalone model runner: %w", err)
-			} else if (kind == desktop.ModelRunnerEngineKindMoby || kind == desktop.ModelRunnerEngineKindCloud) &&
-				standalone == nil || standalone.gatewayIP == "" || standalone.gatewayPort == 0 {
+			} else if ((kind == desktop.ModelRunnerEngineKindMoby || kind == desktop.ModelRunnerEngineKindCloud) &&
+				standalone == nil) ||
+				(standalone != nil && (standalone.gatewayIP == "" || standalone.gatewayPort == 0)) {
 				return errors.New("unable to determine standalone runner endpoint")
 			}
 
