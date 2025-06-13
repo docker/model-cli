@@ -3,6 +3,7 @@ package standalone
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -105,6 +106,17 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 			Name: "always",
 		},
 	}
+	// Mount the Docker config file.
+	dockerConfigPath := os.ExpandEnv("$HOME/.docker/config.json")
+	if _, err := os.Stat(dockerConfigPath); err == nil {
+		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
+			Type:     mount.TypeBind,
+			Source:   dockerConfigPath,
+			Target:   "/root/.docker/config.json",
+			ReadOnly: true,
+		})
+	}
+
 	portBindings := []nat.PortBinding{{HostIP: "127.0.0.1", HostPort: portStr}}
 	if bridgeGatewayIP, err := determineBridgeGatewayIP(ctx, dockerClient); err == nil && bridgeGatewayIP != "" {
 		portBindings = append(portBindings, nat.PortBinding{HostIP: bridgeGatewayIP, HostPort: portStr})
