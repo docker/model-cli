@@ -14,6 +14,7 @@ import (
 
 	"github.com/docker/model-runner/pkg/inference"
 	"github.com/docker/model-runner/pkg/inference/models"
+	"github.com/docker/model-runner/pkg/inference/scheduling"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 )
@@ -547,6 +548,30 @@ func (c *Client) Unload(req UnloadRequest) (UnloadResponse, error) {
 	}
 
 	return unloadResp, nil
+}
+
+func (c *Client) ConfigureBackend(request scheduling.ConfigureRequest) error {
+	configureBackendPath := inference.InferencePrefix + "/_configure"
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("error marshaling request: %w", err)
+	}
+
+	resp, err := c.doRequest(http.MethodPost, configureBackendPath, bytes.NewReader(jsonData))
+	if err != nil {
+		return c.handleQueryError(err, configureBackendPath)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusAccepted {
+		body, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode == http.StatusConflict {
+			return fmt.Errorf("%s", body)
+		}
+		return fmt.Errorf("%s (%s)", body, resp.Status)
+	}
+
+	return nil
 }
 
 // doRequest is a helper function that performs HTTP requests and handles 503 responses
