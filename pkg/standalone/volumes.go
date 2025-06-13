@@ -60,7 +60,7 @@ func PruneModelStorageVolumes(ctx context.Context, dockerClient *client.Client, 
 		printer.Println("Removed volume", volume)
 	}
 	if pruned.SpaceReclaimed > 0 {
-		fmt.Printf("Reclaimed %d bytes\n", pruned.SpaceReclaimed)
+		printer.Printf("Reclaimed %d bytes\n", pruned.SpaceReclaimed)
 	}
 	return nil
 }
