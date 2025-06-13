@@ -97,7 +97,7 @@ func TestInspectHuggingFaceModel(t *testing.T) {
 		}`)),
 	}, nil)
 
-	model, err := client.Inspect(modelName)
+	model, err := client.Inspect(modelName, false)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedLowercase, model.Tags[0])
 }
