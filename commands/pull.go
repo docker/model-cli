@@ -2,6 +2,9 @@ package commands
 
 import (
 	"fmt"
+	"strings"
+
+	"github.com/google/go-containerregistry/pkg/name"
 
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
@@ -34,19 +37,54 @@ func newPullCmd() *cobra.Command {
 }
 
 func pullModel(cmd *cobra.Command, desktopClient *desktop.Client, model string) error {
-	response, progressShown, err := desktopClient.Pull(model, TUIProgress)
-
-	// Add a newline before any output (success or error) if progress was shown.
-	if progressShown {
-		cmd.Println()
+	tag, err := name.NewTag(model)
+	if err != nil {
+		return fmt.Errorf("invalid model name: %w", err)
 	}
+
+	if tag.TagStr() == "latest" && !strings.Contains(model, ":") {
+		cmd.Println("Using default tag: latest")
+	}
+
+	// Show "Pulling from" header
+	cmd.Printf("%s: Pulling from %s\n", tag.TagStr(), tag.RepositoryStr())
+
+	// Create multi-layer progress tracker
+	progressFunc, tracker := MultiLayerTUIProgress()
+
+	response, progressShown, err := desktopClient.Pull(model, progressFunc)
+
+	// Stop the progress tracker and show final completion state
+	tracker.Stop()
 
 	if err != nil {
 		return handleNotRunningError(handleClientError(err, "Failed to pull model"))
 	}
 
-	cmd.Println(response)
+	// Show completion summary
+	showPullCompletionSummary(cmd, tag, response, progressShown, tracker)
 	return nil
+}
+
+// showPullCompletionSummary displays the completion summary
+func showPullCompletionSummary(cmd *cobra.Command, reference name.Reference, response string, progressShown bool, tracker *ProgressTracker) {
+	// Determine if this was a fresh download or already up to date
+	isAlreadyUpToDate := !progressShown && !tracker.HasLayers()
+
+	// Add spacing if progress was shown
+	if progressShown {
+		cmd.Println()
+	}
+
+	// Show status message - modify based on whether model was already present
+	if isAlreadyUpToDate {
+		cmd.Printf("Status: Model is up to date for %s\n", reference.String())
+	} else {
+		cmd.Printf("Status: %s\n", response)
+	}
+
+	// Show the fully qualified model reference
+	cmd.Println(reference.Name())
 }
 
 func TUIProgress(message string) {
