@@ -30,7 +30,7 @@ func newInspectCmd() *cobra.Command {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
 			if openai && remote {
-				return fmt.Errorf("--openai and --remote flags are not compatible")
+				return fmt.Errorf("--remote flag cannot be used with --openai flag")
 			}
 			inspectedModel, err := inspectModel(args, openai, remote, desktopClient)
 			if err != nil {
