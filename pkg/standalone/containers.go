@@ -82,7 +82,7 @@ func waitForContainerToStart(ctx context.Context, dockerClient *client.Client, c
 	for i := 5; i > 0; i-- {
 		if status, err := dockerClient.ContainerInspect(ctx, containerID); err != nil {
 			return fmt.Errorf("unable to inspect container (%s): %w", containerID[:12], err)
-		} else if status.State.Status == "running" {
+		} else if status.State.Status == container.StateRunning {
 			return nil
 		}
 		if i > 1 {

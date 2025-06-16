@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/docker/cli/cli/command"
+	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/docker/cli/cli/config"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/fvbommel/sortorder"
@@ -22,10 +22,12 @@ const (
 	// used to originally invoke the docker CLI when executing a
 	// plugin. Assuming $PATH and $CWD remain unchanged this should allow
 	// the plugin to re-execute the original CLI.
-	ReexecEnvvar = "DOCKER_CLI_PLUGIN_ORIGINAL_CLI_COMMAND"
+	ReexecEnvvar = metadata.ReexecEnvvar
 
 	// ResourceAttributesEnvvar is the name of the envvar that includes additional
 	// resource attributes for OTEL.
+	//
+	// Deprecated: The "OTEL_RESOURCE_ATTRIBUTES" env-var is part of the OpenTelemetry specification; users should define their own const for this. This const will be removed in the next release.
 	ResourceAttributesEnvvar = "OTEL_RESOURCE_ATTRIBUTES"
 )
 
@@ -59,20 +61,16 @@ func IsNotFound(err error) bool {
 // 3. Platform-specific defaultSystemPluginDirs.
 //
 // [ConfigFile.CLIPluginsExtraDirs]: https://pkg.go.dev/github.com/docker/cli@v26.1.4+incompatible/cli/config/configfile#ConfigFile.CLIPluginsExtraDirs
-func getPluginDirs(cfg *configfile.ConfigFile) ([]string, error) {
+func getPluginDirs(cfg *configfile.ConfigFile) []string {
 	var pluginDirs []string
 
 	if cfg != nil {
 		pluginDirs = append(pluginDirs, cfg.CLIPluginsExtraDirs...)
 	}
-	pluginDir, err := config.Path("cli-plugins")
-	if err != nil {
-		return nil, err
-	}
-
+	pluginDir := filepath.Join(config.Dir(), "cli-plugins")
 	pluginDirs = append(pluginDirs, pluginDir)
 	pluginDirs = append(pluginDirs, defaultSystemPluginDirs...)
-	return pluginDirs, nil
+	return pluginDirs
 }
 
 func addPluginCandidatesFromDir(res map[string][]string, d string) {
@@ -83,7 +81,7 @@ func addPluginCandidatesFromDir(res map[string][]string, d string) {
 		return
 	}
 	for _, dentry := range dentries {
-		switch dentry.Type() & os.ModeType {
+		switch dentry.Type() & os.ModeType { //nolint:exhaustive,nolintlint // no need to include all possible file-modes in this list
 		case 0, os.ModeSymlink:
 			// Regular file or symlink, keep going
 		default:
@@ -91,10 +89,10 @@ func addPluginCandidatesFromDir(res map[string][]string, d string) {
 			continue
 		}
 		name := dentry.Name()
-		if !strings.HasPrefix(name, NamePrefix) {
+		if !strings.HasPrefix(name, metadata.NamePrefix) {
 			continue
 		}
-		name = strings.TrimPrefix(name, NamePrefix)
+		name = strings.TrimPrefix(name, metadata.NamePrefix)
 		var err error
 		if name, err = trimExeSuffix(name); err != nil {
 			continue
@@ -113,12 +111,12 @@ func listPluginCandidates(dirs []string) map[string][]string {
 }
 
 // GetPlugin returns a plugin on the system by its name
-func GetPlugin(name string, dockerCli command.Cli, rootcmd *cobra.Command) (*Plugin, error) {
-	pluginDirs, err := getPluginDirs(dockerCli.ConfigFile())
-	if err != nil {
-		return nil, err
-	}
+func GetPlugin(name string, dockerCLI config.Provider, rootcmd *cobra.Command) (*Plugin, error) {
+	pluginDirs := getPluginDirs(dockerCLI.ConfigFile())
+	return getPlugin(name, pluginDirs, rootcmd)
+}
 
+func getPlugin(name string, pluginDirs []string, rootcmd *cobra.Command) (*Plugin, error) {
 	candidates := listPluginCandidates(pluginDirs)
 	if paths, ok := candidates[name]; ok {
 		if len(paths) == 0 {
@@ -139,17 +137,21 @@ func GetPlugin(name string, dockerCli command.Cli, rootcmd *cobra.Command) (*Plu
 }
 
 // ListPlugins produces a list of the plugins available on the system
-func ListPlugins(dockerCli command.Cli, rootcmd *cobra.Command) ([]Plugin, error) {
-	pluginDirs, err := getPluginDirs(dockerCli.ConfigFile())
-	if err != nil {
-		return nil, err
-	}
-
+func ListPlugins(dockerCli config.Provider, rootcmd *cobra.Command) ([]Plugin, error) {
+	pluginDirs := getPluginDirs(dockerCli.ConfigFile())
 	candidates := listPluginCandidates(pluginDirs)
+	if len(candidates) == 0 {
+		return nil, nil
+	}
 
 	var plugins []Plugin
 	var mu sync.Mutex
-	eg, _ := errgroup.WithContext(context.TODO())
+	ctx := rootcmd.Context()
+	if ctx == nil {
+		// Fallback, mostly for tests that pass a bare cobra.command
+		ctx = context.Background()
+	}
+	eg, _ := errgroup.WithContext(ctx)
 	cmds := rootcmd.Commands()
 	for _, paths := range candidates {
 		func(paths []string) {
@@ -186,7 +188,7 @@ func ListPlugins(dockerCli command.Cli, rootcmd *cobra.Command) ([]Plugin, error
 // PluginRunCommand returns an "os/exec".Cmd which when .Run() will execute the named plugin.
 // The rootcmd argument is referenced to determine the set of builtin commands in order to detect conficts.
 // The error returned satisfies the IsNotFound() predicate if no plugin was found or if the first candidate plugin was invalid somehow.
-func PluginRunCommand(dockerCli command.Cli, name string, rootcmd *cobra.Command) (*exec.Cmd, error) {
+func PluginRunCommand(dockerCli config.Provider, name string, rootcmd *cobra.Command) (*exec.Cmd, error) {
 	// This uses the full original args, not the args which may
 	// have been provided by cobra to our caller. This is because
 	// they lack e.g. global options which we must propagate here.
@@ -196,11 +198,8 @@ func PluginRunCommand(dockerCli command.Cli, name string, rootcmd *cobra.Command
 		// fallback to their "invalid" command path.
 		return nil, errPluginNotFound(name)
 	}
-	exename := addExeSuffix(NamePrefix + name)
-	pluginDirs, err := getPluginDirs(dockerCli.ConfigFile())
-	if err != nil {
-		return nil, err
-	}
+	exename := addExeSuffix(metadata.NamePrefix + name)
+	pluginDirs := getPluginDirs(dockerCli.ConfigFile())
 
 	for _, d := range pluginDirs {
 		path := filepath.Join(d, exename)
@@ -233,7 +232,7 @@ func PluginRunCommand(dockerCli command.Cli, name string, rootcmd *cobra.Command
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
-		cmd.Env = append(cmd.Environ(), ReexecEnvvar+"="+os.Args[0])
+		cmd.Env = append(cmd.Environ(), metadata.ReexecEnvvar+"="+os.Args[0])
 		cmd.Env = appendPluginResourceAttributesEnvvar(cmd.Env, rootcmd, plugin)
 
 		return cmd, nil
@@ -243,5 +242,5 @@ func PluginRunCommand(dockerCli command.Cli, name string, rootcmd *cobra.Command
 
 // IsPluginCommand checks if the given cmd is a plugin-stub.
 func IsPluginCommand(cmd *cobra.Command) bool {
-	return cmd.Annotations[CommandAnnotationPlugin] == "true"
+	return cmd.Annotations[metadata.CommandAnnotationPlugin] == "true"
 }

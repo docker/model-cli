@@ -1,21 +1,21 @@
 package opts
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
 	"path"
-	"regexp"
 	"strings"
 
+	"github.com/docker/cli/internal/lazyregexp"
 	"github.com/docker/docker/api/types/filters"
-	units "github.com/docker/go-units"
-	"github.com/pkg/errors"
+	"github.com/docker/go-units"
 )
 
 var (
-	alphaRegexp  = regexp.MustCompile(`[a-zA-Z]`)
-	domainRegexp = regexp.MustCompile(`^(:?(:?[a-zA-Z0-9]|(:?[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9]))(:?\.(:?[a-zA-Z0-9]|(:?[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])))*)\.?\s*$`)
+	alphaRegexp  = lazyregexp.New(`[a-zA-Z]`)
+	domainRegexp = lazyregexp.New(`^(:?(:?[a-zA-Z0-9]|(:?[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9]))(:?\.(:?[a-zA-Z0-9]|(:?[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])))*)\.?\s*$`)
 )
 
 // ListOpts holds a list of values and a validation function.
@@ -80,7 +80,19 @@ func (opts *ListOpts) GetMap() map[string]struct{} {
 }
 
 // GetAll returns the values of slice.
+//
+// Deprecated: use [ListOpts.GetSlice] instead. This method will be removed in a future release.
 func (opts *ListOpts) GetAll() []string {
+	return *opts.values
+}
+
+// GetSlice returns the values of slice.
+//
+// It implements [cobra.SliceValue] to allow shell completion to be provided
+// multiple times.
+//
+// [cobra.SliceValue]: https://pkg.go.dev/github.com/spf13/cobra@v1.9.1#SliceValue
+func (opts *ListOpts) GetSlice() []string {
 	return *opts.values
 }
 

@@ -100,7 +100,7 @@ func (m *MountOpt) Set(value string) error {
 			mount.Type = mounttypes.Type(strings.ToLower(val))
 		case "source", "src":
 			mount.Source = val
-			if strings.HasPrefix(val, "."+string(filepath.Separator)) || val == "." {
+			if !filepath.IsAbs(val) && strings.HasPrefix(val, ".") {
 				if abs, err := filepath.Abs(val); err == nil {
 					mount.Source = abs
 				}
@@ -135,8 +135,7 @@ func (m *MountOpt) Set(value string) error {
 				// TODO: implicitly set propagation and error if the user specifies a propagation in a future refactor/UX polish pass
 				// https://github.com/docker/cli/pull/4316#discussion_r1341974730
 			default:
-				return fmt.Errorf("invalid value for %s: %s (must be \"enabled\", \"disabled\", \"writable\", or \"readonly\")",
-					key, val)
+				return fmt.Errorf(`invalid value for %s: %s (must be "enabled", "disabled", "writable", or "readonly")`, key, val)
 			}
 		case "volume-subpath":
 			volumeOptions().Subpath = val
