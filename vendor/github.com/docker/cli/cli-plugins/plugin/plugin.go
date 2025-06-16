@@ -9,7 +9,7 @@ import (
 	"sync"
 
 	"github.com/docker/cli/cli"
-	"github.com/docker/cli/cli-plugins/manager"
+	"github.com/docker/cli/cli-plugins/metadata"
 	"github.com/docker/cli/cli-plugins/socket"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/connhelper"
@@ -30,7 +30,7 @@ import (
 var PersistentPreRunE func(*cobra.Command, []string) error
 
 // RunPlugin executes the specified plugin command
-func RunPlugin(dockerCli *command.DockerCli, plugin *cobra.Command, meta manager.Metadata) error {
+func RunPlugin(dockerCli *command.DockerCli, plugin *cobra.Command, meta metadata.Metadata) error {
 	tcmd := newPluginCommand(dockerCli, plugin, meta)
 
 	var persistentPreRunOnce sync.Once
@@ -81,7 +81,7 @@ func RunPlugin(dockerCli *command.DockerCli, plugin *cobra.Command, meta manager
 }
 
 // Run is the top-level entry point to the CLI plugin framework. It should be called from your plugin's `main()` function.
-func Run(makeCmd func(command.Cli) *cobra.Command, meta manager.Metadata) {
+func Run(makeCmd func(command.Cli) *cobra.Command, meta metadata.Metadata) {
 	otel.SetErrorHandler(debug.OTELErrorHandler)
 
 	dockerCli, err := command.NewDockerCli()
@@ -109,9 +109,9 @@ func Run(makeCmd func(command.Cli) *cobra.Command, meta manager.Metadata) {
 }
 
 func withPluginClientConn(name string) command.CLIOption {
-	return command.WithInitializeClient(func(dockerCli *command.DockerCli) (client.APIClient, error) {
+	return func(cli *command.DockerCli) error {
 		cmd := "docker"
-		if x := os.Getenv(manager.ReexecEnvvar); x != "" {
+		if x := os.Getenv(metadata.ReexecEnvvar); x != "" {
 			cmd = x
 		}
 		var flags []string
@@ -133,16 +133,19 @@ func withPluginClientConn(name string) command.CLIOption {
 
 		helper, err := connhelper.GetCommandConnectionHelper(cmd, flags...)
 		if err != nil {
-			return nil, err
+			return err
 		}
-
-		return client.NewClientWithOpts(client.WithDialContext(helper.Dialer))
-	})
+		apiClient, err := client.NewClientWithOpts(client.WithDialContext(helper.Dialer))
+		if err != nil {
+			return err
+		}
+		return command.WithAPIClient(apiClient)(cli)
+	}
 }
 
-func newPluginCommand(dockerCli *command.DockerCli, plugin *cobra.Command, meta manager.Metadata) *cli.TopLevelCommand {
+func newPluginCommand(dockerCli *command.DockerCli, plugin *cobra.Command, meta metadata.Metadata) *cli.TopLevelCommand {
 	name := plugin.Name()
-	fullname := manager.NamePrefix + name
+	fullname := metadata.NamePrefix + name
 
 	cmd := &cobra.Command{
 		Use:           fmt.Sprintf("docker [OPTIONS] %s [ARG...]", name),
@@ -177,12 +180,12 @@ func newPluginCommand(dockerCli *command.DockerCli, plugin *cobra.Command, meta 
 	return cli.NewTopLevelCommand(cmd, dockerCli, opts, cmd.Flags())
 }
 
-func newMetadataSubcommand(plugin *cobra.Command, meta manager.Metadata) *cobra.Command {
+func newMetadataSubcommand(plugin *cobra.Command, meta metadata.Metadata) *cobra.Command {
 	if meta.ShortDescription == "" {
 		meta.ShortDescription = plugin.Short
 	}
 	cmd := &cobra.Command{
-		Use:    manager.MetadataSubcommandName,
+		Use:    metadata.MetadataSubcommandName,
 		Hidden: true,
 		// Suppress the global/parent PersistentPreRunE, which
 		// needlessly initializes the client and tries to
@@ -200,8 +203,8 @@ func newMetadataSubcommand(plugin *cobra.Command, meta manager.Metadata) *cobra.
 
 // RunningStandalone tells a CLI plugin it is run standalone by direct execution
 func RunningStandalone() bool {
-	if os.Getenv(manager.ReexecEnvvar) != "" {
+	if os.Getenv(metadata.ReexecEnvvar) != "" {
 		return false
 	}
-	return len(os.Args) < 2 || os.Args[1] != manager.MetadataSubcommandName
+	return len(os.Args) < 2 || os.Args[1] != metadata.MetadataSubcommandName
 }
