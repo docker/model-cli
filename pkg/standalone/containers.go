@@ -108,7 +108,7 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 	}
 	// Mount the Docker config file.
 	dockerConfigPath := os.ExpandEnv("$HOME/.docker/config.json")
-	if _, err := os.Stat(dockerConfigPath); err == nil {
+	if s, err := os.Stat(dockerConfigPath); err == nil && s.Mode()&os.ModeType == 0 {
 		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
 			Type:     mount.TypeBind,
 			Source:   dockerConfigPath,
