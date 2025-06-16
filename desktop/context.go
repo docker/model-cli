@@ -72,7 +72,11 @@ func DockerClientForContext(cli *command.DockerCli, name string) (*clientpkg.Cli
 	if err != nil {
 		return nil, fmt.Errorf("unable to determine context endpoint: %w", err)
 	}
-	return clientpkg.NewClientWithOpts(clientpkg.FromEnv, clientpkg.WithHost(endpoint.Host))
+	return clientpkg.NewClientWithOpts(
+		clientpkg.FromEnv,
+		clientpkg.WithHost(endpoint.Host),
+		clientpkg.WithAPIVersionNegotiation(),
+	)
 }
 
 // ModelRunnerEngineKind encodes the kind of Docker engine associated with the
