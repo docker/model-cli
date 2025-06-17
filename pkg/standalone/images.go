@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
@@ -15,13 +16,27 @@ import (
 const (
 	// ControllerImage is the image used for the controller container.
 	ControllerImage = "docker/model-runner"
-	// controllerImageTagCPU is the image tag used for the controller container
+	// defaultControllerImageTagCPU is the image tag used for the controller container
 	// when running with the CPU backend.
-	controllerImageTagCPU = "latest"
-	// controllerImageTagCUDA is the image tag used for the controller container
+	defaultControllerImageTagCPU = "latest"
+	// defaultControllerImageTagCUDA is the image tag used for the controller container
 	// when running with the CUDA GPU backend.
-	controllerImageTagCUDA = "latest-cuda"
+	defaultControllerImageTagCUDA = "latest-cuda"
 )
+
+func controllerImageTagCPU() string {
+	if version, ok := os.LookupEnv("MODEL_RUNNER_CONTROLLER_VERSION"); ok && version != "" {
+		return version
+	}
+	return defaultControllerImageTagCPU
+}
+
+func controllerImageTagCUDA() string {
+	if version, ok := os.LookupEnv("MODEL_RUNNER_CONTROLLER_VERSION"); ok && version != "" {
+		return version + "-cuda"
+	}
+	return defaultControllerImageTagCUDA
+}
 
 // EnsureControllerImage ensures that the controller container image is pulled.
 func EnsureControllerImage(ctx context.Context, dockerClient *client.Client, gpu gpupkg.GPUSupport, printer StatusPrinter) error {
@@ -29,9 +44,9 @@ func EnsureControllerImage(ctx context.Context, dockerClient *client.Client, gpu
 	var imageName string
 	switch gpu {
 	case gpupkg.GPUSupportCUDA:
-		imageName = ControllerImage + ":" + controllerImageTagCUDA
+		imageName = ControllerImage + ":" + controllerImageTagCUDA()
 	default:
-		imageName = ControllerImage + ":" + controllerImageTagCPU
+		imageName = ControllerImage + ":" + controllerImageTagCPU()
 	}
 
 	// Perform the pull.
@@ -65,13 +80,13 @@ func EnsureControllerImage(ctx context.Context, dockerClient *client.Client, gpu
 // PruneControllerImages removes any unused controller container images.
 func PruneControllerImages(ctx context.Context, dockerClient *client.Client, printer StatusPrinter) error {
 	// Remove the standard image, if present.
-	imageNameCPU := ControllerImage + ":" + controllerImageTagCPU
+	imageNameCPU := ControllerImage + ":" + controllerImageTagCPU()
 	if _, err := dockerClient.ImageRemove(ctx, imageNameCPU, image.RemoveOptions{}); err == nil {
 		printer.Println("Removed image", imageNameCPU)
 	}
 
 	// Remove the CUDA GPU image, if present.
-	imageNameCUDA := ControllerImage + ":" + controllerImageTagCUDA
+	imageNameCUDA := ControllerImage + ":" + controllerImageTagCUDA()
 	if _, err := dockerClient.ImageRemove(ctx, imageNameCUDA, image.RemoveOptions{}); err == nil {
 		printer.Println("Removed image", imageNameCUDA)
 	}

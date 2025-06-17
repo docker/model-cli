@@ -11,7 +11,6 @@ import (
 
 	"github.com/docker/cli/cli/streams"
 	"github.com/docker/docker/client"
-	"github.com/docker/docker/errdefs"
 	"github.com/moby/term"
 	"github.com/pkg/errors"
 )
@@ -101,7 +100,8 @@ func WithContentTrust(enabled bool) CLIOption {
 // WithDefaultContextStoreConfig configures the cli to use the default context store configuration.
 func WithDefaultContextStoreConfig() CLIOption {
 	return func(cli *DockerCli) error {
-		cli.contextStoreConfig = DefaultContextStoreConfig()
+		cfg := DefaultContextStoreConfig()
+		cli.contextStoreConfig = &cfg
 		return nil
 	}
 }
@@ -111,6 +111,18 @@ func WithAPIClient(c client.APIClient) CLIOption {
 	return func(cli *DockerCli) error {
 		cli.client = c
 		return nil
+	}
+}
+
+// WithInitializeClient is passed to [DockerCli.Initialize] to initialize
+// an API Client for use by the CLI.
+func WithInitializeClient(makeClient func(*DockerCli) (client.APIClient, error)) CLIOption {
+	return func(cli *DockerCli) error {
+		c, err := makeClient(cli)
+		if err != nil {
+			return err
+		}
+		return WithAPIClient(c)(cli)
 	}
 }
 
@@ -177,7 +189,7 @@ func withCustomHeadersFromEnv() client.Opt {
 		csvReader := csv.NewReader(strings.NewReader(value))
 		fields, err := csvReader.Read()
 		if err != nil {
-			return errdefs.InvalidParameter(errors.Errorf(
+			return invalidParameter(errors.Errorf(
 				"failed to parse custom headers from %s environment variable: value must be formatted as comma-separated key=value pairs",
 				envOverrideHTTPHeaders,
 			))
@@ -194,7 +206,7 @@ func withCustomHeadersFromEnv() client.Opt {
 			k = strings.TrimSpace(k)
 
 			if k == "" {
-				return errdefs.InvalidParameter(errors.Errorf(
+				return invalidParameter(errors.Errorf(
 					`failed to set custom headers from %s environment variable: value contains a key=value pair with an empty key: '%s'`,
 					envOverrideHTTPHeaders, kv,
 				))
@@ -205,7 +217,7 @@ func withCustomHeadersFromEnv() client.Opt {
 			// from an environment variable with the same name). In the meantime,
 			// produce an error to prevent users from depending on this.
 			if !hasValue {
-				return errdefs.InvalidParameter(errors.Errorf(
+				return invalidParameter(errors.Errorf(
 					`failed to set custom headers from %s environment variable: missing "=" in key=value pair: '%s'`,
 					envOverrideHTTPHeaders, kv,
 				))

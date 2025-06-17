@@ -4,10 +4,13 @@ import (
 	"archive/tar"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -20,6 +23,11 @@ import (
 
 // controllerContainerName is the name to use for the controller container.
 const controllerContainerName = "docker-model-runner"
+
+// concurrentInstallMatcher matches error message that indicate a concurrent
+// standalone model runner installation is taking place. It extracts the ID of
+// the conflicting container in a capture group.
+var concurrentInstallMatcher = regexp.MustCompile(`is already in use by container "([a-z0-9]+)"`)
 
 // copyDockerConfigToContainer copies the Docker config file from the host to the container
 // and sets up proper ownership and permissions for the modelrunner user.
@@ -142,20 +150,45 @@ func determineBridgeGatewayIP(ctx context.Context, dockerClient *client.Client) 
 	return "", nil
 }
 
+// waitForContainerToStart waits for a container to start.
+func waitForContainerToStart(ctx context.Context, dockerClient *client.Client, containerID string) error {
+	// Unfortunately the Docker API's /containers/{id}/wait API (and the
+	// corresponding Client.ContainerWait method) don't allow waiting for
+	// container startup, so instead we'll take a polling approach.
+	for i := 5; i > 0; i-- {
+		if status, err := dockerClient.ContainerInspect(ctx, containerID); err != nil {
+			return fmt.Errorf("unable to inspect container (%s): %w", containerID[:12], err)
+		} else if status.State.Status == container.StateRunning {
+			return nil
+		}
+		if i > 1 {
+			select {
+			case <-time.After(1 * time.Second):
+			case <-ctx.Done():
+				return errors.New("waiting cancelled")
+			}
+		}
+	}
+	return errors.New("timed out")
+}
+
 // CreateControllerContainer creates and starts a controller container.
-func CreateControllerContainer(ctx context.Context, dockerClient *client.Client, port uint16, doNotTrack bool, gpu gpupkg.GPUSupport, modelStorageVolume string, printer StatusPrinter) error {
+func CreateControllerContainer(ctx context.Context, dockerClient *client.Client, port uint16, environment string, doNotTrack bool, gpu gpupkg.GPUSupport, modelStorageVolume string, printer StatusPrinter) error {
 	// Determine the target image.
 	var imageName string
 	switch gpu {
 	case gpupkg.GPUSupportCUDA:
-		imageName = ControllerImage + ":" + controllerImageTagCUDA
+		imageName = ControllerImage + ":" + controllerImageTagCUDA()
 	default:
-		imageName = ControllerImage + ":" + controllerImageTagCPU
+		imageName = ControllerImage + ":" + controllerImageTagCPU()
 	}
 
 	// Set up the container configuration.
 	portStr := strconv.Itoa(int(port))
-	env := []string{"MODEL_RUNNER_PORT=" + portStr}
+	env := []string{
+		"MODEL_RUNNER_PORT=" + portStr,
+		"MODEL_RUNNER_ENVIRONMENT=" + environment,
+	}
 	if doNotTrack {
 		env = append(env, "DO_NOT_TRACK=1")
 	}
@@ -182,10 +215,12 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 			Name: "always",
 		},
 	}
-
 	portBindings := []nat.PortBinding{{HostIP: "127.0.0.1", HostPort: portStr}}
-	if bridgeGatewayIP, err := determineBridgeGatewayIP(ctx, dockerClient); err == nil && bridgeGatewayIP != "" {
-		portBindings = append(portBindings, nat.PortBinding{HostIP: bridgeGatewayIP, HostPort: portStr})
+	if os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") != "1" {
+		// Don't bind the bridge gateway IP if we're treating Docker Desktop as Moby.
+		if bridgeGatewayIP, err := determineBridgeGatewayIP(ctx, dockerClient); err == nil && bridgeGatewayIP != "" {
+			portBindings = append(portBindings, nat.PortBinding{HostIP: bridgeGatewayIP, HostPort: portStr})
+		}
 	}
 	hostConfig.PortBindings = nat.PortMap{
 		nat.Port(portStr + "/tcp"): portBindings,
@@ -195,9 +230,17 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 		hostConfig.DeviceRequests = []container.DeviceRequest{{Count: -1, Capabilities: [][]string{{"gpu"}}}}
 	}
 
-	// Create the container.
+	// Create the container. If we detect that a concurrent installation is in
+	// progress, then we wait for whichever install process creates the
+	// container first and then wait for its container to be ready.
 	resp, err := dockerClient.ContainerCreate(ctx, config, hostConfig, nil, nil, controllerContainerName)
 	if err != nil {
+		if match := concurrentInstallMatcher.FindStringSubmatch(err.Error()); match != nil {
+			if err := waitForContainerToStart(ctx, dockerClient, match[1]); err != nil {
+				return fmt.Errorf("failed waiting for concurrent installation: %w", err)
+			}
+			return nil
+		}
 		return fmt.Errorf("failed to create container %s: %w", controllerContainerName, err)
 	}
 

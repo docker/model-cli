@@ -1,6 +1,7 @@
 package desktop
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -8,6 +9,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/context/docker"
@@ -18,11 +20,20 @@ import (
 
 // isDesktopContext returns true if the CLI instance points to a Docker Desktop
 // context and false otherwise.
-func isDesktopContext(cli *command.DockerCli) bool {
+func isDesktopContext(ctx context.Context, cli *command.DockerCli) bool {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	serverInfo, _ := cli.Client().Info(ctx)
+
 	// We don't currently support Docker Model Runner in Docker Desktop for
 	// Linux, so we won't treat that as a Docker Desktop case (though it will
 	// still work as a standard Moby or Cloud case, depending on configuration).
 	if runtime.GOOS == "linux" {
+		if strings.Contains(serverInfo.KernelVersion, "-microsoft-standard-WSL2") {
+			// We can use Docker Desktop from within a WSL2 integrated distro.
+			// https://github.com/search?q=repo%3Amicrosoft%2FWSL2-Linux-Kernel+path%3A%2F%5Earch%5C%2F.*%5C%2Fconfigs%5C%2Fconfig-wsl%2F+CONFIG_LOCALVERSION&type=code
+			return true
+		}
 		return false
 	}
 
@@ -32,18 +43,8 @@ func isDesktopContext(cli *command.DockerCli) bool {
 		return false
 	}
 
-	// Otherwise used name-based heuristics to identify the environment.
-	name := cli.CurrentContext()
-	if name == "desktop-linux" {
-		return true
-	} else if name == "default" && os.Getenv("DOCKER_HOST") == "" {
-		return true
-	} else if runtime.GOOS == "windows" && name == "desktop-windows" {
-		// On Windows, we'll still target the Linux engine, even if the Windows
-		// engine is currently active.
-		return true
-	}
-	return false
+	// docker run -it --rm --privileged --pid=host justincormack/nsenter1 /bin/sh -c 'cat /etc/os-release'
+	return serverInfo.OperatingSystem == "Docker Desktop"
 }
 
 // isCloudContext returns true if the CLI instance points to a Docker Cloud
@@ -71,7 +72,11 @@ func DockerClientForContext(cli *command.DockerCli, name string) (*clientpkg.Cli
 	if err != nil {
 		return nil, fmt.Errorf("unable to determine context endpoint: %w", err)
 	}
-	return clientpkg.NewClientWithOpts(clientpkg.FromEnv, clientpkg.WithHost(endpoint.Host))
+	return clientpkg.NewClientWithOpts(
+		clientpkg.FromEnv,
+		clientpkg.WithHost(endpoint.Host),
+		clientpkg.WithAPIVersionNegotiation(),
+	)
 }
 
 // ModelRunnerEngineKind encodes the kind of Docker engine associated with the
@@ -136,19 +141,19 @@ func NewContextForMock(client DockerHttpClient) *ModelRunnerContext {
 }
 
 // DetectContext determines the current Docker Model Runner context.
-func DetectContext(cli *command.DockerCli) (*ModelRunnerContext, error) {
+func DetectContext(ctx context.Context, cli *command.DockerCli) (*ModelRunnerContext, error) {
 	// Check for an explicit endpoint setting.
 	modelRunnerHost := os.Getenv("MODEL_RUNNER_HOST")
 
 	// Check if we're treating Docker Desktop as regular Moby. This is only for
 	// testing purposes.
-	treatDesktopAsMoby := os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") != ""
+	treatDesktopAsMoby := os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") == "1"
 
 	// Detect the associated engine type.
 	kind := ModelRunnerEngineKindMoby
 	if modelRunnerHost != "" {
 		kind = ModelRunnerEngineKindMobyManual
-	} else if isDesktopContext(cli) {
+	} else if isDesktopContext(ctx, cli) {
 		kind = ModelRunnerEngineKindDesktop
 		if treatDesktopAsMoby {
 			kind = ModelRunnerEngineKindMoby
