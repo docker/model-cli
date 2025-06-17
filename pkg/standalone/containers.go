@@ -1,6 +1,8 @@
 package standalone
 
 import (
+	"archive/tar"
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -18,6 +20,80 @@ import (
 
 // controllerContainerName is the name to use for the controller container.
 const controllerContainerName = "docker-model-runner"
+
+// copyDockerConfigToContainer copies the Docker config file from the host to the container
+// and sets up proper ownership and permissions for the modelrunner user.
+func copyDockerConfigToContainer(ctx context.Context, dockerClient *client.Client, containerID string) error {
+	dockerConfigPath := os.ExpandEnv("$HOME/.docker/config.json")
+	if s, err := os.Stat(dockerConfigPath); err != nil || s.Mode()&os.ModeType != 0 {
+		return nil
+	}
+
+	configData, err := os.ReadFile(dockerConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to read Docker config file: %w", err)
+	}
+
+	var buf bytes.Buffer
+	tw := tar.NewWriter(&buf)
+	header := &tar.Header{
+		Name: ".docker/config.json",
+		Mode: 0600,
+		Size: int64(len(configData)),
+	}
+	if err := tw.WriteHeader(header); err != nil {
+		return fmt.Errorf("failed to write tar header: %w", err)
+	}
+	if _, err := tw.Write(configData); err != nil {
+		return fmt.Errorf("failed to write config data to tar: %w", err)
+	}
+	if err := tw.Close(); err != nil {
+		return fmt.Errorf("failed to close tar writer: %w", err)
+	}
+
+	// Ensure the .docker directory exists
+	mkdirCmd := "mkdir -p /home/modelrunner/.docker && chown modelrunner:modelrunner /home/modelrunner/.docker"
+	if err := execInContainer(ctx, dockerClient, containerID, mkdirCmd); err != nil {
+		return err
+	}
+
+	// Copy directly into the .docker directory
+	err = dockerClient.CopyToContainer(ctx, containerID, "/home/modelrunner", &buf, container.CopyToContainerOptions{
+		CopyUIDGID: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to copy config file to container: %w", err)
+	}
+
+	// Set correct ownership and permissions
+	chmodCmd := "chown modelrunner:modelrunner /home/modelrunner/.docker/config.json && chmod 600 /home/modelrunner/.docker/config.json"
+	if err := execInContainer(ctx, dockerClient, containerID, chmodCmd); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func execInContainer(ctx context.Context, dockerClient *client.Client, containerID, cmd string) error {
+	execConfig := container.ExecOptions{
+		Cmd: []string{"sh", "-c", cmd},
+	}
+	execResp, err := dockerClient.ContainerExecCreate(ctx, containerID, execConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create exec for command '%s': %w", cmd, err)
+	}
+	if err := dockerClient.ContainerExecStart(ctx, execResp.ID, container.ExecStartOptions{}); err != nil {
+		return fmt.Errorf("failed to start exec for command '%s': %w", cmd, err)
+	}
+	inspectResp, err := dockerClient.ContainerExecInspect(ctx, execResp.ID)
+	if err != nil {
+		return fmt.Errorf("failed to inspect exec for command '%s': %w", cmd, err)
+	}
+	if inspectResp.ExitCode != 0 {
+		return fmt.Errorf("command '%s' failed with exit code %d", cmd, inspectResp.ExitCode)
+	}
+	return nil
+}
 
 // FindControllerContainer searches for a running controller container. It
 // returns the ID of the container (if found), the container name (if any), the
@@ -106,16 +182,6 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 			Name: "always",
 		},
 	}
-	// Mount the Docker config file.
-	dockerConfigPath := os.ExpandEnv("$HOME/.docker/config.json")
-	if s, err := os.Stat(dockerConfigPath); err == nil && s.Mode()&os.ModeType == 0 {
-		hostConfig.Mounts = append(hostConfig.Mounts, mount.Mount{
-			Type:     mount.TypeBind,
-			Source:   dockerConfigPath,
-			Target:   "/root/.docker/config.json",
-			ReadOnly: true,
-		})
-	}
 
 	portBindings := []nat.PortBinding{{HostIP: "127.0.0.1", HostPort: portStr}}
 	if bridgeGatewayIP, err := determineBridgeGatewayIP(ctx, dockerClient); err == nil && bridgeGatewayIP != "" {
@@ -140,6 +206,12 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 	if err := dockerClient.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		_ = dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
 		return fmt.Errorf("failed to start container %s: %w", controllerContainerName, err)
+	}
+
+	// Copy Docker config file if it exists
+	if err := copyDockerConfigToContainer(ctx, dockerClient, resp.ID); err != nil {
+		// Log warning but continue - don't fail container creation
+		printer.Printf("Warning: failed to copy Docker config: %v\n", err)
 	}
 	return nil
 }
