@@ -105,8 +105,8 @@ func waitForContainerToStart(ctx context.Context, dockerClient *client.Client, c
 				// wait for container to start
 			default:
 				return fmt.Errorf("container is in unexpected state %q", status.State.Status)
-
 			}
+		}
 		if i > 1 {
 			select {
 			case <-time.After(500 * time.Millisecond):
