@@ -7,11 +7,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
@@ -24,11 +24,6 @@ import (
 
 // controllerContainerName is the name to use for the controller container.
 const controllerContainerName = "docker-model-runner"
-
-// concurrentInstallMatcher matches error message that indicate a concurrent
-// standalone model runner installation is taking place. It extracts the ID of
-// the conflicting container in a capture group.
-var concurrentInstallMatcher = regexp.MustCompile(`is already in use by container "([a-z0-9]+)"`)
 
 // copyDockerConfigToContainer copies the Docker config file from the host to the container
 // and sets up proper ownership and permissions for the modelrunner user.
@@ -197,7 +192,7 @@ func waitForContainerToStart(ctx context.Context, dockerClient client.ContainerA
 			// until the polling time out - unfortunately we can't make the 404
 			// acceptance window any smaller than that because the CUDA-based
 			// containers are large and can take time to create).
-			if !strings.Contains(err.Error(), "No such container") {
+			if !errdefs.IsNotFound(err) {
 				return fmt.Errorf("unable to inspect container (%s): %w", containerID[:12], err)
 			}
 		} else {
@@ -284,8 +279,8 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 	// container first and then wait for its container to be ready.
 	resp, err := dockerClient.ContainerCreate(ctx, config, hostConfig, nil, nil, controllerContainerName)
 	if err != nil {
-		if match := concurrentInstallMatcher.FindStringSubmatch(err.Error()); match != nil {
-			if err := waitForContainerToStart(ctx, dockerClient, match[1]); err != nil {
+		if errdefs.IsConflict(err) {
+			if err := waitForContainerToStart(ctx, dockerClient, controllerContainerName); err != nil {
 				return fmt.Errorf("failed waiting for concurrent installation: %w", err)
 			}
 			return nil
