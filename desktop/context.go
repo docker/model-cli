@@ -181,7 +181,7 @@ func DetectContext(ctx context.Context, cli *command.DockerCli) (*ModelRunnerCon
 	// Construct the HTTP client.
 	var client DockerHttpClient
 	if kind == ModelRunnerEngineKindDesktop {
-		dockerClient, err := DockerClientForContext(cli, "desktop-linux")
+		dockerClient, err := DockerClientForContext(cli, cli.CurrentContext())
 		if err != nil {
 			return nil, fmt.Errorf("unable to create model runner client: %w", err)
 		}
