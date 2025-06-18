@@ -41,13 +41,6 @@ func newUpCommand() *cobra.Command {
 			}
 
 			sendInfo("Initializing model runner...")
-			if ctxSize != 4096 {
-				sendInfo(fmt.Sprintf("Setting context size to %d", ctxSize))
-			}
-			if rawRuntimeFlags != "" {
-				sendInfo("Setting raw runtime flags to " + rawRuntimeFlags)
-			}
-
 			kind := modelRunner.EngineKind()
 			standalone, err := ensureStandaloneRunnerAvailable(cmd.Context(), nil)
 			if err != nil {
@@ -61,6 +54,13 @@ func newUpCommand() *cobra.Command {
 
 			if err := downloadModelsOnlyIfNotFound(desktopClient, models); err != nil {
 				return err
+			}
+
+			if ctxSize > 0 && ctxSize != 4096 {
+				sendInfo(fmt.Sprintf("Setting context size to %d", ctxSize))
+			}
+			if rawRuntimeFlags != "" {
+				sendInfo("Setting raw runtime flags to " + rawRuntimeFlags)
 			}
 
 			for _, model := range models {
