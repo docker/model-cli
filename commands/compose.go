@@ -56,7 +56,7 @@ func newUpCommand() *cobra.Command {
 				return err
 			}
 
-			if ctxSize > 0 && ctxSize != 4096 {
+			if ctxSize > 0 {
 				sendInfo(fmt.Sprintf("Setting context size to %d", ctxSize))
 			}
 			if rawRuntimeFlags != "" {
