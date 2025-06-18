@@ -79,15 +79,37 @@ func waitForContainerToStart(ctx context.Context, dockerClient *client.Client, c
 	// Unfortunately the Docker API's /containers/{id}/wait API (and the
 	// corresponding Client.ContainerWait method) don't allow waiting for
 	// container startup, so instead we'll take a polling approach.
-	for i := 5; i > 0; i-- {
+	for i := 10; i > 0; i-- {
 		if status, err := dockerClient.ContainerInspect(ctx, containerID); err != nil {
-			return fmt.Errorf("unable to inspect container (%s): %w", containerID[:12], err)
-		} else if status.State.Status == container.StateRunning {
-			return nil
-		}
+			// There is a small gap between the time that a container ID and
+			// name are registered and the time that the container is actually
+			// created and shows up in container list and inspect requests:
+			//
+			// https://github.com/moby/moby/blob/de24c536b0ea208a09e0fff3fd896c453da6ef2e/daemon/container.go#L138-L156
+			//
+			// Given that multiple install operations tend to end up tightly
+			// synchronized by the preceeding pull operation and that this
+			// method is specifically designed to work around these race
+			// conditions, we'll allow 404 errors to pass silently (at least up
+			// until the polling time out - unfortunately we can't make the 404
+			// acceptance window any smaller than that because the CUDA-based
+			// containers are large and can take time to create).
+			if !strings.Contains(err.Error(), "No such container") {
+				return fmt.Errorf("unable to inspect container (%s): %w", containerID[:12], err)
+			}
+		} else {
+			switch status.State.Status {
+			case container.StateRunning:
+				return nil
+			case container.StateCreated, container.StateRestarting:
+				// wait for container to start
+			default:
+				return fmt.Errorf("container is in unexpected state %q", status.State.Status)
+
+			}
 		if i > 1 {
 			select {
-			case <-time.After(1 * time.Second):
+			case <-time.After(500 * time.Millisecond):
 			case <-ctx.Done():
 				return errors.New("waiting cancelled")
 			}
@@ -196,7 +218,7 @@ func PruneControllerContainers(ctx context.Context, dockerClient *client.Client,
 
 	// Remove all controller containers.
 	for _, ctr := range containers {
-		if skipRunning && ctr.State == "running" {
+		if skipRunning && ctr.State == container.StateRunning {
 			continue
 		}
 		if len(ctr.Names) > 0 {
