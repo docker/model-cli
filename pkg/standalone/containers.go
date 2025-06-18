@@ -97,9 +97,16 @@ func waitForContainerToStart(ctx context.Context, dockerClient *client.Client, c
 			if !strings.Contains(err.Error(), "No such container") {
 				return fmt.Errorf("unable to inspect container (%s): %w", containerID[:12], err)
 			}
-		} else if status.State.Status == container.StateRunning {
-			return nil
-		}
+		} else {
+			switch status.State.Status {
+			case container.StateRunning:
+				return nil
+			case container.StateCreated, container.StateRestarting:
+				// wait for container to start
+			default:
+				return fmt.Errorf("container is in unexpected state %q", status.State.Status)
+
+			}
 		if i > 1 {
 			select {
 			case <-time.After(500 * time.Millisecond):
