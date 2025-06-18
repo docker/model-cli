@@ -2,8 +2,18 @@ package desktop
 
 // ProgressMessage represents a message sent during model pull operations
 type ProgressMessage struct {
-	Type    string `json:"type"`    // "progress", "success", or "error"
-	Message string `json:"message"` // Human-readable message
+	Type    string    `json:"type"`    // "progress", "success", or "error"
+	Message string    `json:"message"` // Human-readable message
+	Total   uint64    `json:"total"`   // Total bytes for this layer
+	Pulled  uint64    `json:"pulled"`  // Bytes pulled for this layer
+	Layer   LayerInfo `json:"layer"`   // Layer-specific information
+}
+
+// LayerInfo represents layer-specific progress information
+type LayerInfo struct {
+	ID      string `json:"ID"`      // Layer SHA256 hash
+	Size    uint64 `json:"Size"`    // Total layer size
+	Current uint64 `json:"Current"` // Current bytes downloaded for this layer
 }
 
 type OpenAIChatMessage struct {

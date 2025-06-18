@@ -100,7 +100,7 @@ func (c *Client) Status() Status {
 	}
 }
 
-func (c *Client) Pull(model string, progress func(string)) (string, bool, error) {
+func (c *Client) Pull(model string, progress func(*ProgressMessage)) (string, bool, error) {
 	model = normalizeHuggingFaceModelName(model)
 	jsonData, err := json.Marshal(models.ModelCreateRequest{From: model})
 	if err != nil {
@@ -108,13 +108,22 @@ func (c *Client) Pull(model string, progress func(string)) (string, bool, error)
 	}
 
 	createPath := inference.ModelsPrefix + "/create"
-	resp, err := c.doRequest(
-		http.MethodPost,
-		createPath,
-		bytes.NewReader(jsonData),
-	)
+	req, err := http.NewRequest(http.MethodPost, c.modelRunner.URL(createPath), bytes.NewReader(jsonData))
+	if err != nil {
+		return "", false, fmt.Errorf("error creating request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "docker-model-cli/"+Version)
+
+	resp, err := c.modelRunner.Client().Do(req)
 	if err != nil {
 		return "", false, c.handleQueryError(err, createPath)
+	}
+
+	if resp.StatusCode == http.StatusServiceUnavailable {
+		resp.Body.Close()
+		return "", false, ErrServiceUnavailable
 	}
 	defer resp.Body.Close()
 
@@ -134,14 +143,14 @@ func (c *Client) Pull(model string, progress func(string)) (string, bool, error)
 
 		// Parse the progress message
 		var progressMsg ProgressMessage
-		if err := json.Unmarshal([]byte(html.UnescapeString(progressLine)), &progressMsg); err != nil {
+		if err := json.Unmarshal([]byte(progressLine), &progressMsg); err != nil {
 			return "", progressShown, fmt.Errorf("error parsing progress message: %w", err)
 		}
 
 		// Handle different message types
 		switch progressMsg.Type {
 		case "progress":
-			progress(progressMsg.Message)
+			progress(&progressMsg)
 			progressShown = true
 		case "error":
 			return "", progressShown, fmt.Errorf("error pulling model: %s", progressMsg.Message)
