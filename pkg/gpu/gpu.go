@@ -17,7 +17,7 @@ const (
 )
 
 // ProbeGPUSupport determines whether or not the Docker engine has GPU support.
-func ProbeGPUSupport(ctx context.Context, dockerClient *client.Client) (GPUSupport, error) {
+func ProbeGPUSupport(ctx context.Context, dockerClient client.SystemAPIClient) (GPUSupport, error) {
 	info, err := dockerClient.Info(ctx)
 	if err != nil {
 		return GPUSupportNone, err
