@@ -70,37 +70,27 @@ func determineBridgeGatewayIP(ctx context.Context, dockerClient *client.Client) 
 }
 
 // waitForContainerToStart waits for a container to start.
-func waitForContainerToStart(ctx context.Context, dockerClient *client.Client, containerID string) error {
-	// Unfortunately the Docker API's /containers/{id}/wait API (and the
-	// corresponding Client.ContainerWait method) don't allow waiting for
-	// container startup, so instead we'll take a polling approach.
+func waitForContainerToStart(ctx context.Context, dockerClient client.ContainerAPIClient, containerID string) error {
 	for i := 10; i > 0; i-- {
-		if status, err := dockerClient.ContainerInspect(ctx, containerID); err != nil {
-			// There is a small gap between the time that a container ID and
-			// name are registered and the time that the container is actually
-			// created and shows up in container list and inspect requests:
-			//
-			// https://github.com/moby/moby/blob/de24c536b0ea208a09e0fff3fd896c453da6ef2e/daemon/container.go#L138-L156
-			//
-			// Given that multiple install operations tend to end up tightly
-			// synchronized by the preceeding pull operation and that this
-			// method is specifically designed to work around these race
-			// conditions, we'll allow 404 errors to pass silently (at least up
-			// until the polling time out - unfortunately we can't make the 404
-			// acceptance window any smaller than that because the CUDA-based
-			// containers are large and can take time to create).
-			if !errdefs.IsNotFound(err) {
-				return fmt.Errorf("unable to inspect container (%s): %w", containerID[:12], err)
-			}
-		} else {
-			switch status.State.Status {
-			case container.StateRunning:
-				return nil
-			case container.StateCreated, container.StateRestarting:
-				// wait for container to start
-			default:
-				return fmt.Errorf("container is in unexpected state %q", status.State.Status)
-			}
+		err := dockerClient.ContainerStart(ctx, containerID, container.StartOptions{})
+		if err == nil {
+			return nil
+		}
+		// There is a small gap between the time that a container ID and
+		// name are registered and the time that the container is actually
+		// created and shows up in container list and inspect requests:
+		//
+		// https://github.com/moby/moby/blob/de24c536b0ea208a09e0fff3fd896c453da6ef2e/daemon/container.go#L138-L156
+		//
+		// Given that multiple install operations tend to end up tightly
+		// synchronized by the preceeding pull operation and that this
+		// method is specifically designed to work around these race
+		// conditions, we'll allow 404 errors to pass silently (at least up
+		// until the polling time out - unfortunately we can't make the 404
+		// acceptance window any smaller than that because the CUDA-based
+		// containers are large and can take time to create).
+		if !errdefs.IsNotFound(err) {
+			return err
 		}
 		if i > 1 {
 			select {
@@ -175,19 +165,13 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 	// progress, then we wait for whichever install process creates the
 	// container first and then wait for its container to be ready.
 	resp, err := dockerClient.ContainerCreate(ctx, config, hostConfig, nil, nil, controllerContainerName)
-	if err != nil {
-		if errdefs.IsConflict(err) {
-			if err := waitForContainerToStart(ctx, dockerClient, controllerContainerName); err != nil {
-				return fmt.Errorf("failed waiting for concurrent installation: %w", err)
-			}
-			return nil
-		}
+	if !errdefs.IsConflict(err) {
 		return fmt.Errorf("failed to create container %s: %w", controllerContainerName, err)
 	}
 
 	// Start the container.
 	printer.Printf("Starting model runner container %s...\n", controllerContainerName)
-	if err := dockerClient.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+	if err := waitForContainerToStart(ctx, dockerClient, controllerContainerName); err != nil {
 		_ = dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
 		return fmt.Errorf("failed to start container %s: %w", controllerContainerName, err)
 	}
