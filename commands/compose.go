@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/spf13/pflag"
 	"slices"
 	"strings"
 
@@ -18,8 +19,9 @@ func newComposeCmd() *cobra.Command {
 	c := &cobra.Command{
 		Use: "compose EVENT",
 	}
-	c.AddCommand(newUpCommand())
-	c.AddCommand(newDownCommand())
+	upCmd := newUpCommand()
+	downCmd := newDownCommand()
+	c.AddCommand(upCmd, downCmd, newMetadataCommand(upCmd, downCmd))
 	c.Hidden = true
 	c.PersistentFlags().String("project-name", "", "compose project name") // unused by model
 
@@ -95,11 +97,11 @@ func newUpCommand() *cobra.Command {
 	c.Flags().Int64Var(&ctxSize, "context-size", -1, "context size for the model")
 	c.Flags().StringVar(&rawRuntimeFlags, "runtime-flags", "", "raw runtime flags to pass to the inference engine")
 	c.Flags().StringVar(&backend, "backend", llamacpp.Name, "inference backend to use")
+	_ = c.MarkFlagRequired("model")
 	return c
 }
 
 func newDownCommand() *cobra.Command {
-	var model []string
 	c := &cobra.Command{
 		Use: "down",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -107,7 +109,28 @@ func newDownCommand() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().StringArrayVar(&model, "model", nil, "model to use")
+	return c
+}
+
+func newMetadataCommand(upCmd, downCmd *cobra.Command) *cobra.Command {
+	c := &cobra.Command{
+		Use:   "metadata",
+		Short: "Metadata for Docker Compose",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			providerMetadata := ProviderMetadata{
+				Description: "Docker Model Runner",
+			}
+			providerMetadata.Up = commandParameters(upCmd)
+			providerMetadata.Down = commandParameters(downCmd)
+
+			jsonMetadata, err := json.Marshal(providerMetadata)
+			if err != nil {
+				return err
+			}
+			fmt.Printf(string(jsonMetadata))
+			return nil
+		},
+	}
 	return c
 }
 
@@ -187,4 +210,37 @@ func sendInfo(s string) error {
 	}
 	_, err = fmt.Println(string(marshal))
 	return err
+}
+
+func commandParameters(cmd *cobra.Command) CommandMetadata {
+	cmdMetadata := CommandMetadata{}
+	cmd.Flags().VisitAll(func(f *pflag.Flag) {
+		_, isRequired := f.Annotations[cobra.BashCompOneRequiredFlag]
+		cmdMetadata.Parameters = append(cmdMetadata.Parameters, ParameterMetadata{
+			Name:        f.Name,
+			Description: f.Usage,
+			Required:    isRequired,
+			Type:        f.Value.Type(),
+			Default:     f.DefValue,
+		})
+	})
+	return cmdMetadata
+}
+
+type ProviderMetadata struct {
+	Description string          `json:"description"`
+	Up          CommandMetadata `json:"up"`
+	Down        CommandMetadata `json:"down"`
+}
+
+type CommandMetadata struct {
+	Parameters []ParameterMetadata `json:"parameters"`
+}
+
+type ParameterMetadata struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Required    bool   `json:"required"`
+	Type        string `json:"type"`
+	Default     string `json:"default,omitempty"`
 }
