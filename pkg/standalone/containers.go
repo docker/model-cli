@@ -93,14 +93,34 @@ func execInContainer(ctx context.Context, dockerClient *client.Client, container
 	if err := dockerClient.ContainerExecStart(ctx, execResp.ID, container.ExecStartOptions{}); err != nil {
 		return fmt.Errorf("failed to start exec for command '%s': %w", cmd, err)
 	}
-	inspectResp, err := dockerClient.ContainerExecInspect(ctx, execResp.ID)
-	if err != nil {
-		return fmt.Errorf("failed to inspect exec for command '%s': %w", cmd, err)
+
+	// Create a timeout context for the polling loop
+	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	// Poll until the command finishes or timeout occurs
+	for {
+		inspectResp, err := dockerClient.ContainerExecInspect(ctx, execResp.ID)
+		if err != nil {
+			return fmt.Errorf("failed to inspect exec for command '%s': %w", cmd, err)
+		}
+
+		if !inspectResp.Running {
+			// Command has finished, now we can safely check the exit code
+			if inspectResp.ExitCode != 0 {
+				return fmt.Errorf("command '%s' failed with exit code %d", cmd, inspectResp.ExitCode)
+			}
+			return nil
+		}
+
+		// Brief sleep to avoid busy polling, with timeout check
+		select {
+		case <-time.After(100 * time.Millisecond):
+			// Continue polling
+		case <-timeoutCtx.Done():
+			return fmt.Errorf("command '%s' timed out after 10 seconds", cmd)
+		}
 	}
-	if inspectResp.ExitCode != 0 {
-		return fmt.Errorf("command '%s' failed with exit code %d", cmd, inspectResp.ExitCode)
-	}
-	return nil
 }
 
 // FindControllerContainer searches for a running controller container. It
