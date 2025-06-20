@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -192,7 +193,11 @@ func waitForContainerToStart(ctx context.Context, dockerClient client.ContainerA
 		// until the polling time out - unfortunately we can't make the 404
 		// acceptance window any smaller than that because the CUDA-based
 		// containers are large and can take time to create).
-		if !errdefs.IsNotFound(err) {
+		//
+		// For some reason, this error case can also manifest as an EOF on the
+		// request (I'm not sure where this arises in the Moby server), so we'll
+		// let that pass silently too.
+		if !(errdefs.IsNotFound(err) || errors.Is(err, io.EOF)) {
 			return err
 		}
 		if i > 1 {
