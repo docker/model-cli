@@ -30,7 +30,7 @@ var concurrentInstallMatcher = regexp.MustCompile(`is already in use by containe
 // FindControllerContainer searches for a running controller container. It
 // returns the ID of the container (if found), the container name (if any), the
 // full container summary (if found), or any error that occurred.
-func FindControllerContainer(ctx context.Context, dockerClient *client.Client) (string, string, container.Summary, error) {
+func FindControllerContainer(ctx context.Context, dockerClient client.ContainerAPIClient) (string, string, container.Summary, error) {
 	// Before listing, prune any stopped controller containers.
 	if err := PruneControllerContainers(ctx, dockerClient, true, NoopPrinter()); err != nil {
 		return "", "", container.Summary{}, fmt.Errorf("unable to prune stopped model runner containers: %w", err)
@@ -61,7 +61,7 @@ func FindControllerContainer(ctx context.Context, dockerClient *client.Client) (
 // determineBridgeGatewayIP attempts to identify the engine's host gateway IP
 // address on the bridge network. It may return an empty IP address even with a
 // nil error if no IP could be identified.
-func determineBridgeGatewayIP(ctx context.Context, dockerClient *client.Client) (string, error) {
+func determineBridgeGatewayIP(ctx context.Context, dockerClient client.NetworkAPIClient) (string, error) {
 	bridge, err := dockerClient.NetworkInspect(ctx, "bridge", network.InspectOptions{})
 	if err != nil {
 		return "", err
@@ -75,7 +75,7 @@ func determineBridgeGatewayIP(ctx context.Context, dockerClient *client.Client) 
 }
 
 // waitForContainerToStart waits for a container to start.
-func waitForContainerToStart(ctx context.Context, dockerClient *client.Client, containerID string) error {
+func waitForContainerToStart(ctx context.Context, dockerClient client.ContainerAPIClient, containerID string) error {
 	// Unfortunately the Docker API's /containers/{id}/wait API (and the
 	// corresponding Client.ContainerWait method) don't allow waiting for
 	// container startup, so instead we'll take a polling approach.
@@ -201,7 +201,7 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 
 // PruneControllerContainers stops and removes any model runner controller
 // containers.
-func PruneControllerContainers(ctx context.Context, dockerClient *client.Client, skipRunning bool, printer StatusPrinter) error {
+func PruneControllerContainers(ctx context.Context, dockerClient client.ContainerAPIClient, skipRunning bool, printer StatusPrinter) error {
 	// Identify all controller containers.
 	containers, err := dockerClient.ContainerList(ctx, container.ListOptions{
 		All: true,
