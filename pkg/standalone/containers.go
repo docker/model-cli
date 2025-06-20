@@ -265,24 +265,31 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 	}
 
 	// Create the container. If we detect that a concurrent installation is in
-	// progress, then we wait for whichever install process creates the
-	// container first and then wait for its container to be ready.
+	// progress (as indicated by a conflicting container name (which should have
+	// been detected just before installation)), then we'll allow the error to
+	// pass silently and simply work in conjunction with any concurrent
+	// installers to start the container.
 	resp, err := dockerClient.ContainerCreate(ctx, config, hostConfig, nil, nil, controllerContainerName)
-	if !errdefs.IsConflict(err) {
+	if err != nil && !errdefs.IsConflict(err) {
 		return fmt.Errorf("failed to create container %s: %w", controllerContainerName, err)
 	}
+	created := err == nil
 
 	// Start the container.
 	printer.Printf("Starting model runner container %s...\n", controllerContainerName)
 	if err := waitForContainerToStart(ctx, dockerClient, controllerContainerName); err != nil {
-		_ = dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
+		if created {
+			_ = dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
+		}
 		return fmt.Errorf("failed to start container %s: %w", controllerContainerName, err)
 	}
 
-	// Copy Docker config file if it exists
-	if err := copyDockerConfigToContainer(ctx, dockerClient, resp.ID, engineKind); err != nil {
-		// Log warning but continue - don't fail container creation
-		printer.Printf("Warning: failed to copy Docker config: %v\n", err)
+	// Copy Docker config file if it exists and we're the container creator.
+	if created {
+		if err := copyDockerConfigToContainer(ctx, dockerClient, resp.ID, engineKind); err != nil {
+			// Log warning but continue - don't fail container creation
+			printer.Printf("Warning: failed to copy Docker config: %v\n", err)
+		}
 	}
 	return nil
 }
