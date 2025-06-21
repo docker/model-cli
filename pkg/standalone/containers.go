@@ -292,12 +292,6 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 		_ = dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
 		return fmt.Errorf("failed to start container %s: %w", controllerContainerName, err)
 	}
-
-	// Copy Docker config file if it exists
-	if err := copyDockerConfigToContainer(ctx, dockerClient, resp.ID); err != nil {
-		// Log warning but continue - don't fail container creation
-		printer.Printf("Warning: failed to copy Docker config: %v\n", err)
-	}
 	return nil
 }
 
