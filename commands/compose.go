@@ -13,6 +13,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
+type composeCommandFlags struct {
+	Models          []string
+	CtxSize         int64
+	RawRuntimeFlags string
+	Backend         string
+}
+
 func newComposeCmd() *cobra.Command {
 
 	c := &cobra.Command{
@@ -26,15 +33,19 @@ func newComposeCmd() *cobra.Command {
 	return c
 }
 
+func setupComposeCommandFlags(c *cobra.Command, flags *composeCommandFlags) {
+	c.Flags().StringArrayVar(&flags.Models, "model", nil, "model to use")
+	c.Flags().Int64Var(&flags.CtxSize, "context-size", -1, "context size for the model")
+	c.Flags().StringVar(&flags.RawRuntimeFlags, "runtime-flags", "", "raw runtime flags to pass to the inference engine")
+	c.Flags().StringVar(&flags.Backend, "backend", llamacpp.Name, "inference backend to use")
+}
+
 func newUpCommand() *cobra.Command {
-	var models []string
-	var ctxSize int64
-	var rawRuntimeFlags string
-	var backend string
+	flags := &composeCommandFlags{}
 	c := &cobra.Command{
 		Use: "up",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(models) == 0 {
+			if len(flags.Models) == 0 {
 				err := errors.New("options.model is required")
 				_ = sendError(err.Error())
 				return err
@@ -52,26 +63,26 @@ func newUpCommand() *cobra.Command {
 				return errors.New("unable to determine standalone runner endpoint")
 			}
 
-			if err := downloadModelsOnlyIfNotFound(desktopClient, models); err != nil {
+			if err := downloadModelsOnlyIfNotFound(desktopClient, flags.Models); err != nil {
 				return err
 			}
 
-			if ctxSize > 0 {
-				sendInfo(fmt.Sprintf("Setting context size to %d", ctxSize))
+			if flags.CtxSize > 0 {
+				sendInfo(fmt.Sprintf("Setting context size to %d", flags.CtxSize))
 			}
-			if rawRuntimeFlags != "" {
-				sendInfo("Setting raw runtime flags to " + rawRuntimeFlags)
+			if flags.RawRuntimeFlags != "" {
+				sendInfo("Setting raw runtime flags to " + flags.RawRuntimeFlags)
 			}
 
-			for _, model := range models {
+			for _, model := range flags.Models {
 				if err := desktopClient.ConfigureBackend(scheduling.ConfigureRequest{
 					Model:           model,
-					ContextSize:     ctxSize,
-					RawRuntimeFlags: rawRuntimeFlags,
+					ContextSize:     flags.CtxSize,
+					RawRuntimeFlags: flags.RawRuntimeFlags,
 				}); err != nil {
 					configErrFmtString := "failed to configure backend for model %s with context-size %d and runtime-flags %s"
-					_ = sendErrorf(configErrFmtString+": %v", model, ctxSize, rawRuntimeFlags, err)
-					return fmt.Errorf(configErrFmtString+": %w", model, ctxSize, rawRuntimeFlags, err)
+					_ = sendErrorf(configErrFmtString+": %v", model, flags.CtxSize, flags.RawRuntimeFlags, err)
+					return fmt.Errorf(configErrFmtString+": %w", model, flags.CtxSize, flags.RawRuntimeFlags, err)
 				}
 				sendInfo("Successfully configured backend for model " + model)
 			}
@@ -91,15 +102,11 @@ func newUpCommand() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().StringArrayVar(&models, "model", nil, "model to use")
-	c.Flags().Int64Var(&ctxSize, "context-size", -1, "context size for the model")
-	c.Flags().StringVar(&rawRuntimeFlags, "runtime-flags", "", "raw runtime flags to pass to the inference engine")
-	c.Flags().StringVar(&backend, "backend", llamacpp.Name, "inference backend to use")
+	setupComposeCommandFlags(c, flags)
 	return c
 }
 
 func newDownCommand() *cobra.Command {
-	var model []string
 	c := &cobra.Command{
 		Use: "down",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -107,7 +114,7 @@ func newDownCommand() *cobra.Command {
 			return nil
 		},
 	}
-	c.Flags().StringArrayVar(&model, "model", nil, "model to use")
+	setupComposeCommandFlags(c, &composeCommandFlags{})
 	return c
 }
 
