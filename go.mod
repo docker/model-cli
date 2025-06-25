@@ -11,6 +11,7 @@ require (
 	github.com/docker/model-distribution v0.0.0-20250512190053-b3792c042d57
 	github.com/docker/model-runner v0.0.0-20250613083629-6b8c3b816f00
 	github.com/google/go-containerregistry v0.20.3
+	github.com/mattn/go-isatty v0.0.17
 	github.com/nxadm/tail v1.4.8
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pkg/errors v0.9.1
