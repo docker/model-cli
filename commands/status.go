@@ -7,44 +7,91 @@ import (
 
 	"github.com/docker/cli/cli-plugins/hooks"
 	"github.com/docker/model-cli/commands/completion"
+	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
 )
 
 func newStatusCmd() *cobra.Command {
+	var formatJson bool
 	c := &cobra.Command{
 		Use:   "status",
 		Short: "Check if the Docker Model Runner is running",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if _, err := ensureStandaloneRunnerAvailable(cmd.Context(), cmd); err != nil {
+			standalone, err := ensureStandaloneRunnerAvailable(cmd.Context(), cmd)
+			if err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
 			status := desktopClient.Status()
 			if status.Error != nil {
 				return handleClientError(status.Error, "Failed to get Docker Model Runner status")
 			}
-			if status.Running {
-				cmd.Println("Docker Model Runner is running")
-				cmd.Println("\nStatus:")
-				var backendStatus map[string]string
-				if err := json.Unmarshal(status.Status, &backendStatus); err != nil {
-					cmd.PrintErrln(string(status.Status))
-				}
-				for b, s := range backendStatus {
-					if s != "not running" {
-						cmd.Println(b+":", s)
-					}
-				}
+
+			var backendStatus map[string]string
+			if err := json.Unmarshal(status.Status, &backendStatus); err != nil {
+				cmd.PrintErrln(string(status.Status))
+			}
+
+			if formatJson {
+				return jsonStatus(standalone, status, backendStatus)
 			} else {
-				cmd.Println("Docker Model Runner is not running")
-				hooks.PrintNextSteps(cmd.OutOrStdout(), []string{enableViaCLI, enableViaGUI})
-				osExit(1)
+				textStatus(cmd, status, backendStatus)
 			}
 
 			return nil
 		},
 		ValidArgsFunction: completion.NoComplete,
 	}
+	c.Flags().BoolVar(&formatJson, "json", false, "Format output in JSON")
 	return c
+}
+
+func textStatus(cmd *cobra.Command, status desktop.Status, backendStatus map[string]string) {
+	if status.Running {
+		cmd.Println("Docker Model Runner is running")
+		cmd.Println("\nStatus:")
+		for b, s := range backendStatus {
+			if s != "not running" {
+				cmd.Println(b+":", s)
+			}
+		}
+	} else {
+		cmd.Println("Docker Model Runner is not running")
+		hooks.PrintNextSteps(cmd.OutOrStdout(), []string{enableViaCLI, enableViaGUI})
+		osExit(1)
+	}
+}
+
+func jsonStatus(standalone *standaloneRunner, status desktop.Status, backendStatus map[string]string) error {
+	type Status struct {
+		Running  bool              `json:"running"`
+		Backends map[string]string `json:"backends"`
+		Endpoint string            `json:"endpoint"`
+	}
+	var endpoint string
+	kind := modelRunner.EngineKind()
+	switch kind {
+	case desktop.ModelRunnerEngineKindDesktop:
+		endpoint = "http://model-runner.docker.internal/engines/v1/"
+	case desktop.ModelRunnerEngineKindMobyManual:
+		endpoint = modelRunner.URL("/engines/v1/")
+	case desktop.ModelRunnerEngineKindCloud:
+		fallthrough
+	case desktop.ModelRunnerEngineKindMoby:
+		endpoint = fmt.Sprintf("http://%s:%d/engines/v1", standalone.gatewayIP, standalone.gatewayPort)
+	default:
+		return fmt.Errorf("unhandled engine kind: %v", kind)
+	}
+	s := Status{
+		Running:  status.Running,
+		Backends: backendStatus,
+		Endpoint: endpoint,
+	}
+	marshal, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(marshal))
+	return nil
 }
 
 var osExit = os.Exit
