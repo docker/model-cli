@@ -2,9 +2,11 @@ package commands
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
+	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +36,13 @@ func newPullCmd() *cobra.Command {
 }
 
 func pullModel(cmd *cobra.Command, desktopClient *desktop.Client, model string) error {
-	response, progressShown, err := desktopClient.Pull(model, TUIProgress)
+	var progress func(string)
+	if isatty.IsTerminal(os.Stdout.Fd()) {
+		progress = TUIProgress
+	} else {
+		progress = RawProgress
+	}
+	response, progressShown, err := desktopClient.Pull(model, progress)
 
 	// Add a newline before any output (success or error) if progress was shown.
 	if progressShown {
@@ -51,4 +59,8 @@ func pullModel(cmd *cobra.Command, desktopClient *desktop.Client, model string) 
 
 func TUIProgress(message string) {
 	fmt.Print("\r\033[K", message)
+}
+
+func RawProgress(message string) {
+	fmt.Println(message)
 }
