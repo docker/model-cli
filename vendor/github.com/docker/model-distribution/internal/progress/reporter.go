@@ -6,23 +6,39 @@ import (
 	"io"
 	"time"
 
-	"github.com/google/go-containerregistry/pkg/v1"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
-// ProgressMessage represents a structured message for progress reporting
-type ProgressMessage struct {
-	Type    string `json:"type"`    // "progress", "success", or "error"
-	Message string `json:"message"` // Human-readable message
-	Total   uint64 `json:"total"`   // Total bytes to transfer
-	Pulled  uint64 `json:"pulled"`  // Bytes transferred so far
+// UpdateInterval defines how often progress updates should be sent
+const UpdateInterval = 100 * time.Millisecond
+
+// MinBytesForUpdate defines the minimum number of bytes that need to be transferred
+// before sending a progress update
+const MinBytesForUpdate = 1024 * 1024 // 1MB
+
+type Layer struct {
+	ID      string // Layer ID
+	Size    uint64 // Layer size
+	Current uint64 // Current bytes transferred
+}
+
+// Message represents a structured message for progress reporting
+type Message struct {
+	Type    string `json:"type"`            // "progress", "success", or "error"
+	Message string `json:"message"`         // Human-readable message
+	Total   uint64 `json:"total"`           // Deprecated: use Layer.Size
+	Pulled  uint64 `json:"pulled"`          // Deprecated: use Layer.Current
+	Layer   Layer  `json:"layer,omitempty"` // Current layer information
 }
 
 type Reporter struct {
-	progress chan v1.Update
-	done     chan struct{}
-	err      error
-	out      io.Writer
-	format   progressF
+	progress    chan v1.Update
+	done        chan struct{}
+	err         error
+	out         io.Writer
+	format      progressF
+	layer       v1.Layer
+	TotalLayers int // Total number of layers
 }
 
 type progressF func(update v1.Update) string
@@ -35,12 +51,13 @@ func PushMsg(update v1.Update) string {
 	return fmt.Sprintf("Uploaded: %.2f MB", float64(update.Complete)/1024/1024)
 }
 
-func NewProgressReporter(w io.Writer, msgF progressF) *Reporter {
+func NewProgressReporter(w io.Writer, msgF progressF, layer v1.Layer) *Reporter {
 	return &Reporter{
 		out:      w,
-		progress: make(chan v1.Update),
+		progress: make(chan v1.Update, 1),
 		done:     make(chan struct{}),
 		format:   msgF,
+		layer:    layer,
 	}
 }
 
@@ -58,19 +75,36 @@ func (r *Reporter) Updates() chan<- v1.Update {
 	go func() {
 		var lastComplete int64
 		var lastUpdate time.Time
-		const updateInterval = 500 * time.Millisecond // Update every 500ms
-		const minBytesForUpdate = 1024 * 1024         // At least 1MB difference
 
 		for p := range r.progress {
 			if r.out == nil || r.err != nil {
 				continue // If we fail to write progress, don't try again
 			}
 			now := time.Now()
-			bytesDownloaded := p.Complete - lastComplete
+			var total int64
+			var layerID string
+			if r.layer != nil { // In case of Push there is no layer yet
+				id, err := r.layer.DiffID()
+				if err != nil {
+					r.err = err
+					continue
+				}
+				layerID = id.String()
+				size, err := r.layer.Size()
+				if err != nil {
+					r.err = err
+					continue
+				}
+				total = size
+			} else {
+				total = p.Total
+			}
+			incrementalBytes := p.Complete - lastComplete
+
 			// Only update if enough time has passed or enough bytes downloaded or finished
-			if now.Sub(lastUpdate) >= updateInterval ||
-				bytesDownloaded >= minBytesForUpdate {
-				if err := writeProgress(r.out, r.format(p), safeUint64(p.Total), safeUint64(p.Complete)); err != nil {
+			if now.Sub(lastUpdate) >= UpdateInterval ||
+				incrementalBytes >= MinBytesForUpdate {
+				if err := WriteProgress(r.out, r.format(p), safeUint64(total), safeUint64(p.Complete), layerID); err != nil {
 					r.err = err
 				}
 				lastUpdate = now
@@ -88,8 +122,39 @@ func (r *Reporter) Wait() error {
 	return r.err
 }
 
-// writeProgressMessage writes a JSON-formatted progress message to the writer
-func writeProgressMessage(w io.Writer, msg ProgressMessage) error {
+// WriteProgress writes a progress update message
+func WriteProgress(w io.Writer, msg string, total, current uint64, layerID string) error {
+	return write(w, Message{
+		Type:    "progress",
+		Message: msg,
+		Total:   total,
+		Pulled:  current,
+		Layer: Layer{
+			ID:      layerID,
+			Size:    total,
+			Current: current,
+		},
+	})
+}
+
+// WriteSuccess writes a success message
+func WriteSuccess(w io.Writer, message string) error {
+	return write(w, Message{
+		Type:    "success",
+		Message: message,
+	})
+}
+
+// WriteError writes an error message
+func WriteError(w io.Writer, message string) error {
+	return write(w, Message{
+		Type:    "error",
+		Message: message,
+	})
+}
+
+// write writes a JSON-formatted progress message to the writer
+func write(w io.Writer, msg Message) error {
 	if w == nil {
 		return nil
 	}
@@ -99,30 +164,4 @@ func writeProgressMessage(w io.Writer, msg ProgressMessage) error {
 	}
 	_, err = fmt.Fprintf(w, "%s\n", data)
 	return err
-}
-
-// writeProgress writes a progress update message
-func writeProgress(w io.Writer, msg string, total, pulled uint64) error {
-	return writeProgressMessage(w, ProgressMessage{
-		Type:    "progress",
-		Message: msg,
-		Total:   total,
-		Pulled:  pulled,
-	})
-}
-
-// WriteSuccess writes a success message
-func WriteSuccess(w io.Writer, message string) error {
-	return writeProgressMessage(w, ProgressMessage{
-		Type:    "success",
-		Message: message,
-	})
-}
-
-// WriteError writes an error message
-func WriteError(w io.Writer, message string) error {
-	return writeProgressMessage(w, ProgressMessage{
-		Type:    "error",
-		Message: message,
-	})
 }

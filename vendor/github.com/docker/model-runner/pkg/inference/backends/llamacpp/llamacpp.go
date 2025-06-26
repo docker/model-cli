@@ -144,7 +144,7 @@ func (l *llamaCpp) Run(ctx context.Context, socket, model string, mode inference
 		if config.ContextSize >= 0 {
 			args = append(args, "--ctx-size", strconv.Itoa(int(config.ContextSize)))
 		}
-		args = append(args, config.RawFlags...)
+		args = append(args, config.RuntimeFlags...)
 	}
 
 	l.log.Infof("llamaCppArgs: %v", args)
