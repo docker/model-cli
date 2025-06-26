@@ -19,6 +19,7 @@ import (
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
 	gpupkg "github.com/docker/model-cli/pkg/gpu"
+	"github.com/docker/model-cli/pkg/types"
 )
 
 // controllerContainerName is the name to use for the controller container.
@@ -31,7 +32,13 @@ var concurrentInstallMatcher = regexp.MustCompile(`is already in use by containe
 
 // copyDockerConfigToContainer copies the Docker config file from the host to the container
 // and sets up proper ownership and permissions for the modelrunner user.
-func copyDockerConfigToContainer(ctx context.Context, dockerClient *client.Client, containerID string) error {
+// It does nothing for Desktop and Cloud engine kinds.
+func copyDockerConfigToContainer(ctx context.Context, dockerClient *client.Client, containerID string, engineKind types.ModelRunnerEngineKind) error {
+	// Do nothing for Desktop and Cloud engine kinds
+	if engineKind == types.ModelRunnerEngineKindDesktop || engineKind == types.ModelRunnerEngineKindCloud {
+		return nil
+	}
+
 	dockerConfigPath := os.ExpandEnv("$HOME/.docker/config.json")
 	if s, err := os.Stat(dockerConfigPath); err != nil || s.Mode()&os.ModeType != 0 {
 		return nil
@@ -215,7 +222,7 @@ func waitForContainerToStart(ctx context.Context, dockerClient client.ContainerA
 }
 
 // CreateControllerContainer creates and starts a controller container.
-func CreateControllerContainer(ctx context.Context, dockerClient *client.Client, port uint16, environment string, doNotTrack bool, gpu gpupkg.GPUSupport, modelStorageVolume string, printer StatusPrinter) error {
+func CreateControllerContainer(ctx context.Context, dockerClient *client.Client, port uint16, environment string, doNotTrack bool, gpu gpupkg.GPUSupport, modelStorageVolume string, printer StatusPrinter, engineKind types.ModelRunnerEngineKind) error {
 	// Determine the target image.
 	var imageName string
 	switch gpu {
@@ -294,7 +301,7 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 	}
 
 	// Copy Docker config file if it exists
-	if err := copyDockerConfigToContainer(ctx, dockerClient, resp.ID); err != nil {
+	if err := copyDockerConfigToContainer(ctx, dockerClient, resp.ID, engineKind); err != nil {
 		// Log warning but continue - don't fail container creation
 		printer.Printf("Warning: failed to copy Docker config: %v\n", err)
 	}
