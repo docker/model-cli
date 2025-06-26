@@ -12,8 +12,9 @@ import (
 
 func newPullCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "pull MODEL",
-		Short: "Pull a model from Docker Hub or HuggingFace to your local environment",
+		GroupID: groupIDModelDistribution,
+		Use:     "pull MODEL",
+		Short:   "Pull a model from Docker Hub or HuggingFace to your local environment",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return fmt.Errorf(

@@ -12,8 +12,9 @@ import (
 
 func newDFCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "df",
-		Short: "Show Docker Model Runner disk usage",
+		GroupID: groupIDModelRunner,
+		Use:     "df",
+		Short:   "Show Docker Model Runner disk usage",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			df, err := desktopClient.DF()
 			if err != nil {

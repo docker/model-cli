@@ -17,6 +17,7 @@ import (
 func newListCmd() *cobra.Command {
 	var jsonFormat, openai, quiet bool
 	c := &cobra.Command{
+		GroupID: groupIDModelDistribution,
 		Use:     "list [OPTIONS]",
 		Aliases: []string{"ls"},
 		Short:   "List the models pulled to your local environment",

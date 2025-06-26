@@ -17,8 +17,9 @@ func newRunCmd() *cobra.Command {
 
 	cmdArgs := "MODEL [PROMPT]"
 	c := &cobra.Command{
-		Use:   "run " + cmdArgs,
-		Short: "Run a model and interact with it using a submitted prompt or chat mode",
+		GroupID: groupIDModel,
+		Use:     "run " + cmdArgs,
+		Short:   "Run a model and interact with it using a submitted prompt or chat mode",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			model := args[0]
 			prompt := ""

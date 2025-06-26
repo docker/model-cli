@@ -92,6 +92,13 @@ func NewRootCmd(cli *command.DockerCli) *cobra.Command {
 		globalOptions.InstallFlags(rootCmd.Flags())
 	}
 
+	// Add command groups.
+	rootCmd.AddGroup(
+		&cobra.Group{ID: groupIDModel, Title: "Model Commands"},
+		&cobra.Group{ID: groupIDModelDistribution, Title: "Model Distribution Commands"},
+		&cobra.Group{ID: groupIDModelRunner, Title: "Model Runner Commands"},
+	)
+
 	// Add subcommands.
 	rootCmd.AddCommand(
 		newVersionCmd(),

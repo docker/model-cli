@@ -12,8 +12,9 @@ func newConfigureCmd() *cobra.Command {
 	var opts scheduling.ConfigureRequest
 
 	c := &cobra.Command{
-		Use:   "configure [--context-size=<n>] MODEL [-- <runtime-flags...>]",
-		Short: "Configure runtime options for a model",
+		GroupID: groupIDModel,
+		Use:     "configure [--context-size=<n>] MODEL [-- <runtime-flags...>]",
+		Short:   "Configure runtime options for a model",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) < 1 {
 				return fmt.Errorf(

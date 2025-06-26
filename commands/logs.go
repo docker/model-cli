@@ -27,8 +27,9 @@ import (
 func newLogsCmd() *cobra.Command {
 	var follow, noEngines bool
 	c := &cobra.Command{
-		Use:   "logs [OPTIONS]",
-		Short: "Fetch the Docker Model Runner logs",
+		GroupID: groupIDModelRunner,
+		Use:     "logs [OPTIONS]",
+		Short:   "Fetch the Docker Model Runner logs",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			homeDir, err := os.UserHomeDir()
 			if err != nil {

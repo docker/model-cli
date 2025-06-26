@@ -15,8 +15,9 @@ import (
 func newStatusCmd() *cobra.Command {
 	var formatJson bool
 	c := &cobra.Command{
-		Use:   "status",
-		Short: "Check if the Docker Model Runner is running",
+		GroupID: groupIDModelRunner,
+		Use:     "status",
+		Short:   "Check if the Docker Model Runner is running",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			standalone, err := ensureStandaloneRunnerAvailable(cmd.Context(), cmd)
 			if err != nil {

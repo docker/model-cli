@@ -18,8 +18,9 @@ func newPackagedCmd() *cobra.Command {
 	var opts packageOptions
 
 	c := &cobra.Command{
-		Use:   "package --gguf <path> [--license <path>...] --push TARGET",
-		Short: "Package a GGUF file into a Docker model OCI artifact, with optional licenses, and pushes it to the specified registry",
+		GroupID: groupIDModelDistribution,
+		Use:     "package --gguf <path> [--license <path>...] --push TARGET",
+		Short:   "Package a GGUF file into a Docker model OCI artifact, with optional licenses, and pushes it to the specified registry",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return fmt.Errorf(

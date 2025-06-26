@@ -13,8 +13,9 @@ import (
 
 func newPSCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "ps",
-		Short: "List running models",
+		GroupID: groupIDModel,
+		Use:     "ps",
+		Short:   "List running models",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ps, err := desktopClient.PS()
 			if err != nil {

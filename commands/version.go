@@ -8,8 +8,9 @@ import (
 
 func newVersionCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "version",
-		Short: "Show the Docker Model Runner version",
+		GroupID: groupIDModelRunner,
+		Use:     "version",
+		Short:   "Show the Docker Model Runner version",
 		Run: func(cmd *cobra.Command, args []string) {
 			cmd.Printf("Docker Model Runner version %s\n", desktop.Version)
 			cmd.Printf("Docker Engine Kind: %s\n", modelRunner.EngineKind())

@@ -13,8 +13,9 @@ func newInspectCmd() *cobra.Command {
 	var openai bool
 	var remote bool
 	c := &cobra.Command{
-		Use:   "inspect MODEL",
-		Short: "Display detailed information on one model",
+		GroupID: groupIDModelDistribution,
+		Use:     "inspect MODEL",
+		Short:   "Display detailed information on one model",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return fmt.Errorf(

@@ -10,8 +10,9 @@ import (
 
 func newTagCmd() *cobra.Command {
 	c := &cobra.Command{
-		Use:   "tag SOURCE TARGET",
-		Short: "Tag a model",
+		GroupID: groupIDModelDistribution,
+		Use:     "tag SOURCE TARGET",
+		Short:   "Tag a model",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 2 {
 				return fmt.Errorf(

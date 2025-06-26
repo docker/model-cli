@@ -13,8 +13,9 @@ import (
 func newUninstallRunner() *cobra.Command {
 	var models, images bool
 	c := &cobra.Command{
-		Use:   "uninstall-runner",
-		Short: "Uninstall Docker Model Runner",
+		GroupID: groupIDModelRunner,
+		Use:     "uninstall-runner",
+		Short:   "Uninstall Docker Model Runner (Docker Engine only)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Ensure that we're running in a supported model runner context.
 			if kind := modelRunner.EngineKind(); kind == types.ModelRunnerEngineKindDesktop {

@@ -18,7 +18,8 @@ import (
 func newComposeCmd() *cobra.Command {
 
 	c := &cobra.Command{
-		Use: "compose EVENT",
+		GroupID: groupIDModelRunner,
+		Use:     "compose EVENT",
 	}
 	upCmd := newUpCommand()
 	downCmd := newDownCommand()
