@@ -40,6 +40,8 @@ type Scheduler struct {
 	router *http.ServeMux
 	// tracker is the metrics tracker.
 	tracker *metrics.Tracker
+	// openAIRecorder is used to record OpenAI API inference requests and responses.
+	openAIRecorder *metrics.OpenAIRecorder
 	// lock is used to synchronize access to the scheduler's router.
 	lock sync.Mutex
 }
@@ -54,6 +56,8 @@ func NewScheduler(
 	allowedOrigins []string,
 	tracker *metrics.Tracker,
 ) *Scheduler {
+	openAIRecorder := metrics.NewOpenAIRecorder(log.WithField("component", "openai-recorder"))
+
 	// Create the scheduler.
 	s := &Scheduler{
 		log:            log,
@@ -61,9 +65,10 @@ func NewScheduler(
 		defaultBackend: defaultBackend,
 		modelManager:   modelManager,
 		installer:      newInstaller(log, backends, httpClient),
-		loader:         newLoader(log, backends, modelManager),
+		loader:         newLoader(log, backends, modelManager, openAIRecorder),
 		router:         http.NewServeMux(),
 		tracker:        tracker,
+		openAIRecorder: openAIRecorder,
 	}
 
 	// Register routes.
@@ -115,6 +120,7 @@ func (s *Scheduler) routeHandlers(allowedOrigins []string) map[string]http.Handl
 	m["POST "+inference.InferencePrefix+"/unload"] = s.Unload
 	m["POST "+inference.InferencePrefix+"/{backend}/_configure"] = s.Configure
 	m["POST "+inference.InferencePrefix+"/_configure"] = s.Configure
+	m["GET "+inference.InferencePrefix+"/requests"] = s.openAIRecorder.GetRecordsByModelHandler()
 	return m
 }
 
@@ -231,6 +237,14 @@ func (s *Scheduler) handleOpenAIInference(w http.ResponseWriter, r *http.Request
 		// Non-blocking call to track the model usage.
 		s.tracker.TrackModel(model)
 	}
+
+	// Record the request in the OpenAI recorder.
+	recordID := s.openAIRecorder.RecordRequest(request.Model, r, body)
+	w = s.openAIRecorder.NewResponseRecorder(w)
+	defer func() {
+		// Record the response in the OpenAI recorder.
+		s.openAIRecorder.RecordResponse(recordID, request.Model, w)
+	}()
 
 	// Request a runner to execute the request and defer its release.
 	runner, err := s.loader.load(r.Context(), backend.Name(), request.Model, backendMode)
@@ -374,23 +388,27 @@ func (s *Scheduler) Configure(w http.ResponseWriter, r *http.Request) {
 	}
 
 	configureRequest := ConfigureRequest{
-		Model:           "",
-		ContextSize:     -1,
-		RawRuntimeFlags: "",
+		ContextSize: -1,
 	}
 	if err := json.Unmarshal(body, &configureRequest); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
-	rawFlags, err := shellwords.Parse(configureRequest.RawRuntimeFlags)
-	if err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
-		return
+	var runtimeFlags []string
+	if len(configureRequest.RuntimeFlags) > 0 {
+		runtimeFlags = configureRequest.RuntimeFlags
+	} else {
+		rawFlags, err := shellwords.Parse(configureRequest.RawRuntimeFlags)
+		if err != nil {
+			http.Error(w, "invalid request", http.StatusBadRequest)
+			return
+		}
+		runtimeFlags = rawFlags
 	}
 
 	var runnerConfig inference.BackendConfiguration
 	runnerConfig.ContextSize = configureRequest.ContextSize
-	runnerConfig.RawFlags = rawFlags
+	runnerConfig.RuntimeFlags = runtimeFlags
 
 	if err := s.loader.setRunnerConfig(r.Context(), backend.Name(), configureRequest.Model, inference.BackendModeCompletion, runnerConfig); err != nil {
 		s.log.Warnf("Failed to configure %s runner for %s: %s", backend.Name(), configureRequest.Model, err)
@@ -403,6 +421,84 @@ func (s *Scheduler) Configure(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusAccepted)
+}
+
+// GetAllActiveRunners returns information about all active runners
+func (s *Scheduler) GetAllActiveRunners() []metrics.ActiveRunner {
+	runningBackends := s.getLoaderStatus(context.Background())
+	var activeRunners []metrics.ActiveRunner
+
+	if !s.loader.lock(context.Background()) {
+		return activeRunners
+	}
+	defer s.loader.unlock()
+
+	for _, backend := range runningBackends {
+		// Find the runner slot for this backend/model combination
+		key := runnerKey{
+			backend: backend.BackendName,
+			model:   backend.ModelName,
+			mode:    parseBackendMode(backend.Mode),
+		}
+
+		if slot, exists := s.loader.runners[key]; exists {
+			socket, err := RunnerSocketPath(slot)
+			if err != nil {
+				s.log.Warnf("Failed to get socket path for runner %s/%s: %v", backend.BackendName, backend.ModelName, err)
+				continue
+			}
+
+			activeRunners = append(activeRunners, metrics.ActiveRunner{
+				BackendName: backend.BackendName,
+				ModelName:   backend.ModelName,
+				Mode:        backend.Mode,
+				Socket:      socket,
+			})
+		}
+	}
+
+	return activeRunners
+}
+
+// GetLlamaCppSocket returns the Unix socket path for an active llama.cpp runner
+func (s *Scheduler) GetLlamaCppSocket() (string, error) {
+	runningBackends := s.getLoaderStatus(context.Background())
+
+	if !s.loader.lock(context.Background()) {
+		return "", errors.New("failed to acquire loader lock")
+	}
+	defer s.loader.unlock()
+
+	// Look for an active llama.cpp backend
+	for _, backend := range runningBackends {
+		if backend.BackendName == "llama.cpp" {
+			// Find the runner slot for this backend/model combination
+			key := runnerKey{
+				backend: backend.BackendName,
+				model:   backend.ModelName,
+				mode:    parseBackendMode(backend.Mode),
+			}
+
+			if slot, exists := s.loader.runners[key]; exists {
+				// Use the RunnerSocketPath function to get the socket path
+				return RunnerSocketPath(slot)
+			}
+		}
+	}
+
+	return "", errors.New("no active llama.cpp backend found")
+}
+
+// parseBackendMode converts a string mode to BackendMode
+func parseBackendMode(mode string) inference.BackendMode {
+	switch mode {
+	case "completion":
+		return inference.BackendModeCompletion
+	case "embedding":
+		return inference.BackendModeEmbedding
+	default:
+		return inference.BackendModeCompletion
+	}
 }
 
 // ServeHTTP implements net/http.Handler.ServeHTTP.

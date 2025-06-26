@@ -26,6 +26,7 @@ type Client struct {
 	transport http.RoundTripper
 	userAgent string
 	keychain  authn.Keychain
+	auth      authn.Authenticator
 }
 
 type ClientOption func(*Client)
@@ -42,6 +43,17 @@ func WithUserAgent(userAgent string) ClientOption {
 	return func(c *Client) {
 		if userAgent != "" {
 			c.userAgent = userAgent
+		}
+	}
+}
+
+func WithAuthConfig(username, password string) ClientOption {
+	return func(c *Client) {
+		if username != "" && password != "" {
+			c.auth = &authn.Basic{
+				Username: username,
+				Password: password,
+			}
 		}
 	}
 }
@@ -65,13 +77,22 @@ func (c *Client) Model(ctx context.Context, reference string) (types.ModelArtifa
 		return nil, NewReferenceError(reference, err)
 	}
 
-	// Return the artifact at the given reference
-	remoteImg, err := remote.Image(ref,
+	// Set up authentication options
+	authOpts := []remote.Option{
 		remote.WithContext(ctx),
-		remote.WithAuthFromKeychain(c.keychain),
 		remote.WithTransport(c.transport),
 		remote.WithUserAgent(c.userAgent),
-	)
+	}
+
+	// Use direct auth if provided, otherwise fall back to keychain
+	if c.auth != nil {
+		authOpts = append(authOpts, remote.WithAuth(c.auth))
+	} else {
+		authOpts = append(authOpts, remote.WithAuthFromKeychain(c.keychain))
+	}
+
+	// Return the artifact at the given reference
+	remoteImg, err := remote.Image(ref, authOpts...)
 	if err != nil {
 		errStr := err.Error()
 		if strings.Contains(errStr, "UNAUTHORIZED") {
@@ -93,6 +114,7 @@ type Target struct {
 	transport http.RoundTripper
 	userAgent string
 	keychain  authn.Keychain
+	auth      authn.Authenticator
 }
 
 func (c *Client) NewTarget(tag string) (*Target, error) {
@@ -105,20 +127,30 @@ func (c *Client) NewTarget(tag string) (*Target, error) {
 		transport: c.transport,
 		userAgent: c.userAgent,
 		keychain:  c.keychain,
+		auth:      c.auth,
 	}, nil
 }
 
 func (t *Target) Write(ctx context.Context, model types.ModelArtifact, progressWriter io.Writer) error {
-	pr := progress.NewProgressReporter(progressWriter, progress.PushMsg)
+	pr := progress.NewProgressReporter(progressWriter, progress.PushMsg, nil)
 	defer pr.Wait()
 
-	if err := remote.Write(t.reference, model,
+	// Set up authentication options
+	authOpts := []remote.Option{
 		remote.WithContext(ctx),
-		remote.WithAuthFromKeychain(t.keychain),
 		remote.WithTransport(t.transport),
 		remote.WithUserAgent(t.userAgent),
 		remote.WithProgress(pr.Updates()),
-	); err != nil {
+	}
+
+	// Use direct auth if provided, otherwise fall back to keychain
+	if t.auth != nil {
+		authOpts = append(authOpts, remote.WithAuth(t.auth))
+	} else {
+		authOpts = append(authOpts, remote.WithAuthFromKeychain(t.keychain))
+	}
+
+	if err := remote.Write(t.reference, model, authOpts...); err != nil {
 		return fmt.Errorf("write to registry %q: %w", t.reference.String(), err)
 	}
 	return nil
