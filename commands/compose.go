@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/docker/model-cli/pkg/types"
 	"github.com/spf13/pflag"
 	"slices"
 	"strings"
@@ -48,7 +49,7 @@ func newUpCommand() *cobra.Command {
 			if err != nil {
 				_ = sendErrorf("Failed to initialize standalone model runner: %v", err)
 				return fmt.Errorf("Failed to initialize standalone model runner: %w", err)
-			} else if ((kind == desktop.ModelRunnerEngineKindMoby || kind == desktop.ModelRunnerEngineKindCloud) &&
+			} else if ((kind == types.ModelRunnerEngineKindMoby || kind == types.ModelRunnerEngineKindCloud) &&
 				standalone == nil) ||
 				(standalone != nil && (standalone.gatewayIP == "" || standalone.gatewayPort == 0)) {
 				return errors.New("unable to determine standalone runner endpoint")
@@ -79,13 +80,13 @@ func newUpCommand() *cobra.Command {
 			}
 
 			switch kind {
-			case desktop.ModelRunnerEngineKindDesktop:
+			case types.ModelRunnerEngineKindDesktop:
 				_ = setenv("URL", "http://model-runner.docker.internal/engines/v1/")
-			case desktop.ModelRunnerEngineKindMobyManual:
+			case types.ModelRunnerEngineKindMobyManual:
 				_ = setenv("URL", modelRunner.URL("/engines/v1/"))
-			case desktop.ModelRunnerEngineKindCloud:
+			case types.ModelRunnerEngineKindCloud:
 				fallthrough
-			case desktop.ModelRunnerEngineKindMoby:
+			case types.ModelRunnerEngineKindMoby:
 				_ = setenv("URL", fmt.Sprintf("http://%s:%d/engines/v1", standalone.gatewayIP, standalone.gatewayPort))
 			default:
 				return fmt.Errorf("unhandled engine kind: %v", kind)

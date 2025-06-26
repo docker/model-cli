@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/docker/model-cli/pkg/types"
 	"os"
 	"time"
 
@@ -77,8 +78,8 @@ func inspectStandaloneRunner(container container.Summary) *standaloneRunner {
 func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.StatusPrinter) (*standaloneRunner, error) {
 	// If we're not in a supported model runner context, then don't do anything.
 	engineKind := modelRunner.EngineKind()
-	standaloneSupported := engineKind == desktop.ModelRunnerEngineKindMoby ||
-		engineKind == desktop.ModelRunnerEngineKindCloud
+	standaloneSupported := engineKind == types.ModelRunnerEngineKindMoby ||
+		engineKind == types.ModelRunnerEngineKindCloud
 	if !standaloneSupported {
 		return nil, nil
 	}
@@ -127,11 +128,11 @@ func ensureStandaloneRunnerAvailable(ctx context.Context, printer standalone.Sta
 	// Create the model runner container.
 	port := uint16(standalone.DefaultControllerPortMoby)
 	environment := "moby"
-	if engineKind == desktop.ModelRunnerEngineKindCloud {
+	if engineKind == types.ModelRunnerEngineKindCloud {
 		port = standalone.DefaultControllerPortCloud
 		environment = "cloud"
 	}
-	if err := standalone.CreateControllerContainer(ctx, dockerClient, port, environment, false, gpu, modelStorageVolume, printer); err != nil {
+	if err := standalone.CreateControllerContainer(ctx, dockerClient, port, environment, false, gpu, modelStorageVolume, printer, engineKind); err != nil {
 		return nil, fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 	}
 
@@ -166,14 +167,14 @@ func newInstallRunner() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Ensure that we're running in a supported model runner context.
 			engineKind := modelRunner.EngineKind()
-			if engineKind == desktop.ModelRunnerEngineKindDesktop {
+			if engineKind == types.ModelRunnerEngineKindDesktop {
 				// TODO: We may eventually want to auto-forward this to
 				// docker desktop enable model-runner, but we should first make
 				// sure the CLI flags match.
 				cmd.Println("Standalone installation not supported with Docker Desktop")
 				cmd.Println("Use `docker desktop enable model-runner` instead")
 				return nil
-			} else if engineKind == desktop.ModelRunnerEngineKindMobyManual {
+			} else if engineKind == types.ModelRunnerEngineKindMobyManual {
 				cmd.Println("Standalone installation not supported with MODEL_RUNNER_HOST set")
 				return nil
 			}
@@ -185,14 +186,14 @@ func newInstallRunner() *cobra.Command {
 			// when context detection happens. So assume that a default value
 			// indicates that we want the Cloud default port. This is less
 			// problematic in Cloud since the UX there is mostly invisible.
-			if engineKind == desktop.ModelRunnerEngineKindCloud &&
+			if engineKind == types.ModelRunnerEngineKindCloud &&
 				port == standalone.DefaultControllerPortMoby {
 				port = standalone.DefaultControllerPortCloud
 			}
 
 			// Set the appropriate environment.
 			environment := "moby"
-			if engineKind == desktop.ModelRunnerEngineKindCloud {
+			if engineKind == types.ModelRunnerEngineKindCloud {
 				environment = "cloud"
 			}
 
@@ -238,7 +239,7 @@ func newInstallRunner() *cobra.Command {
 				return fmt.Errorf("unable to initialize standalone model storage: %w", err)
 			}
 			// Create the model runner container.
-			if err := standalone.CreateControllerContainer(cmd.Context(), dockerClient, port, environment, doNotTrack, gpu, modelStorageVolume, cmd); err != nil {
+			if err := standalone.CreateControllerContainer(cmd.Context(), dockerClient, port, environment, doNotTrack, gpu, modelStorageVolume, cmd, engineKind); err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner container: %w", err)
 			}
 

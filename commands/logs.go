@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/docker/model-cli/pkg/types"
 	"io"
 	"os"
 	"os/signal"
@@ -37,8 +38,8 @@ func newLogsCmd() *cobra.Command {
 			// If we're running in standalone mode, then print the container
 			// logs.
 			engineKind := modelRunner.EngineKind()
-			useStandaloneLogs := engineKind == desktop.ModelRunnerEngineKindMoby ||
-				engineKind == desktop.ModelRunnerEngineKindCloud
+			useStandaloneLogs := engineKind == types.ModelRunnerEngineKindMoby ||
+				engineKind == types.ModelRunnerEngineKindCloud
 			if useStandaloneLogs {
 				dockerClient, err := desktop.DockerClientForContext(dockerCLI, dockerCLI.CurrentContext())
 				if err != nil {

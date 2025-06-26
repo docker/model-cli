@@ -3,6 +3,7 @@ package desktop
 import (
 	"context"
 	"fmt"
+	"github.com/docker/model-cli/pkg/types"
 	"net/http"
 	"net/url"
 	"os"
@@ -79,47 +80,11 @@ func DockerClientForContext(cli *command.DockerCli, name string) (*clientpkg.Cli
 	)
 }
 
-// ModelRunnerEngineKind encodes the kind of Docker engine associated with the
-// model runner context.
-type ModelRunnerEngineKind uint8
-
-const (
-	// ModelRunnerEngineKindMoby represents a non-Desktop/Cloud engine on which
-	// the Model CLI command is responsible for managing a Model Runner.
-	ModelRunnerEngineKindMoby ModelRunnerEngineKind = iota
-	// ModelRunnerEngineKindMobyManual represents a non-Desktop/Cloud engine
-	// that's explicitly targeted by a MODEL_RUNNER_HOST environment variable on
-	// which the user is responsible for managing a Model Runner.
-	ModelRunnerEngineKindMobyManual
-	// ModelRunnerEngineKindDesktop represents a Docker Desktop engine. It only
-	// refers to a Docker Desktop Linux engine, i.e. not a Windows container
-	// engine in the case of Docker Desktop for Windows.
-	ModelRunnerEngineKindDesktop
-	// ModelRunnerEngineKindCloud represents a Docker Cloud engine.
-	ModelRunnerEngineKindCloud
-)
-
-// String returns a human-readable engine kind description.
-func (k ModelRunnerEngineKind) String() string {
-	switch k {
-	case ModelRunnerEngineKindMoby:
-		return "Docker Engine"
-	case ModelRunnerEngineKindMobyManual:
-		return "Docker Engine (Manual Install)"
-	case ModelRunnerEngineKindDesktop:
-		return "Docker Desktop"
-	case ModelRunnerEngineKindCloud:
-		return "Docker Cloud"
-	default:
-		return "Unknown"
-	}
-}
-
 // ModelRunnerContext encodes the operational context of a Model CLI command and
 // provides facilities for inspecting and interacting with the Model Runner.
 type ModelRunnerContext struct {
 	// kind stores the associated engine kind.
-	kind ModelRunnerEngineKind
+	kind types.ModelRunnerEngineKind
 	// urlPrefix is the prefix URL for all requests.
 	urlPrefix *url.URL
 	// client is the model runner client.
@@ -134,7 +99,7 @@ func NewContextForMock(client DockerHttpClient) *ModelRunnerContext {
 		panic("error occurred while parsing known-good URL")
 	}
 	return &ModelRunnerContext{
-		kind:      ModelRunnerEngineKindDesktop,
+		kind:      types.ModelRunnerEngineKindDesktop,
 		urlPrefix: urlPrefix,
 		client:    client,
 	}
@@ -150,25 +115,25 @@ func DetectContext(ctx context.Context, cli *command.DockerCli) (*ModelRunnerCon
 	treatDesktopAsMoby := os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") == "1"
 
 	// Detect the associated engine type.
-	kind := ModelRunnerEngineKindMoby
+	kind := types.ModelRunnerEngineKindMoby
 	if modelRunnerHost != "" {
-		kind = ModelRunnerEngineKindMobyManual
+		kind = types.ModelRunnerEngineKindMobyManual
 	} else if isDesktopContext(ctx, cli) {
-		kind = ModelRunnerEngineKindDesktop
+		kind = types.ModelRunnerEngineKindDesktop
 		if treatDesktopAsMoby {
-			kind = ModelRunnerEngineKindMoby
+			kind = types.ModelRunnerEngineKindMoby
 		}
 	} else if isCloudContext(cli) {
-		kind = ModelRunnerEngineKindCloud
+		kind = types.ModelRunnerEngineKindCloud
 	}
 
 	// Compute the URL prefix based on the associated engine kind.
 	var rawURLPrefix string
-	if kind == ModelRunnerEngineKindMoby {
+	if kind == types.ModelRunnerEngineKindMoby {
 		rawURLPrefix = "http://localhost:" + strconv.Itoa(standalone.DefaultControllerPortMoby)
-	} else if kind == ModelRunnerEngineKindCloud {
+	} else if kind == types.ModelRunnerEngineKindCloud {
 		rawURLPrefix = "http://localhost:" + strconv.Itoa(standalone.DefaultControllerPortCloud)
-	} else if kind == ModelRunnerEngineKindMobyManual {
+	} else if kind == types.ModelRunnerEngineKindMobyManual {
 		rawURLPrefix = modelRunnerHost
 	} else { // ModelRunnerEngineKindDesktop
 		rawURLPrefix = "http://localhost" + inference.ExperimentalEndpointsPrefix
@@ -180,7 +145,7 @@ func DetectContext(ctx context.Context, cli *command.DockerCli) (*ModelRunnerCon
 
 	// Construct the HTTP client.
 	var client DockerHttpClient
-	if kind == ModelRunnerEngineKindDesktop {
+	if kind == types.ModelRunnerEngineKindDesktop {
 		dockerClient, err := DockerClientForContext(cli, cli.CurrentContext())
 		if err != nil {
 			return nil, fmt.Errorf("unable to create model runner client: %w", err)
@@ -199,7 +164,7 @@ func DetectContext(ctx context.Context, cli *command.DockerCli) (*ModelRunnerCon
 }
 
 // EngineKind returns the Docker engine kind associated with the model runner.
-func (c *ModelRunnerContext) EngineKind() ModelRunnerEngineKind {
+func (c *ModelRunnerContext) EngineKind() types.ModelRunnerEngineKind {
 	return c.kind
 }
 

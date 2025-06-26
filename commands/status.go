@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/docker/model-cli/pkg/types"
 	"os"
 
 	"github.com/docker/cli/cli-plugins/hooks"
@@ -74,13 +75,13 @@ func jsonStatus(standalone *standaloneRunner, status desktop.Status, backendStat
 	var endpoint string
 	kind := modelRunner.EngineKind()
 	switch kind {
-	case desktop.ModelRunnerEngineKindDesktop:
+	case types.ModelRunnerEngineKindDesktop:
 		endpoint = "http://model-runner.docker.internal/engines/v1/"
-	case desktop.ModelRunnerEngineKindMobyManual:
+	case types.ModelRunnerEngineKindMobyManual:
 		endpoint = modelRunner.URL("/engines/v1/")
-	case desktop.ModelRunnerEngineKindCloud:
+	case types.ModelRunnerEngineKindCloud:
 		fallthrough
-	case desktop.ModelRunnerEngineKindMoby:
+	case types.ModelRunnerEngineKindMoby:
 		endpoint = fmt.Sprintf("http://%s:%d/engines/v1", standalone.gatewayIP, standalone.gatewayPort)
 	default:
 		return fmt.Errorf("unhandled engine kind: %v", kind)
