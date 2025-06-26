@@ -173,8 +173,9 @@ func determineBridgeGatewayIP(ctx context.Context, dockerClient client.NetworkAP
 	return "", nil
 }
 
-// waitForContainerToStart waits for a container to start.
-func waitForContainerToStart(ctx context.Context, dockerClient client.ContainerAPIClient, containerID string) error {
+// ensureContainerStarted ensures that a container has started. It may be called
+// concurrently, taking advantage of the fact that ContainerStart is idempotent.
+func ensureContainerStarted(ctx context.Context, dockerClient client.ContainerAPIClient, containerID string) error {
 	for i := 10; i > 0; i-- {
 		err := dockerClient.ContainerStart(ctx, containerID, container.StartOptions{})
 		if err == nil {
@@ -282,7 +283,7 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 
 	// Start the container.
 	printer.Printf("Starting model runner container %s...\n", controllerContainerName)
-	if err := waitForContainerToStart(ctx, dockerClient, controllerContainerName); err != nil {
+	if err := ensureContainerStarted(ctx, dockerClient, controllerContainerName); err != nil {
 		if created {
 			_ = dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
 		}
