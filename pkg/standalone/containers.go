@@ -1,13 +1,16 @@
 package standalone
 
 import (
-	"archive/tar"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"log/slog"
+	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -18,7 +21,11 @@ import (
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
-	"github.com/docker/go-connections/nat"
+	clientsdk "github.com/docker/go-sdk/client"
+	"github.com/docker/go-sdk/config"
+	containersdk "github.com/docker/go-sdk/container"
+	"github.com/docker/go-sdk/container/wait"
+	contextsdk "github.com/docker/go-sdk/context"
 	gpupkg "github.com/docker/model-cli/pkg/gpu"
 	"github.com/docker/model-cli/pkg/types"
 )
@@ -26,105 +33,10 @@ import (
 // controllerContainerName is the name to use for the controller container.
 const controllerContainerName = "docker-model-runner"
 
-// copyDockerConfigToContainer copies the Docker config file from the host to the container
-// and sets up proper ownership and permissions for the modelrunner user.
-// It does nothing for Desktop and Cloud engine kinds.
-func copyDockerConfigToContainer(ctx context.Context, dockerClient *client.Client, containerID string, engineKind types.ModelRunnerEngineKind) error {
-	// Do nothing for Desktop and Cloud engine kinds
-	if engineKind == types.ModelRunnerEngineKindDesktop || engineKind == types.ModelRunnerEngineKindCloud {
-		return nil
-	}
-
-	dockerConfigPath := os.ExpandEnv("$HOME/.docker/config.json")
-	if s, err := os.Stat(dockerConfigPath); err != nil || s.Mode()&os.ModeType != 0 {
-		return nil
-	}
-
-	configData, err := os.ReadFile(dockerConfigPath)
-	if err != nil {
-		return fmt.Errorf("failed to read Docker config file: %w", err)
-	}
-
-	var buf bytes.Buffer
-	tw := tar.NewWriter(&buf)
-	header := &tar.Header{
-		Name: ".docker/config.json",
-		Mode: 0600,
-		Size: int64(len(configData)),
-	}
-	if err := tw.WriteHeader(header); err != nil {
-		return fmt.Errorf("failed to write tar header: %w", err)
-	}
-	if _, err := tw.Write(configData); err != nil {
-		return fmt.Errorf("failed to write config data to tar: %w", err)
-	}
-	if err := tw.Close(); err != nil {
-		return fmt.Errorf("failed to close tar writer: %w", err)
-	}
-
-	// Ensure the .docker directory exists
-	mkdirCmd := "mkdir -p /home/modelrunner/.docker && chown modelrunner:modelrunner /home/modelrunner/.docker"
-	if err := execInContainer(ctx, dockerClient, containerID, mkdirCmd); err != nil {
-		return err
-	}
-
-	// Copy directly into the .docker directory
-	err = dockerClient.CopyToContainer(ctx, containerID, "/home/modelrunner", &buf, container.CopyToContainerOptions{
-		CopyUIDGID: true,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to copy config file to container: %w", err)
-	}
-
-	// Set correct ownership and permissions
-	chmodCmd := "chown modelrunner:modelrunner /home/modelrunner/.docker/config.json && chmod 600 /home/modelrunner/.docker/config.json"
-	if err := execInContainer(ctx, dockerClient, containerID, chmodCmd); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func execInContainer(ctx context.Context, dockerClient *client.Client, containerID, cmd string) error {
-	execConfig := container.ExecOptions{
-		Cmd: []string{"sh", "-c", cmd},
-	}
-	execResp, err := dockerClient.ContainerExecCreate(ctx, containerID, execConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create exec for command '%s': %w", cmd, err)
-	}
-	if err := dockerClient.ContainerExecStart(ctx, execResp.ID, container.ExecStartOptions{}); err != nil {
-		return fmt.Errorf("failed to start exec for command '%s': %w", cmd, err)
-	}
-
-	// Create a timeout context for the polling loop
-	timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
-	// Poll until the command finishes or timeout occurs
-	for {
-		inspectResp, err := dockerClient.ContainerExecInspect(ctx, execResp.ID)
-		if err != nil {
-			return fmt.Errorf("failed to inspect exec for command '%s': %w", cmd, err)
-		}
-
-		if !inspectResp.Running {
-			// Command has finished, now we can safely check the exit code
-			if inspectResp.ExitCode != 0 {
-				return fmt.Errorf("command '%s' failed with exit code %d", cmd, inspectResp.ExitCode)
-			}
-			return nil
-		}
-
-		// Brief sleep to avoid busy polling, with timeout check
-		select {
-		case <-time.After(100 * time.Millisecond):
-			// Continue polling
-		case <-timeoutCtx.Done():
-			return fmt.Errorf("command '%s' timed out after 10 seconds", cmd)
-		}
-	}
-}
+// concurrentInstallMatcher matches error message that indicate a concurrent
+// standalone model runner installation is taking place. It extracts the ID of
+// the conflicting container in a capture group.
+var concurrentInstallMatcher = regexp.MustCompile(`is already in use by container "([a-z0-9]+)"`)
 
 // FindControllerContainer searches for a running controller container. It
 // returns the ID of the container (if found), the container name (if any), the
@@ -173,9 +85,11 @@ func determineBridgeGatewayIP(ctx context.Context, dockerClient client.NetworkAP
 	return "", nil
 }
 
-// ensureContainerStarted ensures that a container has started. It may be called
-// concurrently, taking advantage of the fact that ContainerStart is idempotent.
-func ensureContainerStarted(ctx context.Context, dockerClient client.ContainerAPIClient, containerID string) error {
+// waitForContainerToStart waits for a container to start.
+func waitForContainerToStart(ctx context.Context, dockerClient *client.Client, containerID string) error {
+	// Unfortunately the Docker API's /containers/{id}/wait API (and the
+	// corresponding Client.ContainerWait method) don't allow waiting for
+	// container startup, so instead we'll take a polling approach.
 	for i := 10; i > 0; i-- {
 		err := dockerClient.ContainerStart(ctx, containerID, container.StartOptions{})
 		if err == nil {
@@ -213,7 +127,9 @@ func ensureContainerStarted(ctx context.Context, dockerClient client.ContainerAP
 }
 
 // CreateControllerContainer creates and starts a controller container.
-func CreateControllerContainer(ctx context.Context, dockerClient *client.Client, port uint16, environment string, doNotTrack bool, gpu gpupkg.GPUSupport, modelStorageVolume string, printer StatusPrinter, engineKind types.ModelRunnerEngineKind) error {
+func CreateControllerContainer(
+	ctx context.Context, port uint16, environment string, doNotTrack bool, gpu gpupkg.GPUSupport, modelStorageVolume string, printer StatusPrinter,
+) error {
 	// Determine the target image.
 	var imageName string
 	switch gpu {
@@ -223,80 +139,123 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 		imageName = ControllerImage + ":" + controllerImageTagCPU()
 	}
 
-	// Set up the container configuration.
-	portStr := strconv.Itoa(int(port))
-	env := []string{
-		"MODEL_RUNNER_PORT=" + portStr,
-		"MODEL_RUNNER_ENVIRONMENT=" + environment,
-	}
-	if doNotTrack {
-		env = append(env, "DO_NOT_TRACK=1")
-	}
-	config := &container.Config{
-		Image: imageName,
-		Env:   env,
-		ExposedPorts: nat.PortSet{
-			nat.Port(portStr + "/tcp"): struct{}{},
-		},
-		Labels: map[string]string{
-			labelDesktopService: serviceModelRunner,
-			labelRole:           roleController,
-		},
-	}
-	hostConfig := &container.HostConfig{
-		Mounts: []mount.Mount{
-			{
-				Type:   mount.TypeVolume,
-				Source: modelStorageVolume,
-				Target: "/models",
-			},
-		},
-		RestartPolicy: container.RestartPolicy{
-			Name: "always",
-		},
-	}
-	portBindings := []nat.PortBinding{{HostIP: "127.0.0.1", HostPort: portStr}}
-	if os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") != "1" {
-		// Don't bind the bridge gateway IP if we're treating Docker Desktop as Moby.
-		if bridgeGatewayIP, err := determineBridgeGatewayIP(ctx, dockerClient); err == nil && bridgeGatewayIP != "" {
-			portBindings = append(portBindings, nat.PortBinding{HostIP: bridgeGatewayIP, HostPort: portStr})
-		}
-	}
-	hostConfig.PortBindings = nat.PortMap{
-		nat.Port(portStr + "/tcp"): portBindings,
-	}
-	if gpu == gpupkg.GPUSupportCUDA {
-		hostConfig.Runtime = "nvidia"
-		hostConfig.DeviceRequests = []container.DeviceRequest{{Count: -1, Capabilities: [][]string{{"gpu"}}}}
+	crrContext, err := contextsdk.Current()
+	if err != nil {
+		return fmt.Errorf("failed to get current Docker context: %w", err)
 	}
 
-	// Create the container. If we detect that a concurrent installation is in
-	// progress (as indicated by a conflicting container name (which should have
-	// been detected just before installation)), then we'll allow the error to
-	// pass silently and simply work in conjunction with any concurrent
-	// installers to start the container.
-	resp, err := dockerClient.ContainerCreate(ctx, config, hostConfig, nil, nil, controllerContainerName)
-	if err != nil && !errdefs.IsConflict(err) {
+	dockerClient, err := clientsdk.New(
+		ctx,
+		clientsdk.WithDockerContext(crrContext),
+		clientsdk.WithLogger(slog.New(slog.NewTextHandler(os.Stdout, nil))),
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create Docker client: %w", err)
+	}
+
+	// TODO: check if the config.json file exists
+	dockerCfg, err := config.Dir()
+	if err != nil {
+		return fmt.Errorf("failed to get Docker config directory: %w", err)
+	}
+
+	portStr := strconv.Itoa(int(port))
+
+	env := map[string]string{
+		"MODEL_RUNNER_PORT":        portStr,
+		"MODEL_RUNNER_ENVIRONMENT": environment,
+	}
+	if doNotTrack {
+		env["DO_NOT_TRACK"] = "1"
+	}
+
+	customizeOptions := []containersdk.ContainerCustomizer{
+		containersdk.WithDockerClient(dockerClient),
+		containersdk.WithImage(imageName),
+		containersdk.WithEnv(env),
+		containersdk.WithName(controllerContainerName),
+		// using a fixed port for now, although it could be convenient to have it
+		// be dynamic and use a random port. Then consumers of this container would
+		// need a way to get a reference to the container, and use the API to get the
+		// mapped port.
+		containersdk.WithExposedPorts(portStr + ":" + portStr + "/tcp"),
+		containersdk.WithLabels(map[string]string{
+			labelDesktopService: serviceModelRunner,
+			labelRole:           roleController,
+		}),
+		containersdk.WithWaitStrategy(wait.ForAll(
+			//wait.ForListeningPort(nat.Port(portStr+"/tcp")).WithTimeout(1*time.Minute),   // wait for the container to be listening on the port
+			wait.ForHTTP("/models").WithTimeout(1 * time.Minute).WithStatus(http.StatusOK), // wait for the container to be ready to serve requests
+		)),
+		containersdk.WithHostConfigModifier(func(hc *container.HostConfig) {
+			hc.Mounts = []mount.Mount{
+				{
+					Type:   mount.TypeVolume,
+					Source: modelStorageVolume,
+					Target: "/models",
+				},
+			}
+			hc.RestartPolicy = container.RestartPolicy{
+				Name: "always",
+			}
+
+			if gpu == gpupkg.GPUSupportCUDA {
+				hc.Runtime = "nvidia"
+				hc.DeviceRequests = []container.DeviceRequest{{Count: -1, Capabilities: [][]string{{"gpu"}}}}
+			}
+		}),
+	}
+
+	// Set up the container configuration.
+	/*
+		portBindings := []nat.PortBinding{{HostIP: "127.0.0.1", HostPort: portStr}}
+		if os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") != "1" {
+			// Don't bind the bridge gateway IP if we're treating Docker Desktop as Moby.
+			if bridgeGatewayIP, err := determineBridgeGatewayIP(ctx, dockerClient); err == nil && bridgeGatewayIP != "" {
+				portBindings = append(portBindings, nat.PortBinding{HostIP: bridgeGatewayIP, HostPort: portStr})
+			}
+		}
+		hostConfig.PortBindings = nat.PortMap{
+			nat.Port(portStr + "/tcp"): portBindings,
+		}*/
+
+	underlyingClient, err := dockerClient.Client()
+	if err != nil {
+		return fmt.Errorf("failed to get underlying Docker client: %w", err)
+	}
+
+	// Run the container. If we detect that a concurrent installation is in
+	// progress, then we wait for whichever install process creates the
+	// container first and then wait for its container to be ready.
+	dmrContainer, err := containersdk.Run(ctx, customizeOptions...)
+	if err != nil {
+		if match := concurrentInstallMatcher.FindStringSubmatch(err.Error()); match != nil {
+			if err := waitForContainerToStart(ctx, underlyingClient, match[1]); err != nil {
+				return fmt.Errorf("failed waiting for concurrent installation: %w", err)
+			}
+			return nil
+		}
 		return fmt.Errorf("failed to create container %s: %w", controllerContainerName, err)
 	}
 	created := err == nil
 
-	// Start the container.
-	printer.Printf("Starting model runner container %s...\n", controllerContainerName)
-	if err := ensureContainerStarted(ctx, dockerClient, controllerContainerName); err != nil {
-		if created {
-			_ = dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
-		}
-		return fmt.Errorf("failed to start container %s: %w", controllerContainerName, err)
+	_, _, err = dmrContainer.Exec(ctx, []string{"/bin/sh", "-c", "mkdir -p /home/modelrunner/.docker"})
+	if err != nil {
+		return fmt.Errorf("mkdir config directory in container: %w", err)
 	}
 
-	// Copy Docker config file if it exists and we're the container creator.
-	if created {
-		if err := copyDockerConfigToContainer(ctx, dockerClient, resp.ID, engineKind); err != nil {
-			// Log warning but continue - don't fail container creation
-			printer.Printf("Warning: failed to copy Docker config: %v\n", err)
-		}
+	cfgFile, err := os.ReadFile(filepath.Join(dockerCfg, config.FileName))
+	if err != nil {
+		return fmt.Errorf("read config file: %w", err)
 	}
+
+	err = dmrContainer.CopyToContainer(ctx, cfgFile, "/home/modelrunner/.docker/"+config.FileName, 0o600)
+	if err != nil {
+		return fmt.Errorf("copy directory to container: %w", err)
+	}
+
+	printer.Printf("Model runner container %s is running\n", controllerContainerName)
+
 	return nil
 }
 
