@@ -26,9 +26,13 @@ func newStatusCmd() *cobra.Command {
 				return handleClientError(status.Error, "Failed to get Docker Model Runner status")
 			}
 
+			if len(status.Status) == 0 {
+				status.Status = []byte("{}")
+			}
+
 			var backendStatus map[string]string
 			if err := json.Unmarshal(status.Status, &backendStatus); err != nil {
-				cmd.PrintErrln(string(status.Status))
+				cmd.PrintErrln(fmt.Errorf("failed to parse status response: %w", err))
 			}
 
 			if formatJson {
