@@ -38,6 +38,12 @@ func (b *Builder) WithLicense(path string) (*Builder, error) {
 	}, nil
 }
 
+func (b *Builder) WithContextSize(size uint64) *Builder {
+	return &Builder{
+		model: mutate.ContextSize(b.model, size),
+	}
+}
+
 // Target represents a build target
 type Target interface {
 	Write(context.Context, types.ModelArtifact, io.Writer) error

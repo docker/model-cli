@@ -20,3 +20,10 @@ func ConfigMediaType(mdl types.ModelArtifact, mt ggcr.MediaType) types.ModelArti
 		configMediaType: mt,
 	}
 }
+
+func ContextSize(mdl types.ModelArtifact, cs uint64) types.ModelArtifact {
+	return &model{
+		base:        mdl,
+		contextSize: &cs,
+	}
+}

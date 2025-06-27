@@ -18,7 +18,7 @@ func newPackagedCmd() *cobra.Command {
 	var opts packageOptions
 
 	c := &cobra.Command{
-		Use:   "package --gguf <path> [--license <path>...] --push TARGET",
+		Use:   "package --gguf <path> [--license <path>...] [--context-size <tokens>] --push TARGET",
 		Short: "Package a GGUF file into a Docker model OCI artifact, with optional licenses, and pushes it to the specified registry",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
@@ -72,6 +72,7 @@ func newPackagedCmd() *cobra.Command {
 	c.Flags().StringVar(&opts.ggufPath, "gguf", "", "absolute path to gguf file (required)")
 	c.Flags().StringArrayVarP(&opts.licensePaths, "license", "l", nil, "absolute path to a license file")
 	c.Flags().BoolVar(&opts.push, "push", false, "push to registry (required)")
+	c.Flags().Uint64Var(&opts.contextSize, "context-size", 0, "context size in tokens")
 	return c
 }
 
@@ -79,6 +80,7 @@ type packageOptions struct {
 	ggufPath     string
 	licensePaths []string
 	push         bool
+	contextSize  uint64
 }
 
 func packageModel(cmd *cobra.Command, tag string, opts packageOptions) error {
@@ -95,6 +97,12 @@ func packageModel(cmd *cobra.Command, tag string, opts packageOptions) error {
 	pkg, err := builder.FromGGUF(opts.ggufPath)
 	if err != nil {
 		return fmt.Errorf("add gguf file: %w", err)
+	}
+
+	// Set context size
+	if opts.contextSize > 0 {
+		cmd.PrintErrf("Setting context size %d\n", opts.contextSize)
+		pkg = pkg.WithContextSize(opts.contextSize)
 	}
 
 	// Add license files

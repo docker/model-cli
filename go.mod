@@ -5,12 +5,13 @@ go 1.24
 toolchain go1.24.4
 
 require (
+	github.com/containerd/errdefs v1.0.0
 	github.com/docker/cli v28.3.0+incompatible
 	github.com/docker/cli-docs-tool v0.10.0
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
-	github.com/docker/model-distribution v0.0.0-20250627131521-63daf278071c
+	github.com/docker/model-distribution v0.0.0-20250627163720-aff34abcf3e0
 	github.com/docker/model-runner v0.0.0-20250627142917-26a0a73fbbc0
 	github.com/google/go-containerregistry v0.20.6
 	github.com/mattn/go-isatty v0.0.17
@@ -31,7 +32,6 @@ require (
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/containerd/containerd/v2 v2.1.3 // indirect
-	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v1.0.0-rc.1 // indirect
