@@ -54,7 +54,7 @@ type Config struct {
 	Parameters   string  `json:"parameters,omitempty"`
 	Architecture string  `json:"architecture,omitempty"`
 	Size         string  `json:"size,omitempty"`
-	ContextSize  *uint64 `json:"context_size,omitempty"`
+	ContextSize  uint64 `json:"context_size,omitzero"`
 }
 
 type Model struct {
