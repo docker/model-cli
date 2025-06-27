@@ -44,6 +44,16 @@ type OpenAIInferenceRequest struct {
 	Model string `json:"model"`
 }
 
+// OpenAIErrorResponse is used to format an OpenAI API compatible error response
+// (see https://platform.openai.com/docs/api-reference/responses-streaming/error)
+type OpenAIErrorResponse struct {
+	Type           string  `json:"type"` // always "error"
+	Code           *string `json:"code"`
+	Message        string  `json:"message"`
+	Param          *string `json:"param"`
+	SequenceNumber int     `json:"sequence_number"`
+}
+
 // BackendStatus represents information about a running backend
 type BackendStatus struct {
 	// BackendName is the name of the backend
@@ -76,7 +86,8 @@ type UnloadResponse struct {
 
 // ConfigureRequest specifies per-model runtime configuration options.
 type ConfigureRequest struct {
-	Model           string `json:"model"`
-	ContextSize     int64  `json:"context-size,omitempty"`
-	RawRuntimeFlags string `json:"raw-runtime-flags,omitempty"`
+	Model           string   `json:"model"`
+	ContextSize     int64    `json:"context-size,omitempty"`
+	RuntimeFlags    []string `json:"runtime-flags,omitempty"`
+	RawRuntimeFlags string   `json:"raw-runtime-flags,omitempty"`
 }

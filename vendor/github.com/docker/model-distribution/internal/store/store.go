@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+
+	"github.com/docker/model-distribution/internal/progress"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
@@ -40,6 +43,25 @@ func New(opts Options) (*LocalStore, error) {
 	}
 
 	return store, nil
+}
+
+// Reset clears all contents of the store directory and reinitializes the store.
+// It removes all files and subdirectories within the store's root path, but preserves the root directory itself.
+// This allows the method to work correctly when the store directory is a mounted volume (e.g., in Docker CE).
+func (s *LocalStore) Reset() error {
+	entries, err := os.ReadDir(s.rootPath)
+	if err != nil {
+		return fmt.Errorf("reading store directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		entryPath := filepath.Join(s.rootPath, entry.Name())
+		if err := os.RemoveAll(entryPath); err != nil {
+			return fmt.Errorf("removing %s: %w", entryPath, err)
+		}
+	}
+
+	return s.initialize()
 }
 
 // initialize creates the store directory structure if it doesn't exist
@@ -160,11 +182,7 @@ func (s *LocalStore) Version() string {
 }
 
 // Write writes a model to the store
-func (s *LocalStore) Write(mdl v1.Image, tags []string, progress chan<- v1.Update) error {
-	if progress != nil {
-		defer close(progress)
-	}
-
+func (s *LocalStore) Write(mdl v1.Image, tags []string, w io.Writer) error {
 	// Write the config JSON file
 	if err := s.writeConfigFile(mdl); err != nil {
 		return fmt.Errorf("writing config file: %w", err)
@@ -177,7 +195,23 @@ func (s *LocalStore) Write(mdl v1.Image, tags []string, progress chan<- v1.Updat
 	}
 
 	for _, layer := range layers {
-		if err := s.writeBlob(layer, progress); err != nil {
+		var pr *progress.Reporter
+		var progressChan chan<- v1.Update
+		if w != nil {
+			pr = progress.NewProgressReporter(w, progress.PullMsg, layer)
+			progressChan = pr.Updates()
+		}
+
+		err := s.writeBlob(layer, progressChan)
+
+		if progressChan != nil {
+			close(progressChan)
+			if err := pr.Wait(); err != nil {
+				fmt.Printf("reporter finished with non-fatal error: %v\n", err)
+			}
+		}
+
+		if err != nil {
 			return fmt.Errorf("writing blob: %w", err)
 		}
 	}
@@ -241,9 +275,14 @@ type ProgressReader struct {
 
 func (pr *ProgressReader) Read(p []byte) (int, error) {
 	n, err := pr.Reader.Read(p)
-	if n > 0 {
-		pr.Total += int64(n)
+	pr.Total += int64(n)
+	if err == io.EOF {
 		pr.ProgressChan <- v1.Update{Complete: pr.Total}
+	} else if n > 0 {
+		select {
+		case pr.ProgressChan <- v1.Update{Complete: pr.Total}:
+		default: // if the progress channel is full, it skips sending rather than blocking the Read() call.
+		}
 	}
 	return n, err
 }

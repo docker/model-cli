@@ -2,6 +2,7 @@ package scheduling
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/docker/model-runner/pkg/inference"
 	"github.com/docker/model-runner/pkg/logging"
+	"github.com/docker/model-runner/pkg/metrics"
 )
 
 const (
@@ -62,6 +64,8 @@ type runner struct {
 	proxy *httputil.ReverseProxy
 	// proxyLog is the stream used for logging by proxy.
 	proxyLog io.Closer
+	// openAIRecorder is used to record OpenAI API inference requests and responses.
+	openAIRecorder *metrics.OpenAIRecorder
 	// err is the error returned by the runner's backend, only valid after done is closed.
 	err error
 }
@@ -74,6 +78,7 @@ func run(
 	mode inference.BackendMode,
 	slot int,
 	runnerConfig *inference.BackendConfiguration,
+	openAIRecorder *metrics.OpenAIRecorder,
 ) (*runner, error) {
 	// Create a dialer / transport that target backend on the specified slot.
 	socket, err := RunnerSocketPath(slot)
@@ -123,16 +128,17 @@ func run(
 	runDone := make(chan struct{})
 
 	r := &runner{
-		log:       log,
-		backend:   backend,
-		model:     model,
-		mode:      mode,
-		cancel:    runCancel,
-		done:      runDone,
-		transport: transport,
-		client:    client,
-		proxy:     proxy,
-		proxyLog:  proxyLog,
+		log:            log,
+		backend:        backend,
+		model:          model,
+		mode:           mode,
+		cancel:         runCancel,
+		done:           runDone,
+		transport:      transport,
+		client:         client,
+		proxy:          proxy,
+		proxyLog:       proxyLog,
+		openAIRecorder: openAIRecorder,
 	}
 
 	proxy.ErrorHandler = func(w http.ResponseWriter, req *http.Request, err error) {
@@ -143,6 +149,18 @@ func run(
 			w.WriteHeader(http.StatusInternalServerError)
 			select {
 			case <-r.done:
+				res := OpenAIErrorResponse{
+					Type:           "error",
+					Code:           nil,
+					Message:        r.err.Error(),
+					Param:          nil,
+					SequenceNumber: 1,
+				}
+				errJson, err := json.Marshal(&res)
+				if err == nil {
+					w.Header().Set("Content-Type", "application/json; charset=utf-8")
+					w.Write(errJson)
+				}
 				return
 			case <-time.After(30 * time.Second):
 			}
@@ -150,6 +168,8 @@ func run(
 			w.WriteHeader(http.StatusBadGateway)
 		}
 	}
+
+	r.openAIRecorder.SetConfigForModel(model, runnerConfig)
 
 	// Start the backend run loop.
 	go func() {
@@ -223,6 +243,8 @@ func (r *runner) terminate() {
 	if err := r.proxyLog.Close(); err != nil {
 		r.log.Warnf("Unable to close reverse proxy log writer: %v", err)
 	}
+
+	r.openAIRecorder.RemoveModel(r.model)
 }
 
 // ServeHTTP implements net/http.Handler.ServeHTTP. It forwards requests to the
