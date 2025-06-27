@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 
+	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-runner/pkg/inference/scheduling"
 	"github.com/spf13/cobra"
 )
@@ -39,6 +40,7 @@ func newConfigureCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return desktopClient.ConfigureBackend(opts)
 		},
+		ValidArgsFunction: completion.ModelNames(getDesktopClient, -1),
 	}
 
 	c.Flags().Int64Var(&opts.ContextSize, "context-size", -1, "context size (in tokens)")
