@@ -238,14 +238,6 @@ func (s *Scheduler) handleOpenAIInference(w http.ResponseWriter, r *http.Request
 		s.tracker.TrackModel(model)
 	}
 
-	// Record the request in the OpenAI recorder.
-	recordID := s.openAIRecorder.RecordRequest(request.Model, r, body)
-	w = s.openAIRecorder.NewResponseRecorder(w)
-	defer func() {
-		// Record the response in the OpenAI recorder.
-		s.openAIRecorder.RecordResponse(recordID, request.Model, w)
-	}()
-
 	// Request a runner to execute the request and defer its release.
 	runner, err := s.loader.load(r.Context(), backend.Name(), request.Model, backendMode)
 	if err != nil {
@@ -253,6 +245,14 @@ func (s *Scheduler) handleOpenAIInference(w http.ResponseWriter, r *http.Request
 		return
 	}
 	defer s.loader.release(runner)
+
+	// Record the request in the OpenAI recorder.
+	recordID := s.openAIRecorder.RecordRequest(request.Model, r, body)
+	w = s.openAIRecorder.NewResponseRecorder(w)
+	defer func() {
+		// Record the response in the OpenAI recorder.
+		s.openAIRecorder.RecordResponse(recordID, request.Model, w)
+	}()
 
 	// Create a request with the body replaced for forwarding upstream.
 	upstreamRequest := r.Clone(r.Context())

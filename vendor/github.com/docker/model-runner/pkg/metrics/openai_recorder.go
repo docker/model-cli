@@ -29,6 +29,12 @@ func (rr *responseRecorder) WriteHeader(statusCode int) {
 	rr.ResponseWriter.WriteHeader(statusCode)
 }
 
+func (rr *responseRecorder) Flush() {
+	if flusher, ok := rr.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 type RequestResponsePair struct {
 	ID         string    `json:"id"`
 	Model      string    `json:"model"`
