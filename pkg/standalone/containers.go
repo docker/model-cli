@@ -6,12 +6,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/containerd/errdefs"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
@@ -24,11 +25,6 @@ import (
 
 // controllerContainerName is the name to use for the controller container.
 const controllerContainerName = "docker-model-runner"
-
-// concurrentInstallMatcher matches error message that indicate a concurrent
-// standalone model runner installation is taking place. It extracts the ID of
-// the conflicting container in a capture group.
-var concurrentInstallMatcher = regexp.MustCompile(`is already in use by container "([a-z0-9]+)"`)
 
 // copyDockerConfigToContainer copies the Docker config file from the host to the container
 // and sets up proper ownership and permissions for the modelrunner user.
@@ -177,38 +173,33 @@ func determineBridgeGatewayIP(ctx context.Context, dockerClient client.NetworkAP
 	return "", nil
 }
 
-// waitForContainerToStart waits for a container to start.
-func waitForContainerToStart(ctx context.Context, dockerClient client.ContainerAPIClient, containerID string) error {
-	// Unfortunately the Docker API's /containers/{id}/wait API (and the
-	// corresponding Client.ContainerWait method) don't allow waiting for
-	// container startup, so instead we'll take a polling approach.
+// ensureContainerStarted ensures that a container has started. It may be called
+// concurrently, taking advantage of the fact that ContainerStart is idempotent.
+func ensureContainerStarted(ctx context.Context, dockerClient client.ContainerAPIClient, containerID string) error {
 	for i := 10; i > 0; i-- {
-		if status, err := dockerClient.ContainerInspect(ctx, containerID); err != nil {
-			// There is a small gap between the time that a container ID and
-			// name are registered and the time that the container is actually
-			// created and shows up in container list and inspect requests:
-			//
-			// https://github.com/moby/moby/blob/de24c536b0ea208a09e0fff3fd896c453da6ef2e/daemon/container.go#L138-L156
-			//
-			// Given that multiple install operations tend to end up tightly
-			// synchronized by the preceeding pull operation and that this
-			// method is specifically designed to work around these race
-			// conditions, we'll allow 404 errors to pass silently (at least up
-			// until the polling time out - unfortunately we can't make the 404
-			// acceptance window any smaller than that because the CUDA-based
-			// containers are large and can take time to create).
-			if !strings.Contains(err.Error(), "No such container") {
-				return fmt.Errorf("unable to inspect container (%s): %w", containerID[:12], err)
-			}
-		} else {
-			switch status.State.Status {
-			case container.StateRunning:
-				return nil
-			case container.StateCreated, container.StateRestarting:
-				// wait for container to start
-			default:
-				return fmt.Errorf("container is in unexpected state %q", status.State.Status)
-			}
+		err := dockerClient.ContainerStart(ctx, containerID, container.StartOptions{})
+		if err == nil {
+			return nil
+		}
+		// There is a small gap between the time that a container ID and
+		// name are registered and the time that the container is actually
+		// created and shows up in container list and inspect requests:
+		//
+		// https://github.com/moby/moby/blob/de24c536b0ea208a09e0fff3fd896c453da6ef2e/daemon/container.go#L138-L156
+		//
+		// Given that multiple install operations tend to end up tightly
+		// synchronized by the preceeding pull operation and that this
+		// method is specifically designed to work around these race
+		// conditions, we'll allow 404 errors to pass silently (at least up
+		// until the polling time out - unfortunately we can't make the 404
+		// acceptance window any smaller than that because the CUDA-based
+		// containers are large and can take time to create).
+		//
+		// For some reason, this error case can also manifest as an EOF on the
+		// request (I'm not sure where this arises in the Moby server), so we'll
+		// let that pass silently too.
+		if !(errdefs.IsNotFound(err) || errors.Is(err, io.EOF)) {
+			return err
 		}
 		if i > 1 {
 			select {
@@ -280,30 +271,31 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 	}
 
 	// Create the container. If we detect that a concurrent installation is in
-	// progress, then we wait for whichever install process creates the
-	// container first and then wait for its container to be ready.
+	// progress (as indicated by a conflicting container name (which should have
+	// been detected just before installation)), then we'll allow the error to
+	// pass silently and simply work in conjunction with any concurrent
+	// installers to start the container.
 	resp, err := dockerClient.ContainerCreate(ctx, config, hostConfig, nil, nil, controllerContainerName)
-	if err != nil {
-		if match := concurrentInstallMatcher.FindStringSubmatch(err.Error()); match != nil {
-			if err := waitForContainerToStart(ctx, dockerClient, match[1]); err != nil {
-				return fmt.Errorf("failed waiting for concurrent installation: %w", err)
-			}
-			return nil
-		}
+	if err != nil && !errdefs.IsConflict(err) {
 		return fmt.Errorf("failed to create container %s: %w", controllerContainerName, err)
 	}
+	created := err == nil
 
 	// Start the container.
 	printer.Printf("Starting model runner container %s...\n", controllerContainerName)
-	if err := dockerClient.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		_ = dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
+	if err := ensureContainerStarted(ctx, dockerClient, controllerContainerName); err != nil {
+		if created {
+			_ = dockerClient.ContainerRemove(ctx, resp.ID, container.RemoveOptions{Force: true})
+		}
 		return fmt.Errorf("failed to start container %s: %w", controllerContainerName, err)
 	}
 
-	// Copy Docker config file if it exists
-	if err := copyDockerConfigToContainer(ctx, dockerClient, resp.ID, engineKind); err != nil {
-		// Log warning but continue - don't fail container creation
-		printer.Printf("Warning: failed to copy Docker config: %v\n", err)
+	// Copy Docker config file if it exists and we're the container creator.
+	if created {
+		if err := copyDockerConfigToContainer(ctx, dockerClient, resp.ID, engineKind); err != nil {
+			// Log warning but continue - don't fail container creation
+			printer.Printf("Warning: failed to copy Docker config: %v\n", err)
+		}
 	}
 	return nil
 }
