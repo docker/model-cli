@@ -10,7 +10,7 @@ require (
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
-	github.com/docker/model-distribution v0.0.0-20250627131521-63daf278071c
+	github.com/docker/model-distribution v0.0.0-20250627152504-c0c68acaabd5
 	github.com/docker/model-runner v0.0.0-20250627142917-26a0a73fbbc0
 	github.com/google/go-containerregistry v0.20.6
 	github.com/mattn/go-isatty v0.0.17

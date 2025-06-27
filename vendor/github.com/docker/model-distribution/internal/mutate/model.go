@@ -16,6 +16,7 @@ type model struct {
 	base            types.ModelArtifact
 	appended        []v1.Layer
 	configMediaType ggcr.MediaType
+	contextSize     *uint64
 }
 
 func (m *model) Descriptor() (types.Descriptor, error) {
@@ -122,6 +123,9 @@ func (m *model) RawConfigFile() ([]byte, error) {
 			return nil, err
 		}
 		cf.RootFS.DiffIDs = append(cf.RootFS.DiffIDs, diffID)
+	}
+	if m.contextSize != nil {
+		cf.Config.ContextSize = m.contextSize
 	}
 	raw, err := json.Marshal(cf)
 	if err != nil {

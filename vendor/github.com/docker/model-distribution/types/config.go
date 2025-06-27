@@ -44,6 +44,7 @@ type Config struct {
 	Architecture string            `json:"architecture,omitempty"`
 	Size         string            `json:"size,omitempty"`
 	GGUF         map[string]string `json:"gguf,omitempty"`
+	ContextSize  *uint64           `json:"context_size,omitempty"`
 }
 
 // Descriptor provides metadata about the provenance of the model.
