@@ -3,15 +3,17 @@ package commands
 import (
 	"bytes"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/docker/go-units"
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/commands/formatter"
 	"github.com/docker/model-cli/desktop"
 	"github.com/docker/model-cli/pkg/standalone"
+	dmrm "github.com/docker/model-runner/pkg/inference/models"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
-	"os"
-	"time"
 )
 
 func newListCmd() *cobra.Command {
@@ -79,7 +81,7 @@ func listModels(openai bool, desktopClient *desktop.Client, quiet bool, jsonForm
 	return prettyPrintModels(models), nil
 }
 
-func prettyPrintModels(models []desktop.Model) string {
+func prettyPrintModels(models []dmrm.Model) string {
 	var buf bytes.Buffer
 	table := tablewriter.NewWriter(&buf)
 
@@ -116,7 +118,7 @@ func prettyPrintModels(models []desktop.Model) string {
 	return buf.String()
 }
 
-func appendRow(table *tablewriter.Table, tag string, model desktop.Model) {
+func appendRow(table *tablewriter.Table, tag string, model dmrm.Model) {
 	if len(model.ID) < 19 {
 		fmt.Fprintf(os.Stderr, "invalid model ID for model: %v\n", model)
 		return

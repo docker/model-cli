@@ -12,6 +12,7 @@ import (
 	"github.com/docker/model-cli/desktop"
 	"github.com/docker/model-runner/pkg/inference/backends/llamacpp"
 	"github.com/docker/model-runner/pkg/inference/scheduling"
+	dmrm "github.com/docker/model-runner/pkg/inference/models"
 	"github.com/spf13/cobra"
 )
 
@@ -143,7 +144,7 @@ func downloadModelsOnlyIfNotFound(desktopClient *desktop.Client, models []string
 	}
 	for _, model := range models {
 		// Download the model if not already present in the local model store
-		if !slices.ContainsFunc(modelsDownloaded, func(m desktop.Model) bool {
+		if !slices.ContainsFunc(modelsDownloaded, func(m dmrm.Model) bool {
 			if model == m.ID {
 				return true
 			}

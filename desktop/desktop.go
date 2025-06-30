@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/docker/model-runner/pkg/inference"
-	"github.com/docker/model-runner/pkg/inference/models"
+	dmrm "github.com/docker/model-runner/pkg/inference/models"
 	"github.com/docker/model-runner/pkg/inference/scheduling"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
@@ -102,7 +102,7 @@ func (c *Client) Status() Status {
 
 func (c *Client) Pull(model string, progress func(string)) (string, bool, error) {
 	model = normalizeHuggingFaceModelName(model)
-	jsonData, err := json.Marshal(models.ModelCreateRequest{From: model})
+	jsonData, err := json.Marshal(dmrm.ModelCreateRequest{From: model})
 	if err != nil {
 		return "", false, fmt.Errorf("error marshaling request: %w", err)
 	}
@@ -207,14 +207,14 @@ func (c *Client) Push(model string, progress func(string)) (string, bool, error)
 	return "", progressShown, fmt.Errorf("unexpected end of stream while pushing model %s", model)
 }
 
-func (c *Client) List() ([]Model, error) {
+func (c *Client) List() ([]dmrm.Model, error) {
 	modelsRoute := inference.ModelsPrefix
 	body, err := c.listRaw(modelsRoute, "")
 	if err != nil {
-		return []Model{}, err
+		return []dmrm.Model{}, err
 	}
 
-	var modelsJson []Model
+	var modelsJson []dmrm.Model
 	if err := json.Unmarshal(body, &modelsJson); err != nil {
 		return modelsJson, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
@@ -222,36 +222,36 @@ func (c *Client) List() ([]Model, error) {
 	return modelsJson, nil
 }
 
-func (c *Client) ListOpenAI() (OpenAIModelList, error) {
+func (c *Client) ListOpenAI() (dmrm.OpenAIModelList, error) {
 	modelsRoute := inference.InferencePrefix + "/v1/models"
 	rawResponse, err := c.listRaw(modelsRoute, "")
 	if err != nil {
-		return OpenAIModelList{}, err
+		return dmrm.OpenAIModelList{}, err
 	}
-	var modelsJson OpenAIModelList
+	var modelsJson dmrm.OpenAIModelList
 	if err := json.Unmarshal(rawResponse, &modelsJson); err != nil {
 		return modelsJson, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 	return modelsJson, nil
 }
 
-func (c *Client) Inspect(model string, remote bool) (Model, error) {
+func (c *Client) Inspect(model string, remote bool) (dmrm.Model, error) {
 	model = normalizeHuggingFaceModelName(model)
 	if model != "" {
 		if !strings.Contains(strings.Trim(model, "/"), "/") {
 			// Do an extra API call to check if the model parameter isn't a model ID.
 			modelId, err := c.fullModelID(model)
 			if err != nil {
-				return Model{}, fmt.Errorf("invalid model name: %s", model)
+				return dmrm.Model{}, fmt.Errorf("invalid model name: %s", model)
 			}
 			model = modelId
 		}
 	}
 	rawResponse, err := c.listRawWithQuery(fmt.Sprintf("%s/%s", inference.ModelsPrefix, model), model, remote)
 	if err != nil {
-		return Model{}, err
+		return dmrm.Model{}, err
 	}
-	var modelInspect Model
+	var modelInspect dmrm.Model
 	if err := json.Unmarshal(rawResponse, &modelInspect); err != nil {
 		return modelInspect, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
@@ -259,21 +259,21 @@ func (c *Client) Inspect(model string, remote bool) (Model, error) {
 	return modelInspect, nil
 }
 
-func (c *Client) InspectOpenAI(model string) (OpenAIModel, error) {
+func (c *Client) InspectOpenAI(model string) (dmrm.OpenAIModel, error) {
 	model = normalizeHuggingFaceModelName(model)
 	modelsRoute := inference.InferencePrefix + "/v1/models"
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
 		var err error
 		if model, err = c.fullModelID(model); err != nil {
-			return OpenAIModel{}, fmt.Errorf("invalid model name: %s", model)
+			return dmrm.OpenAIModel{}, fmt.Errorf("invalid model name: %s", model)
 		}
 	}
 	rawResponse, err := c.listRaw(fmt.Sprintf("%s/%s", modelsRoute, model), model)
 	if err != nil {
-		return OpenAIModel{}, err
+		return dmrm.OpenAIModel{}, err
 	}
-	var modelInspect OpenAIModel
+	var modelInspect dmrm.OpenAIModel
 	if err := json.Unmarshal(rawResponse, &modelInspect); err != nil {
 		return modelInspect, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
@@ -315,7 +315,7 @@ func (c *Client) fullModelID(id string) (string, error) {
 		return "", err
 	}
 
-	var modelsJson []Model
+	var modelsJson []dmrm.Model
 	if err := json.Unmarshal(bodyResponse, &modelsJson); err != nil {
 		return "", fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
