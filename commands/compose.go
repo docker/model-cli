@@ -129,7 +129,7 @@ func newMetadataCommand(upCmd, downCmd *cobra.Command) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			fmt.Printf(string(jsonMetadata))
+			fmt.Print(string(jsonMetadata))
 			return nil
 		},
 	}

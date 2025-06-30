@@ -15,7 +15,7 @@ import (
 func newRunCmd() *cobra.Command {
 	var debug bool
 
-	cmdArgs := "MODEL [PROMPT]"
+	const cmdArgs = "MODEL [PROMPT]"
 	c := &cobra.Command{
 		Use:   "run " + cmdArgs,
 		Short: "Run a model and interact with it using a submitted prompt or chat mode",

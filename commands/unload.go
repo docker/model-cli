@@ -12,7 +12,7 @@ func newUnloadCmd() *cobra.Command {
 	var all bool
 	var backend string
 
-	cmdArgs := "(MODEL [MODEL ...] [--backend BACKEND] | --all)"
+	const cmdArgs = "(MODEL [MODEL ...] [--backend BACKEND] | --all)"
 	c := &cobra.Command{
 		Use:   "unload " + cmdArgs,
 		Short: "Unload running models",
