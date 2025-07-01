@@ -8,7 +8,6 @@ import (
 	"os"
 	"log/slog"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -27,7 +26,6 @@ import (
 	"github.com/docker/go-sdk/container/wait"
 	contextsdk "github.com/docker/go-sdk/context"
 	gpupkg "github.com/docker/model-cli/pkg/gpu"
-	"github.com/docker/model-cli/pkg/types"
 )
 
 // controllerContainerName is the name to use for the controller container.
@@ -237,7 +235,6 @@ func CreateControllerContainer(
 		}
 		return fmt.Errorf("failed to create container %s: %w", controllerContainerName, err)
 	}
-	created := err == nil
 
 	_, _, err = dmrContainer.Exec(ctx, []string{"/bin/sh", "-c", "mkdir -p /home/modelrunner/.docker"})
 	if err != nil {
