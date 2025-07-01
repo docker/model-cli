@@ -26,6 +26,7 @@ import (
 	"github.com/docker/go-sdk/container/wait"
 	contextsdk "github.com/docker/go-sdk/context"
 	gpupkg "github.com/docker/model-cli/pkg/gpu"
+	"github.com/docker/model-cli/pkg/types"
 )
 
 // controllerContainerName is the name to use for the controller container.
@@ -126,7 +127,7 @@ func waitForContainerToStart(ctx context.Context, dockerClient *client.Client, c
 
 // CreateControllerContainer creates and starts a controller container.
 func CreateControllerContainer(
-	ctx context.Context, port uint16, environment string, doNotTrack bool, gpu gpupkg.GPUSupport, modelStorageVolume string, printer StatusPrinter,
+	ctx context.Context, port uint16, environment string, doNotTrack bool, gpu gpupkg.GPUSupport, modelStorageVolume string, printer StatusPrinter, engineKind types.ModelRunnerEngineKind,
 ) error {
 	// Determine the target image.
 	var imageName string
@@ -236,6 +237,13 @@ func CreateControllerContainer(
 		return fmt.Errorf("failed to create container %s: %w", controllerContainerName, err)
 	}
 
+	printer.Printf("Model runner container %s is running\n", controllerContainerName)
+
+	// Do not copy the config file for Desktop and Cloud engine kinds
+	if engineKind == types.ModelRunnerEngineKindDesktop || engineKind == types.ModelRunnerEngineKindCloud {
+		return nil
+	}
+
 	_, _, err = dmrContainer.Exec(ctx, []string{"/bin/sh", "-c", "mkdir -p /home/modelrunner/.docker"})
 	if err != nil {
 		return fmt.Errorf("mkdir config directory in container: %w", err)
@@ -250,8 +258,6 @@ func CreateControllerContainer(
 	if err != nil {
 		return fmt.Errorf("copy directory to container: %w", err)
 	}
-
-	printer.Printf("Model runner container %s is running\n", controllerContainerName)
 
 	return nil
 }
