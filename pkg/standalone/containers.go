@@ -198,7 +198,8 @@ func ensureContainerStarted(ctx context.Context, dockerClient client.ContainerAP
 		// For some reason, this error case can also manifest as an EOF on the
 		// request (I'm not sure where this arises in the Moby server), so we'll
 		// let that pass silently too.
-		if !(errdefs.IsNotFound(err) || errors.Is(err, io.EOF)) {
+		// TODO: Investigate whether nvidia runtime actually returns IsNotFound.
+		if !(errdefs.IsNotFound(err) || errors.Is(err, io.EOF) || strings.Contains(err.Error(), "No such container")) {
 			return err
 		}
 		if i > 1 {
@@ -275,8 +276,9 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 	// been detected just before installation)), then we'll allow the error to
 	// pass silently and simply work in conjunction with any concurrent
 	// installers to start the container.
+	// TODO: Remove strings.Contains check once we ensure it's not necessary.
 	resp, err := dockerClient.ContainerCreate(ctx, config, hostConfig, nil, nil, controllerContainerName)
-	if err != nil && !errdefs.IsConflict(err) {
+	if err != nil && !(errdefs.IsConflict(err) || strings.Contains(err.Error(), "is already in use by container")) {
 		return fmt.Errorf("failed to create container %s: %w", controllerContainerName, err)
 	}
 	created := err == nil
