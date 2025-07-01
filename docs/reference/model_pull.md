@@ -22,7 +22,8 @@ docker model pull ai/smollm2
 
 You can pull GGUF models directly from [Hugging Face](https://huggingface.co/models?library=gguf).
 
-**Note about quantization:** If no tag is specified, the command pulls the non-quantized version of the model.
+**Note about quantization:** If no tag is specified, the command tries to pull the `Q4_K_M` version of the model.
+If `Q4_K_M` doesn't exist, the command pulls the first GGUF found in the **Files** view of the model on HuggingFace.
 To specify the quantization, provide it as a tag, for example:
 `docker model pull hf.co/bartowski/Llama-3.2-1B-Instruct-GGUF:Q4_K_S`
 
