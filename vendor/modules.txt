@@ -12,6 +12,9 @@ github.com/Microsoft/go-winio/pkg/guid
 # github.com/StackExchange/wmi v1.2.1
 ## explicit; go 1.13
 github.com/StackExchange/wmi
+# github.com/caarlos0/env/v11 v11.3.1
+## explicit; go 1.18
+github.com/caarlos0/env/v11
 # github.com/cenkalti/backoff/v4 v4.3.0
 ## explicit; go 1.18
 github.com/cenkalti/backoff/v4
@@ -141,6 +144,28 @@ github.com/docker/docker-credential-helpers/credentials
 github.com/docker/go-connections/nat
 github.com/docker/go-connections/sockets
 github.com/docker/go-connections/tlsconfig
+# github.com/docker/go-sdk/client v0.1.0-alpha006
+## explicit; go 1.23.6
+github.com/docker/go-sdk/client
+# github.com/docker/go-sdk/config v0.1.0-alpha006
+## explicit; go 1.23.6
+github.com/docker/go-sdk/config
+github.com/docker/go-sdk/config/auth
+# github.com/docker/go-sdk/container v0.1.0-alpha006
+## explicit; go 1.23.6
+github.com/docker/go-sdk/container
+github.com/docker/go-sdk/container/exec
+github.com/docker/go-sdk/container/wait
+# github.com/docker/go-sdk/context v0.1.0-alpha006
+## explicit; go 1.23.6
+github.com/docker/go-sdk/context
+github.com/docker/go-sdk/context/internal
+# github.com/docker/go-sdk/image v0.1.0-alpha006
+## explicit; go 1.23.6
+github.com/docker/go-sdk/image
+# github.com/docker/go-sdk/network v0.1.0-alpha006
+## explicit; go 1.23.6
+github.com/docker/go-sdk/network
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
@@ -236,8 +261,8 @@ github.com/gpustack/gguf-parser-go/util/osx
 github.com/gpustack/gguf-parser-go/util/ptr
 github.com/gpustack/gguf-parser-go/util/slicex
 github.com/gpustack/gguf-parser-go/util/stringx
-# github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.1
-## explicit; go 1.22
+# github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3
+## explicit; go 1.23.0
 github.com/grpc-ecosystem/grpc-gateway/v2/internal/httprule
 github.com/grpc-ecosystem/grpc-gateway/v2/runtime
 github.com/grpc-ecosystem/grpc-gateway/v2/utilities
@@ -424,8 +449,8 @@ go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc/internal/envco
 go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc/internal/oconf
 go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc/internal/retry
 go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc/internal/transform
-# go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.35.0
-## explicit; go 1.22.0
+# go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.36.0
+## explicit; go 1.23.0
 go.opentelemetry.io/otel/exporters/otlp/otlptrace
 go.opentelemetry.io/otel/exporters/otlp/otlptrace/internal/tracetransform
 # go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.35.0
@@ -462,8 +487,8 @@ go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/trace/embedded
 go.opentelemetry.io/otel/trace/internal/telemetry
 go.opentelemetry.io/otel/trace/noop
-# go.opentelemetry.io/proto/otlp v1.5.0
-## explicit; go 1.22.0
+# go.opentelemetry.io/proto/otlp v1.7.0
+## explicit; go 1.23.0
 go.opentelemetry.io/proto/otlp/collector/metrics/v1
 go.opentelemetry.io/proto/otlp/collector/trace/v1
 go.opentelemetry.io/proto/otlp/common/v1
@@ -515,8 +540,6 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.9.0
-## explicit; go 1.18
 # golang.org/x/tools v0.34.0
 ## explicit; go 1.23.0
 golang.org/x/tools/cmd/stringer
@@ -555,10 +578,10 @@ gonum.org/v1/gonum/lapack
 gonum.org/v1/gonum/lapack/gonum
 gonum.org/v1/gonum/lapack/lapack64
 gonum.org/v1/gonum/mat
-# google.golang.org/genproto/googleapis/api v0.0.0-20250219182151-9fdb1cabc7b2
+# google.golang.org/genproto/googleapis/api v0.0.0-20250528174236-200df99c418a
 ## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20250414145226-207652e42e2e
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20250528174236-200df99c418a
 ## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
@@ -671,8 +694,6 @@ gopkg.in/tomb.v1
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# gotest.tools/v3 v3.5.2
-## explicit; go 1.17
 # howett.net/plist v1.0.1
 ## explicit; go 1.12
 howett.net/plist
