@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bytes"
+	"strings"
 	"time"
 
 	"github.com/docker/go-units"
@@ -50,8 +51,12 @@ func psTable(ps []desktop.BackendStatus) string {
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 
 	for _, status := range ps {
+		modelName := status.ModelName
+		if strings.HasPrefix(modelName, "sha256:") {
+			modelName = modelName[7:19]
+		}
 		table.Append([]string{
-			status.ModelName,
+			modelName,
 			status.BackendName,
 			status.Mode,
 			units.HumanDuration(time.Since(status.LastUsed)) + " ago",
