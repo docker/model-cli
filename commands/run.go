@@ -37,17 +37,15 @@ func newRunCmd() *cobra.Command {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
 
-			modelDetail, err := desktopClient.Inspect(model, false)
+			_, err := desktopClient.Inspect(model, false)
 			if err != nil {
 				if !errors.Is(err, desktop.ErrNotFound) {
-					return handleNotRunningError(handleClientError(err, "Failed to list models"))
+					return handleNotRunningError(handleClientError(err, "Failed to inspect model"))
 				}
 				cmd.Println("Unable to find model '" + model + "' locally. Pulling from the server.")
 				if err := pullModel(cmd, desktopClient, model); err != nil {
 					return err
 				}
-			} else if model != modelDetail.Tags[0] {
-				model = modelDetail.Tags[0]
 			}
 
 			if prompt != "" {
