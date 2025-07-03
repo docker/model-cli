@@ -1,9 +1,18 @@
 package desktop
 
-// ProgressMessage represents a message sent during model pull operations
+// ProgressMessage represents a structured message for progress reporting
 type ProgressMessage struct {
 	Type    string `json:"type"`    // "progress", "success", or "error"
-	Message string `json:"message"` // Human-readable message
+	Message string `json:"message"` // Deprecated: the message should be defined by clients based on Message.Total and Message.Layer
+	Total   uint64 `json:"total"`
+	Pulled  uint64 `json:"pulled"` // Deprecated: use Layer.Current
+	Layer   Layer  `json:"layer"`  // Current layer information
+}
+
+type Layer struct {
+	ID      string // Layer ID
+	Size    uint64 // Layer size
+	Current uint64 // Current bytes transferred
 }
 
 type OpenAIChatMessage struct {
