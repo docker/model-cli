@@ -88,7 +88,7 @@ func newUpCommand() *cobra.Command {
 			case types.ModelRunnerEngineKindCloud:
 				fallthrough
 			case types.ModelRunnerEngineKindMoby:
-				_ = setenv("URL", fmt.Sprintf("http://%s:%d/engines/v1", standalone.gatewayIP, standalone.gatewayPort))
+				_ = setenv("URL", fmt.Sprintf("http://%s:%d/engines/v1/", standalone.gatewayIP, standalone.gatewayPort))
 			default:
 				return fmt.Errorf("unhandled engine kind: %v", kind)
 			}
