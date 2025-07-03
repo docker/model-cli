@@ -82,7 +82,7 @@ func jsonStatus(standalone *standaloneRunner, status desktop.Status, backendStat
 	case types.ModelRunnerEngineKindCloud:
 		fallthrough
 	case types.ModelRunnerEngineKindMoby:
-		endpoint = fmt.Sprintf("http://%s:%d/engines/v1", standalone.gatewayIP, standalone.gatewayPort)
+		endpoint = fmt.Sprintf("http://%s:%d/engines/v1/", standalone.gatewayIP, standalone.gatewayPort)
 	default:
 		return fmt.Errorf("unhandled engine kind: %v", kind)
 	}
