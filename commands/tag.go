@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 
+	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/spf13/cobra"
@@ -28,6 +29,7 @@ func newTagCmd() *cobra.Command {
 			}
 			return tagModel(cmd, desktopClient, args[0], args[1])
 		},
+		ValidArgsFunction: completion.ModelNames(getDesktopClient, 1),
 	}
 	return c
 }
