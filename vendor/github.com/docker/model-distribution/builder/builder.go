@@ -44,6 +44,17 @@ func (b *Builder) WithContextSize(size uint64) *Builder {
 	}
 }
 
+// WithMultimodalProjector adds a Multimodal projector file to the artifact
+func (b *Builder) WithMultimodalProjector(path string) (*Builder, error) {
+	mmprojLayer, err := partial.NewLayer(path, types.MediaTypeMultimodalProjector)
+	if err != nil {
+		return nil, fmt.Errorf("mmproj layer from %q: %w", path, err)
+	}
+	return &Builder{
+		model: mutate.AppendLayers(b.model, mmprojLayer),
+	}, nil
+}
+
 // Target represents a build target
 type Target interface {
 	Write(context.Context, types.ModelArtifact, io.Writer) error

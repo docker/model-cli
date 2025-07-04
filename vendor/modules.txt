@@ -144,7 +144,7 @@ github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
-# github.com/docker/model-distribution v0.0.0-20250627163720-aff34abcf3e0
+# github.com/docker/model-distribution v0.0.0-20250710123110-a633223e127e
 ## explicit; go 1.23.0
 github.com/docker/model-distribution/builder
 github.com/docker/model-distribution/distribution
@@ -155,7 +155,7 @@ github.com/docker/model-distribution/internal/progress
 github.com/docker/model-distribution/internal/store
 github.com/docker/model-distribution/registry
 github.com/docker/model-distribution/types
-# github.com/docker/model-runner v0.0.0-20250627142917-26a0a73fbbc0
+# github.com/docker/model-runner v0.0.0-20250711130825-8907b3ddf82e
 ## explicit; go 1.23.7
 github.com/docker/model-runner/pkg/diskusage
 github.com/docker/model-runner/pkg/environment

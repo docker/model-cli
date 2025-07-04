@@ -132,7 +132,20 @@ func (c *Client) NewTarget(tag string) (*Target, error) {
 }
 
 func (t *Target) Write(ctx context.Context, model types.ModelArtifact, progressWriter io.Writer) error {
-	pr := progress.NewProgressReporter(progressWriter, progress.PushMsg, nil)
+	layers, err := model.Layers()
+	if err != nil {
+		return fmt.Errorf("getting layers: %w", err)
+	}
+
+	imageSize := int64(0)
+	for _, layer := range layers {
+		size, err := layer.Size()
+		if err != nil {
+			return fmt.Errorf("getting layer size: %w", err)
+		}
+		imageSize += size
+	}
+	pr := progress.NewProgressReporter(progressWriter, progress.PushMsg, imageSize, nil)
 	defer pr.Wait()
 
 	// Set up authentication options

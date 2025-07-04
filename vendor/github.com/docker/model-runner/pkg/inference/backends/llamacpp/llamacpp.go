@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"strings"
 
 	"github.com/docker/model-runner/pkg/diskusage"
@@ -122,10 +121,9 @@ func (l *llamaCpp) Install(ctx context.Context, httpClient *http.Client) error {
 
 // Run implements inference.Backend.Run.
 func (l *llamaCpp) Run(ctx context.Context, socket, model string, mode inference.BackendMode, config *inference.BackendConfiguration) error {
-	modelPath, err := l.modelManager.GetModelPath(model)
-	l.log.Infof("Model path: %s", modelPath)
+	mdl, err := l.modelManager.GetModel(model)
 	if err != nil {
-		return fmt.Errorf("failed to get model path: %w", err)
+		return fmt.Errorf("failed to get model: %w", err)
 	}
 
 	if err := os.RemoveAll(socket); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -138,13 +136,9 @@ func (l *llamaCpp) Run(ctx context.Context, socket, model string, mode inference
 		binPath = l.updatedServerStoragePath
 	}
 
-	args := l.config.GetArgs(modelPath, socket, mode)
-
-	if config != nil {
-		if config.ContextSize >= 0 {
-			args = append(args, "--ctx-size", strconv.Itoa(int(config.ContextSize)))
-		}
-		args = append(args, config.RuntimeFlags...)
+	args, err := l.config.GetArgs(mdl, socket, mode, config)
+	if err != nil {
+		return fmt.Errorf("failed to get args for llama.cpp: %w", err)
 	}
 
 	l.log.Infof("llamaCppArgs: %v", args)

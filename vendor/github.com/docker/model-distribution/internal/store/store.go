@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/docker/model-distribution/internal/progress"
-
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
@@ -93,14 +92,14 @@ func (s *LocalStore) List() ([]IndexEntry, error) {
 }
 
 // Delete deletes a model by reference
-func (s *LocalStore) Delete(ref string) error {
+func (s *LocalStore) Delete(ref string) (string, []string, error) {
 	idx, err := s.readIndex()
 	if err != nil {
-		return fmt.Errorf("reading models file: %w", err)
+		return "", nil, fmt.Errorf("reading models file: %w", err)
 	}
 	model, _, ok := idx.Find(ref)
 	if !ok {
-		return ErrModelNotFound
+		return "", nil, ErrModelNotFound
 	}
 
 	// Remove manifest file
@@ -140,7 +139,7 @@ func (s *LocalStore) Delete(ref string) error {
 
 	idx = idx.Remove(model.ID)
 
-	return s.writeIndex(idx)
+	return model.ID, model.Tags, s.writeIndex(idx)
 }
 
 // AddTags adds tags to an existing model
@@ -160,15 +159,25 @@ func (s *LocalStore) AddTags(ref string, newTags []string) error {
 }
 
 // RemoveTags removes tags from models
-func (s *LocalStore) RemoveTags(tags []string) error {
+func (s *LocalStore) RemoveTags(tags []string) ([]string, error) {
 	index, err := s.readIndex()
 	if err != nil {
-		return fmt.Errorf("reading modelss index: %w", err)
+		return nil, fmt.Errorf("reading modelss index: %w", err)
 	}
+	var tagRefs []string
 	for _, tag := range tags {
-		index = index.UnTag(tag)
+		tagRef, newIndex, err := index.UnTag(tag)
+		if err != nil {
+			// Try to save progress before returning error.
+			if writeIndexErr := s.writeIndex(newIndex); writeIndexErr != nil {
+				return tagRefs, fmt.Errorf("untagging model: %w, also failed to save: %w", err, writeIndexErr)
+			}
+			return tagRefs, fmt.Errorf("untagging model: %w", err)
+		}
+		tagRefs = append(tagRefs, tagRef.Name())
+		index = newIndex
 	}
-	return s.writeIndex(index)
+	return tagRefs, s.writeIndex(index)
 }
 
 // Version returns the store version
@@ -188,17 +197,25 @@ func (s *LocalStore) Write(mdl v1.Image, tags []string, w io.Writer) error {
 		return fmt.Errorf("writing config file: %w", err)
 	}
 
-	// Write the blobs
 	layers, err := mdl.Layers()
 	if err != nil {
 		return fmt.Errorf("getting layers: %w", err)
+	}
+
+	imageSize := int64(0)
+	for _, layer := range layers {
+		size, err := layer.Size()
+		if err != nil {
+			return fmt.Errorf("getting layer size: %w", err)
+		}
+		imageSize += size
 	}
 
 	for _, layer := range layers {
 		var pr *progress.Reporter
 		var progressChan chan<- v1.Update
 		if w != nil {
-			pr = progress.NewProgressReporter(w, progress.PullMsg, layer)
+			pr = progress.NewProgressReporter(w, progress.PullMsg, imageSize, layer)
 			progressChan = pr.Updates()
 		}
 

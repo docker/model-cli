@@ -235,7 +235,7 @@ func (s *Scheduler) handleOpenAIInference(w http.ResponseWriter, r *http.Request
 			return
 		}
 		// Non-blocking call to track the model usage.
-		s.tracker.TrackModel(model)
+		s.tracker.TrackModel(model, r.UserAgent())
 	}
 
 	// Request a runner to execute the request and defer its release.
@@ -409,6 +409,11 @@ func (s *Scheduler) Configure(w http.ResponseWriter, r *http.Request) {
 	var runnerConfig inference.BackendConfiguration
 	runnerConfig.ContextSize = configureRequest.ContextSize
 	runnerConfig.RuntimeFlags = runtimeFlags
+
+	if model, err := s.modelManager.GetModel(configureRequest.Model); err == nil {
+		// Configure is called by compose for each model.
+		s.tracker.TrackModel(model, r.UserAgent())
+	}
 
 	if err := s.loader.setRunnerConfig(r.Context(), backend.Name(), configureRequest.Model, inference.BackendModeCompletion, runnerConfig); err != nil {
 		s.log.Warnf("Failed to configure %s runner for %s: %s", backend.Name(), configureRequest.Model, err)

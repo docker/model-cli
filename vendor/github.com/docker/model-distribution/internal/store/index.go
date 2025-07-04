@@ -39,10 +39,10 @@ func (i Index) Tag(reference string, tag string) (Index, error) {
 	return result, nil
 }
 
-func (i Index) UnTag(tag string) Index {
+func (i Index) UnTag(tag string) (name.Tag, Index, error) {
 	tagRef, err := name.NewTag(tag)
 	if err != nil {
-		return Index{}
+		return name.Tag{}, Index{}, err
 	}
 
 	result := Index{
@@ -52,7 +52,7 @@ func (i Index) UnTag(tag string) Index {
 		result.Models = append(result.Models, entry.UnTag(tagRef))
 	}
 
-	return result
+	return tagRef, result, nil
 }
 
 func (i Index) Find(reference string) (IndexEntry, int, bool) {
