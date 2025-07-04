@@ -8,6 +8,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
 	"github.com/docker/model-distribution/builder"
 	"github.com/docker/model-distribution/registry"
@@ -67,6 +68,7 @@ func newPackagedCmd() *cobra.Command {
 			}
 			return nil
 		},
+		ValidArgsFunction: completion.NoComplete,
 	}
 
 	c.Flags().StringVar(&opts.ggufPath, "gguf", "", "absolute path to gguf file (required)")
