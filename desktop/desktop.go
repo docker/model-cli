@@ -429,19 +429,23 @@ func (c *Client) Remove(models []string, force bool) (string, error) {
 		}
 		defer resp.Body.Close()
 
-		if resp.StatusCode != http.StatusOK {
+		var bodyStr string
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			bodyStr = fmt.Sprintf("(failed to read response body: %v)", err)
+		} else {
+			bodyStr = string(body)
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			modelRemoved += bodyStr
+		} else {
 			if resp.StatusCode == http.StatusNotFound {
 				return modelRemoved, fmt.Errorf("no such model: %s", model)
 			}
-			var bodyStr string
-			body, err := io.ReadAll(resp.Body)
-			if err != nil {
-				bodyStr = fmt.Sprintf("(failed to read response body: %v)", err)
-			} else {
-				bodyStr = string(body)
-			}
 			return modelRemoved, fmt.Errorf("removing %s failed with status %s: %s", model, resp.Status, bodyStr)
 		}
+
 		modelRemoved += fmt.Sprintf("Model %s removed successfully\n", model)
 	}
 	return modelRemoved, nil
