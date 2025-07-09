@@ -193,8 +193,7 @@ func TestTagHuggingFaceModel(t *testing.T) {
 		Body:       io.NopCloser(bytes.NewBufferString("Tag created successfully")),
 	}, nil)
 
-	_, err := client.Tag(sourceModel, targetRepo, targetTag)
-	assert.NoError(t, err)
+	assert.NoError(t, client.Tag(sourceModel, targetRepo, targetTag))
 }
 
 func TestInspectOpenAIHuggingFaceModel(t *testing.T) {

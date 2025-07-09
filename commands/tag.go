@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/docker/model-cli/desktop"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -33,20 +34,21 @@ func newTagCmd() *cobra.Command {
 }
 
 func tagModel(cmd *cobra.Command, desktopClient *desktop.Client, source, target string) error {
-	// Parse the target to extract repo and tag
+	// Ensure tag is valid
 	tag, err := name.NewTag(target)
 	if err != nil {
 		return fmt.Errorf("invalid tag: %w", err)
 	}
-	targetRepo := tag.Repository.String()
-	targetTag := tag.TagStr()
-
-	// Make the POST request
-	resp, err := desktopClient.Tag(source, targetRepo, targetTag)
-	if err != nil {
+	// Make tag request with model runner client
+	if err := desktopClient.Tag(source, parseRepo(tag), tag.TagStr()); err != nil {
 		return fmt.Errorf("failed to tag model: %w", err)
 	}
-
-	cmd.Println(resp)
+	cmd.Printf("Model %q tagged successfully with %q\n", source, target)
 	return nil
+}
+
+// parseRepo returns the repo portion of the original target string. It does not include implicit
+// index.docker.io when the registry is omitted.
+func parseRepo(tag name.Tag) string {
+	return strings.TrimSuffix(tag.String(), ":"+tag.TagStr())
 }
