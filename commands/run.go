@@ -14,12 +14,20 @@ import (
 
 func newRunCmd() *cobra.Command {
 	var debug bool
+	var backend string
 
 	const cmdArgs = "MODEL [PROMPT]"
 	c := &cobra.Command{
 		Use:   "run " + cmdArgs,
 		Short: "Run a model and interact with it using a submitted prompt or chat mode",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate backend if specified
+			if backend != "" {
+				if err := validateBackend(backend); err != nil {
+					return err
+				}
+			}
+
 			model := args[0]
 			prompt := ""
 			if len(args) == 1 {
@@ -49,7 +57,7 @@ func newRunCmd() *cobra.Command {
 			}
 
 			if prompt != "" {
-				if err := desktopClient.Chat(model, prompt); err != nil {
+				if err := desktopClient.Chat(backend, model, prompt); err != nil {
 					return handleClientError(err, "Failed to generate a response")
 				}
 				cmd.Println()
@@ -73,7 +81,7 @@ func newRunCmd() *cobra.Command {
 					continue
 				}
 
-				if err := desktopClient.Chat(model, userInput); err != nil {
+				if err := desktopClient.Chat(backend, model, userInput); err != nil {
 					cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
 					cmd.Print("> ")
 					continue
@@ -104,6 +112,7 @@ func newRunCmd() *cobra.Command {
 	}
 
 	c.Flags().BoolVar(&debug, "debug", false, "Enable debug logging")
+	c.Flags().StringVar(&backend, "backend", "", "Specify the backend to use (llama.cpp, openai)")
 
 	return c
 }

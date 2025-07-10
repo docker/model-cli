@@ -329,7 +329,7 @@ func (c *Client) fullModelID(id string) (string, error) {
 	return "", fmt.Errorf("model with ID %s not found", id)
 }
 
-func (c *Client) Chat(model, prompt string) error {
+func (c *Client) Chat(backend, model, prompt string) error {
 	model = normalizeHuggingFaceModelName(model)
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
@@ -354,14 +354,20 @@ func (c *Client) Chat(model, prompt string) error {
 		return fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	chatCompletionsPath := inference.InferencePrefix + "/v1/chat/completions"
+	var completionsPath string
+	if backend != "" {
+		completionsPath = inference.InferencePrefix + "/" + backend + "/v1/chat/completions"
+	} else {
+		completionsPath = inference.InferencePrefix + "/v1/chat/completions"
+	}
+
 	resp, err := c.doRequest(
 		http.MethodPost,
-		chatCompletionsPath,
+		completionsPath,
 		bytes.NewReader(jsonData),
 	)
 	if err != nil {
-		return c.handleQueryError(err, chatCompletionsPath)
+		return c.handleQueryError(err, completionsPath)
 	}
 	defer resp.Body.Close()
 
