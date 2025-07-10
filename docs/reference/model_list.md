@@ -9,11 +9,12 @@ List the models pulled to your local environment
 
 ### Options
 
-| Name            | Type   | Default | Description                     |
-|:----------------|:-------|:--------|:--------------------------------|
-| `--json`        | `bool` |         | List models in a JSON format    |
-| `--openai`      | `bool` |         | List models in an OpenAI format |
-| `-q`, `--quiet` | `bool` |         | Only show model IDs             |
+| Name            | Type     | Default | Description                                    |
+|:----------------|:---------|:--------|:-----------------------------------------------|
+| `--backend`     | `string` |         | Specify the backend to use (llama.cpp, openai) |
+| `--json`        | `bool`   |         | List models in a JSON format                   |
+| `--openai`      | `bool`   |         | List models in an OpenAI format                |
+| `-q`, `--quiet` | `bool`   |         | Only show model IDs                            |
 
 
 <!---MARKER_GEN_END-->
