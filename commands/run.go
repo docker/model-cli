@@ -12,6 +12,71 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// readMultilineInput reads input from stdin, supporting both single-line and multiline input.
+// For multiline input, it detects triple-quoted strings and shows continuation prompts.
+func readMultilineInput(cmd *cobra.Command, scanner *bufio.Scanner) (string, error) {
+	cmd.Print("> ")
+
+	if !scanner.Scan() {
+		if err := scanner.Err(); err != nil {
+			return "", fmt.Errorf("error reading input: %v", err)
+		}
+		return "", fmt.Errorf("EOF")
+	}
+
+	line := scanner.Text()
+
+	// Check if this is the start of a multiline input (triple quotes)
+	tripleQuoteStart := ""
+	if strings.HasPrefix(line, `"""`) {
+		tripleQuoteStart = `"""`
+	} else if strings.HasPrefix(line, "'''") {
+		tripleQuoteStart = "'''"
+	}
+
+	// If no triple quotes, return a single line
+	if tripleQuoteStart == "" {
+		return line, nil
+	}
+
+	// Check if the triple quotes are closed on the same line
+	restOfLine := line[3:]
+	if strings.HasSuffix(restOfLine, tripleQuoteStart) && len(restOfLine) >= 3 {
+		// Complete multiline string on single line
+		return line, nil
+	}
+
+	// Start collecting multiline input
+	var multilineInput strings.Builder
+	multilineInput.WriteString(line)
+	multilineInput.WriteString("\n")
+
+	// Continue reading lines until we find the closing triple quotes
+	for {
+		cmd.Print("... ")
+
+		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				return "", fmt.Errorf("error reading input: %v", err)
+			}
+			return "", fmt.Errorf("unclosed multiline input (EOF)")
+		}
+
+		line = scanner.Text()
+		multilineInput.WriteString(line)
+
+		// Check if this line contains the closing triple quotes
+		if strings.Contains(line, tripleQuoteStart) {
+			// Found closing quotes, we're done
+			break
+		}
+
+		multilineInput.WriteString("\n")
+	}
+
+	return multilineInput.String(), nil
+}
+
 func newRunCmd() *cobra.Command {
 	var debug bool
 
@@ -58,32 +123,32 @@ func newRunCmd() *cobra.Command {
 
 			scanner := bufio.NewScanner(os.Stdin)
 			cmd.Println("Interactive chat mode started. Type '/bye' to exit.")
-			cmd.Print("> ")
 
-			for scanner.Scan() {
-				userInput := scanner.Text()
+			for {
+				userInput, err := readMultilineInput(cmd, scanner)
+				if err != nil {
+					if err.Error() == "EOF" {
+						cmd.Println("\nChat session ended.")
+						break
+					}
+					return fmt.Errorf("Error reading input: %v", err)
+				}
 
-				if strings.ToLower(userInput) == "/bye" {
+				if strings.ToLower(strings.TrimSpace(userInput)) == "/bye" {
 					cmd.Println("Chat session ended.")
 					break
 				}
 
 				if strings.TrimSpace(userInput) == "" {
-					cmd.Print("> ")
 					continue
 				}
 
 				if err := desktopClient.Chat(model, userInput); err != nil {
 					cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
-					cmd.Print("> ")
 					continue
 				}
 
-				cmd.Print("\n> ")
-			}
-
-			if err := scanner.Err(); err != nil {
-				return fmt.Errorf("Error reading input: %v\n", err)
+				cmd.Println()
 			}
 			return nil
 		},
