@@ -155,7 +155,7 @@ func (c *Client) Pull(model string, progress func(string)) (string, bool, error)
 				current += layerCurrent
 			}
 
-			progress(fmt.Sprintf("Downloaded %s of %s", units.HumanSize(float64(current)), units.HumanSize(float64(progressMsg.Total))))
+			progress(fmt.Sprintf("Downloaded %s of %s", units.CustomSize("%.2f%s", float64(current), 1000.0, []string{"B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"}), units.CustomSize("%.2f%s", float64(progressMsg.Total), 1000.0, []string{"B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"})))
 			progressShown = true
 		case "error":
 			return "", progressShown, fmt.Errorf("error pulling model: %s", progressMsg.Message)
