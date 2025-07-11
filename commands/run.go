@@ -51,14 +51,17 @@ func newRunCmd() *cobra.Command {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
 
-			_, err := desktopClient.Inspect(model, false)
-			if err != nil {
-				if !errors.Is(err, desktop.ErrNotFound) {
-					return handleNotRunningError(handleClientError(err, "Failed to inspect model"))
-				}
-				cmd.Println("Unable to find model '" + model + "' locally. Pulling from the server.")
-				if err := pullModel(cmd, desktopClient, model); err != nil {
-					return err
+			// Do not validate the model in case of using OpenAI's backend, let OpenAI handle it
+			if backend != "openai" {
+				_, err := desktopClient.Inspect(model, false)
+				if err != nil {
+					if !errors.Is(err, desktop.ErrNotFound) {
+						return handleNotRunningError(handleClientError(err, "Failed to inspect model"))
+					}
+					cmd.Println("Unable to find model '" + model + "' locally. Pulling from the server.")
+					if err := pullModel(cmd, desktopClient, model); err != nil {
+						return err
+					}
 				}
 			}
 
