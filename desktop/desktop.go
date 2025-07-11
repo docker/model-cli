@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/docker/go-units"
+
 	"github.com/docker/model-runner/pkg/inference"
 	dmrm "github.com/docker/model-runner/pkg/inference/models"
 	"github.com/docker/model-runner/pkg/inference/scheduling"
@@ -124,6 +126,8 @@ func (c *Client) Pull(model string, progress func(string)) (string, bool, error)
 	}
 
 	progressShown := false
+	current := uint64(0)                     // Track cumulative progress across all layers
+	layerProgress := make(map[string]uint64) // Track progress per layer ID
 
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
@@ -141,7 +145,17 @@ func (c *Client) Pull(model string, progress func(string)) (string, bool, error)
 		// Handle different message types
 		switch progressMsg.Type {
 		case "progress":
-			progress(progressMsg.Message)
+			// Update the current progress for this layer
+			layerID := progressMsg.Layer.ID
+			layerProgress[layerID] = progressMsg.Layer.Current
+
+			// Sum all layer progress values
+			current = uint64(0)
+			for _, layerCurrent := range layerProgress {
+				current += layerCurrent
+			}
+
+			progress(fmt.Sprintf("Downloaded %s of %s", units.HumanSize(float64(current)), units.HumanSize(float64(progressMsg.Total))))
 			progressShown = true
 		case "error":
 			return "", progressShown, fmt.Errorf("error pulling model: %s", progressMsg.Message)
