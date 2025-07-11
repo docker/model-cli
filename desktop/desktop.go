@@ -222,14 +222,27 @@ func (c *Client) List() ([]dmrm.Model, error) {
 	return modelsJson, nil
 }
 
-func (c *Client) ListOpenAI() (dmrm.OpenAIModelList, error) {
+func (c *Client) ListOpenAI(apiKey string) (dmrm.OpenAIModelList, error) {
 	modelsRoute := inference.InferencePrefix + "/v1/models"
-	rawResponse, err := c.listRaw(modelsRoute, "")
+
+	// Use doRequestWithAuth to support API key authentication
+	resp, err := c.doRequestWithAuth(http.MethodGet, modelsRoute, nil, "openai", apiKey)
 	if err != nil {
-		return dmrm.OpenAIModelList{}, err
+		return dmrm.OpenAIModelList{}, c.handleQueryError(err, modelsRoute)
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return dmrm.OpenAIModelList{}, fmt.Errorf("failed to list models: %s", resp.Status)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return dmrm.OpenAIModelList{}, fmt.Errorf("failed to read response body: %w", err)
+	}
+
 	var modelsJson dmrm.OpenAIModelList
-	if err := json.Unmarshal(rawResponse, &modelsJson); err != nil {
+	if err := json.Unmarshal(body, &modelsJson); err != nil {
 		return modelsJson, fmt.Errorf("failed to unmarshal response body: %w", err)
 	}
 	return modelsJson, nil

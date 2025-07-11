@@ -35,6 +35,15 @@ func newListCmd() *cobra.Command {
 				return fmt.Errorf("--quiet flag cannot be used with --openai flag")
 			}
 
+			// Validate API key for OpenAI backend
+			var apiKey string
+			if backend == "openai" {
+				apiKey = os.Getenv("OPENAI_API_KEY")
+				if apiKey == "" {
+					return fmt.Errorf("OPENAI_API_KEY environment variable is required when using OpenAI backend")
+				}
+			}
+
 			// If we're doing an automatic install, only show the installation
 			// status if it won't corrupt machine-readable output.
 			var standaloneInstallPrinter standalone.StatusPrinter
@@ -44,7 +53,7 @@ func newListCmd() *cobra.Command {
 			if _, err := ensureStandaloneRunnerAvailable(cmd.Context(), standaloneInstallPrinter); err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
-			models, err := listModels(openai, backend, desktopClient, quiet, jsonFormat)
+			models, err := listModels(openai, backend, desktopClient, quiet, jsonFormat, apiKey)
 			if err != nil {
 				return err
 			}
@@ -60,9 +69,9 @@ func newListCmd() *cobra.Command {
 	return c
 }
 
-func listModels(openai bool, backend string, desktopClient *desktop.Client, quiet bool, jsonFormat bool) (string, error) {
+func listModels(openai bool, backend string, desktopClient *desktop.Client, quiet bool, jsonFormat bool, apiKey string) (string, error) {
 	if openai || backend == "openai" {
-		models, err := desktopClient.ListOpenAI()
+		models, err := desktopClient.ListOpenAI(apiKey)
 		if err != nil {
 			err = handleClientError(err, "Failed to list models")
 			return "", handleNotRunningError(err)
