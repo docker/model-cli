@@ -15,7 +15,6 @@ import (
 func newRunCmd() *cobra.Command {
 	var debug bool
 	var backend string
-	var apiKey string
 
 	const cmdArgs = "MODEL [PROMPT]"
 	c := &cobra.Command{
@@ -30,8 +29,12 @@ func newRunCmd() *cobra.Command {
 			}
 
 			// Validate API key for OpenAI backend
-			if backend == "openai" && apiKey == "" {
-				return fmt.Errorf("--api-key is required when using --backend=openai")
+			var apiKey string
+			if backend == "openai" {
+				apiKey = os.Getenv("OPENAI_API_KEY")
+				if apiKey == "" {
+					return fmt.Errorf("OPENAI_API_KEY environment variable is required when using --backend=openai")
+				}
 			}
 
 			model := args[0]
@@ -122,7 +125,6 @@ func newRunCmd() *cobra.Command {
 
 	c.Flags().BoolVar(&debug, "debug", false, "Enable debug logging")
 	c.Flags().StringVar(&backend, "backend", "", "Specify the backend to use (llama.cpp, openai)")
-	c.Flags().StringVar(&apiKey, "api-key", "", "API key for external backends (required for OpenAI)")
 
 	return c
 }
