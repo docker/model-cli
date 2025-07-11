@@ -633,7 +633,7 @@ func (c *Client) handleQueryError(err error, path string) error {
 	return fmt.Errorf("error querying %s: %w", path, err)
 }
 
-func (c *Client) Tag(source, targetRepo, targetTag string) (string, error) {
+func (c *Client) Tag(source, targetRepo, targetTag string) error {
 	source = normalizeHuggingFaceModelName(source)
 	// Check if the source is a model ID, and expand it if necessary
 	if !strings.Contains(strings.Trim(source, "/"), "/") {
@@ -653,19 +653,17 @@ func (c *Client) Tag(source, targetRepo, targetTag string) (string, error) {
 
 	resp, err := c.doRequest(http.MethodPost, tagPath, nil)
 	if err != nil {
-		return "", c.handleQueryError(err, tagPath)
+		return c.handleQueryError(err, tagPath)
 	}
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("tagging failed with status %s: %s", resp.Status, string(body))
-	}
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
+		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	return string(body), nil
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("tagging failed with status %s: %s", resp.Status, string(body))
+	}
+
+	return nil
 }
