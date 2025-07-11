@@ -114,6 +114,10 @@ func (m *Model) GGUFPath() (string, error) {
 	return mdpartial.GGUFPath(m)
 }
 
+func (m *Model) MMPROJPath() (string, error) {
+	return mdpartial.MMPROJPath(m)
+}
+
 func (m *Model) Tags() []string {
 	return m.tags
 }

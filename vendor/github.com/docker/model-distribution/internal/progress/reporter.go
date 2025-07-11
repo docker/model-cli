@@ -24,21 +24,21 @@ type Layer struct {
 
 // Message represents a structured message for progress reporting
 type Message struct {
-	Type    string `json:"type"`            // "progress", "success", or "error"
-	Message string `json:"message"`         // Human-readable message
-	Total   uint64 `json:"total"`           // Deprecated: use Layer.Size
-	Pulled  uint64 `json:"pulled"`          // Deprecated: use Layer.Current
-	Layer   Layer  `json:"layer,omitempty"` // Current layer information
+	Type    string `json:"type"`    // "progress", "success", or "error"
+	Message string `json:"message"` // Deprecated: the message should be defined by clients based on Message.Total and Message.Layer
+	Total   uint64 `json:"total"`
+	Pulled  uint64 `json:"pulled"` // Deprecated: use Layer.Current
+	Layer   Layer  `json:"layer"`  // Current layer information
 }
 
 type Reporter struct {
-	progress    chan v1.Update
-	done        chan struct{}
-	err         error
-	out         io.Writer
-	format      progressF
-	layer       v1.Layer
-	TotalLayers int // Total number of layers
+	progress  chan v1.Update
+	done      chan struct{}
+	err       error
+	out       io.Writer
+	format    progressF
+	layer     v1.Layer
+	imageSize uint64
 }
 
 type progressF func(update v1.Update) string
@@ -51,13 +51,14 @@ func PushMsg(update v1.Update) string {
 	return fmt.Sprintf("Uploaded: %.2f MB", float64(update.Complete)/1024/1024)
 }
 
-func NewProgressReporter(w io.Writer, msgF progressF, layer v1.Layer) *Reporter {
+func NewProgressReporter(w io.Writer, msgF progressF, imageSize int64, layer v1.Layer) *Reporter {
 	return &Reporter{
-		out:      w,
-		progress: make(chan v1.Update, 1),
-		done:     make(chan struct{}),
-		format:   msgF,
-		layer:    layer,
+		out:       w,
+		progress:  make(chan v1.Update, 1),
+		done:      make(chan struct{}),
+		format:    msgF,
+		layer:     layer,
+		imageSize: safeUint64(imageSize),
 	}
 }
 
@@ -81,7 +82,7 @@ func (r *Reporter) Updates() chan<- v1.Update {
 				continue // If we fail to write progress, don't try again
 			}
 			now := time.Now()
-			var total int64
+			var layerSize uint64
 			var layerID string
 			if r.layer != nil { // In case of Push there is no layer yet
 				id, err := r.layer.DiffID()
@@ -95,16 +96,17 @@ func (r *Reporter) Updates() chan<- v1.Update {
 					r.err = err
 					continue
 				}
-				total = size
+				layerSize = safeUint64(size)
 			} else {
-				total = p.Total
+				layerSize = safeUint64(p.Total)
 			}
 			incrementalBytes := p.Complete - lastComplete
 
 			// Only update if enough time has passed or enough bytes downloaded or finished
 			if now.Sub(lastUpdate) >= UpdateInterval ||
-				incrementalBytes >= MinBytesForUpdate {
-				if err := WriteProgress(r.out, r.format(p), safeUint64(total), safeUint64(p.Complete), layerID); err != nil {
+				incrementalBytes >= MinBytesForUpdate ||
+				safeUint64(p.Complete) == layerSize {
+				if err := WriteProgress(r.out, r.format(p), r.imageSize, layerSize, safeUint64(p.Complete), layerID); err != nil {
 					r.err = err
 				}
 				lastUpdate = now
@@ -123,15 +125,15 @@ func (r *Reporter) Wait() error {
 }
 
 // WriteProgress writes a progress update message
-func WriteProgress(w io.Writer, msg string, total, current uint64, layerID string) error {
+func WriteProgress(w io.Writer, msg string, imageSize, layerSize, current uint64, layerID string) error {
 	return write(w, Message{
 		Type:    "progress",
 		Message: msg,
-		Total:   total,
+		Total:   imageSize,
 		Pulled:  current,
 		Layer: Layer{
 			ID:      layerID,
-			Size:    total,
+			Size:    layerSize,
 			Current: current,
 		},
 	})

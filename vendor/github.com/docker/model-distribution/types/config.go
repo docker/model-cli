@@ -1,7 +1,6 @@
 package types
 
 import (
-	"strings"
 	"time"
 
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -21,12 +20,11 @@ const (
 	// MediaTypeLicense indicates a plain text file containing a license
 	MediaTypeLicense = types.MediaType("application/vnd.docker.ai.license")
 
+	// MediaTypeMultimodalProjector indicates a Multimodal projector file
+	MediaTypeMultimodalProjector = types.MediaType("application/vnd.docker.ai.mmproj")
+
 	FormatGGUF = Format("gguf")
 )
-
-func IsModelConfig(mt types.MediaType) bool {
-	return strings.HasPrefix(string(mt), string(MediaTypeModelConfigV01))
-}
 
 type Format string
 

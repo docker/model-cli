@@ -29,7 +29,7 @@ func newRemoveCmd() *cobra.Command {
 			}
 			response, err := desktopClient.Remove(args, force)
 			if response != "" {
-				cmd.Println(response)
+				cmd.Print(response)
 			}
 			if err != nil {
 				err = handleClientError(err, "Failed to remove model")

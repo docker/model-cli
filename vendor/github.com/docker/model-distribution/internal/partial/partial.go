@@ -7,7 +7,6 @@ import (
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/partial"
 	ggcr "github.com/google/go-containerregistry/pkg/v1/types"
-	"github.com/pkg/errors"
 
 	"github.com/docker/model-distribution/types"
 )
@@ -67,22 +66,31 @@ type WithLayers interface {
 }
 
 func GGUFPath(i WithLayers) (string, error) {
+	return layerPathByMediaType(i, types.MediaTypeGGUF)
+}
+
+func MMPROJPath(i WithLayers) (string, error) {
+	return layerPathByMediaType(i, types.MediaTypeMultimodalProjector)
+}
+
+// layerPathByMediaType is a generic helper function that finds a layer by media type and returns its path
+func layerPathByMediaType(i WithLayers, mediaType ggcr.MediaType) (string, error) {
 	layers, err := i.Layers()
 	if err != nil {
 		return "", fmt.Errorf("get layers: %w", err)
 	}
 	for _, l := range layers {
 		mt, err := l.MediaType()
-		if err != nil || mt != types.MediaTypeGGUF {
+		if err != nil || mt != mediaType {
 			continue
 		}
-		ggufLayer, ok := l.(*Layer)
+		layer, ok := l.(*Layer)
 		if !ok {
-			return "", errors.New("gguf Layer is not available locally")
+			return "", fmt.Errorf("%s Layer is not available locally", mediaType)
 		}
-		return ggufLayer.Path, nil
+		return layer.Path, nil
 	}
-	return "", errors.New("model does not contain a GGUF layer")
+	return "", fmt.Errorf("model does not contain a %s layer", mediaType)
 }
 
 func ManifestForLayers(i WithLayers) (*v1.Manifest, error) {

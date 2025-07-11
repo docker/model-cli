@@ -1,9 +1,11 @@
 package llamacpp
 
 import (
+	"fmt"
 	"runtime"
 	"strconv"
 
+	"github.com/docker/model-distribution/types"
 	"github.com/docker/model-runner/pkg/inference"
 )
 
@@ -33,9 +35,19 @@ func NewDefaultLlamaCppConfig() *Config {
 }
 
 // GetArgs implements BackendConfig.GetArgs.
-func (c *Config) GetArgs(modelPath, socket string, mode inference.BackendMode) []string {
+func (c *Config) GetArgs(model types.Model, socket string, mode inference.BackendMode, config *inference.BackendConfiguration) ([]string, error) {
 	// Start with the arguments from LlamaCppConfig
 	args := append([]string{}, c.Args...)
+
+	modelPath, err := model.GGUFPath()
+	if err != nil {
+		return nil, fmt.Errorf("get gguf path: %w", err)
+	}
+
+	modelCfg, err := model.Config()
+	if err != nil {
+		return nil, fmt.Errorf("get model config: %w", err)
+	}
 
 	// Add model and socket arguments
 	args = append(args, "--model", modelPath, "--host", socket)
@@ -45,7 +57,26 @@ func (c *Config) GetArgs(modelPath, socket string, mode inference.BackendMode) [
 		args = append(args, "--embeddings")
 	}
 
-	return args
+	// Add arguments from model config
+	if modelCfg.ContextSize != nil {
+		args = append(args, "--ctx-size", strconv.FormatUint(*modelCfg.ContextSize, 10))
+	}
+
+	// Add arguments from backend config
+	if config != nil {
+		if config.ContextSize > 0 && !containsArg(args, "--ctx-size") {
+			args = append(args, "--ctx-size", strconv.FormatInt(config.ContextSize, 10))
+		}
+		args = append(args, config.RuntimeFlags...)
+	}
+
+	// Add arguments for Multimodal projector
+	path, err := model.MMPROJPath()
+	if path != "" && err == nil {
+		args = append(args, "--mmproj", path)
+	}
+
+	return args, nil
 }
 
 // containsArg checks if the given argument is already in the args slice.
