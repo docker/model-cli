@@ -10,6 +10,15 @@ usage: docker model run MODEL [PROMPT]
 pname: docker model
 plink: docker_model.yaml
 options:
+    - option: api-key
+      value_type: string
+      description: API key for external backends (required for OpenAI)
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: backend
       value_type: string
       description: Specify the backend to use (llama.cpp, openai)

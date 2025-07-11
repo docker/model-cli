@@ -5,10 +5,11 @@ Run a model and interact with it using a submitted prompt or chat mode
 
 ### Options
 
-| Name        | Type     | Default | Description                                    |
-|:------------|:---------|:--------|:-----------------------------------------------|
-| `--backend` | `string` |         | Specify the backend to use (llama.cpp, openai) |
-| `--debug`   | `bool`   |         | Enable debug logging                           |
+| Name        | Type     | Default | Description                                         |
+|:------------|:---------|:--------|:----------------------------------------------------|
+| `--api-key` | `string` |         | API key for external backends (required for OpenAI) |
+| `--backend` | `string` |         | Specify the backend to use (llama.cpp, openai)      |
+| `--debug`   | `bool`   |         | Enable debug logging                                |
 
 
 <!---MARKER_GEN_END-->

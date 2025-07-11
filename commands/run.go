@@ -15,6 +15,7 @@ import (
 func newRunCmd() *cobra.Command {
 	var debug bool
 	var backend string
+	var apiKey string
 
 	const cmdArgs = "MODEL [PROMPT]"
 	c := &cobra.Command{
@@ -26,6 +27,11 @@ func newRunCmd() *cobra.Command {
 				if err := validateBackend(backend); err != nil {
 					return err
 				}
+			}
+
+			// Validate API key for OpenAI backend
+			if backend == "openai" && apiKey == "" {
+				return fmt.Errorf("--api-key is required when using --backend=openai")
 			}
 
 			model := args[0]
@@ -57,7 +63,7 @@ func newRunCmd() *cobra.Command {
 			}
 
 			if prompt != "" {
-				if err := desktopClient.Chat(backend, model, prompt); err != nil {
+				if err := desktopClient.Chat(backend, model, prompt, apiKey); err != nil {
 					return handleClientError(err, "Failed to generate a response")
 				}
 				cmd.Println()
@@ -81,7 +87,7 @@ func newRunCmd() *cobra.Command {
 					continue
 				}
 
-				if err := desktopClient.Chat(backend, model, userInput); err != nil {
+				if err := desktopClient.Chat(backend, model, userInput, apiKey); err != nil {
 					cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
 					cmd.Print("> ")
 					continue
@@ -113,6 +119,7 @@ func newRunCmd() *cobra.Command {
 
 	c.Flags().BoolVar(&debug, "debug", false, "Enable debug logging")
 	c.Flags().StringVar(&backend, "backend", "", "Specify the backend to use (llama.cpp, openai)")
+	c.Flags().StringVar(&apiKey, "api-key", "", "API key for external backends (required for OpenAI)")
 
 	return c
 }

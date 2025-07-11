@@ -329,7 +329,7 @@ func (c *Client) fullModelID(id string) (string, error) {
 	return "", fmt.Errorf("model with ID %s not found", id)
 }
 
-func (c *Client) Chat(backend, model, prompt string) error {
+func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 	model = normalizeHuggingFaceModelName(model)
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
@@ -361,10 +361,12 @@ func (c *Client) Chat(backend, model, prompt string) error {
 		completionsPath = inference.InferencePrefix + "/v1/chat/completions"
 	}
 
-	resp, err := c.doRequest(
+	resp, err := c.doRequestWithAuth(
 		http.MethodPost,
 		completionsPath,
 		bytes.NewReader(jsonData),
+		backend,
+		apiKey,
 	)
 	if err != nil {
 		return c.handleQueryError(err, completionsPath)
@@ -582,6 +584,11 @@ func (c *Client) ConfigureBackend(request scheduling.ConfigureRequest) error {
 
 // doRequest is a helper function that performs HTTP requests and handles 503 responses
 func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response, error) {
+	return c.doRequestWithAuth(method, path, body, "", "")
+}
+
+// doRequestWithAuth is a helper function that performs HTTP requests with optional authentication
+func (c *Client) doRequestWithAuth(method, path string, body io.Reader, backend, apiKey string) (*http.Response, error) {
 	req, err := http.NewRequest(method, c.modelRunner.URL(path), body)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
@@ -591,6 +598,12 @@ func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response,
 	}
 
 	req.Header.Set("User-Agent", "docker-model-cli/"+Version)
+
+	// Add Authorization header for OpenAI backend
+	if backend == "openai" && apiKey != "" {
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+
 	resp, err := c.modelRunner.Client().Do(req)
 	if err != nil {
 		return nil, err
