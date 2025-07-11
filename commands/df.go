@@ -46,9 +46,9 @@ func diskUsageTable(df desktop.DiskUsage) string {
 	})
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 
-	table.Append([]string{"Models", units.HumanSize(float64(df.ModelsDiskUsage))})
+	table.Append([]string{"Models", units.CustomSize("%.2f%s", float64(df.ModelsDiskUsage), 1000.0, []string{"B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"})})
 	if df.DefaultBackendDiskUsage != 0 {
-		table.Append([]string{"Inference engine", units.HumanSize(float64(df.DefaultBackendDiskUsage))})
+		table.Append([]string{"Inference engine", units.CustomSize("%.2f%s", float64(df.DefaultBackendDiskUsage), 1000.0, []string{"B", "kB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"})})
 	}
 
 	table.Render()
