@@ -34,9 +34,6 @@ func newListCmd() *cobra.Command {
 			if (backend == "openai" || openai) && quiet {
 				return fmt.Errorf("--quiet flag cannot be used with --openai flag")
 			}
-			if backend != "" && openai {
-				return fmt.Errorf("--backend flag cannot be used with --openai flag")
-			}
 
 			// If we're doing an automatic install, only show the installation
 			// status if it won't corrupt machine-readable output.
