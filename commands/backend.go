@@ -3,7 +3,9 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"strings"
 )
 
@@ -17,7 +19,7 @@ var ValidBackends = map[string]bool{
 func validateBackend(backend string) error {
 	if !ValidBackends[backend] {
 		return fmt.Errorf("invalid backend '%s'. Valid backends are: %s",
-			backend, strings.Join(slices.Collect(maps.Keys(ValidBackends)), ", "))
+			backend, ValidBackendsKeys())
 	}
 	return nil
 }
@@ -32,4 +34,8 @@ func ensureAPIKey(backend string) (string, error) {
 		return apiKey, nil
 	}
 	return "", nil
+}
+
+func ValidBackendsKeys() string {
+	return strings.Join(slices.Collect(maps.Keys(ValidBackends)), ", ")
 }

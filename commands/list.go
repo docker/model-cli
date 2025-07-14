@@ -62,7 +62,7 @@ func newListCmd() *cobra.Command {
 	c.Flags().BoolVar(&jsonFormat, "json", false, "List models in a JSON format")
 	c.Flags().BoolVar(&openai, "openai", false, "List models in an OpenAI format")
 	c.Flags().BoolVarP(&quiet, "quiet", "q", false, "Only show model IDs")
-	c.Flags().StringVar(&backend, "backend", "", "Specify the backend to use (llama.cpp, openai)")
+	c.Flags().StringVar(&backend, "backend", "", fmt.Sprintf("Specify the backend to use (%s)", ValidBackendsKeys()))
 	return c
 }
 

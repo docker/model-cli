@@ -121,7 +121,7 @@ func newRunCmd() *cobra.Command {
 	}
 
 	c.Flags().BoolVar(&debug, "debug", false, "Enable debug logging")
-	c.Flags().StringVar(&backend, "backend", "", "Specify the backend to use (llama.cpp, openai)")
+	c.Flags().StringVar(&backend, "backend", "", fmt.Sprintf("Specify the backend to use (%s)", ValidBackendsKeys()))
 
 	return c
 }
