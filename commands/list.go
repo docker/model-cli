@@ -32,7 +32,7 @@ func newListCmd() *cobra.Command {
 			}
 
 			if (backend == "openai" || openai) && quiet {
-				return fmt.Errorf("--quiet flag cannot be used with --openai flag")
+				return fmt.Errorf("--quiet flag cannot be used with --openai flag or OpenAI backend")
 			}
 
 			// Validate API key for OpenAI backend
