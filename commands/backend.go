@@ -16,12 +16,8 @@ var ValidBackends = map[string]bool{
 // validateBackend checks if the provided backend is valid
 func validateBackend(backend string) error {
 	if !ValidBackends[backend] {
-		keys := make([]string, 0, len(ValidBackends))
-		for k := range ValidBackends {
-			keys = append(keys, k)
-		}
 		return fmt.Errorf("invalid backend '%s'. Valid backends are: %s",
-			backend, strings.Join(keys, ", "))
+			backend, strings.Join(slices.Collect(maps.Keys(ValidBackends)), ", "))
 	}
 	return nil
 }
