@@ -19,6 +19,8 @@ import (
 	"go.opentelemetry.io/otel"
 )
 
+const DefaultBackend = "llama.cpp"
+
 var (
 	ErrNotFound           = errors.New("model not found")
 	ErrServiceUnavailable = errors.New("service unavailable")
@@ -222,8 +224,11 @@ func (c *Client) List() ([]dmrm.Model, error) {
 	return modelsJson, nil
 }
 
-func (c *Client) ListOpenAI(apiKey string) (dmrm.OpenAIModelList, error) {
-	modelsRoute := inference.InferencePrefix + "/v1/models"
+func (c *Client) ListOpenAI(backend, apiKey string) (dmrm.OpenAIModelList, error) {
+	if backend == "" {
+		backend = DefaultBackend
+	}
+	modelsRoute := fmt.Sprintf("%s/%s/v1/models", inference.InferencePrefix, backend)
 
 	// Use doRequestWithAuth to support API key authentication
 	resp, err := c.doRequestWithAuth(http.MethodGet, modelsRoute, nil, "openai", apiKey)

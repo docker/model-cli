@@ -68,7 +68,7 @@ func newListCmd() *cobra.Command {
 
 func listModels(openai bool, backend string, desktopClient *desktop.Client, quiet bool, jsonFormat bool, apiKey string) (string, error) {
 	if openai || backend == "openai" {
-		models, err := desktopClient.ListOpenAI(apiKey)
+		models, err := desktopClient.ListOpenAI(backend, apiKey)
 		if err != nil {
 			err = handleClientError(err, "Failed to list models")
 			return "", handleNotRunningError(err)
