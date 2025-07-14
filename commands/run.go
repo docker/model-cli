@@ -29,12 +29,9 @@ func newRunCmd() *cobra.Command {
 			}
 
 			// Validate API key for OpenAI backend
-			var apiKey string
-			if backend == "openai" {
-				apiKey = os.Getenv("OPENAI_API_KEY")
-				if apiKey == "" {
-					return fmt.Errorf("OPENAI_API_KEY environment variable is required when using --backend=openai")
-				}
+			apiKey, err := ensureAPIKey(backend)
+			if err != nil {
+				return err
 			}
 
 			model := args[0]

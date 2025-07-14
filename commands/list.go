@@ -36,12 +36,9 @@ func newListCmd() *cobra.Command {
 			}
 
 			// Validate API key for OpenAI backend
-			var apiKey string
-			if backend == "openai" {
-				apiKey = os.Getenv("OPENAI_API_KEY")
-				if apiKey == "" {
-					return fmt.Errorf("OPENAI_API_KEY environment variable is required when using OpenAI backend")
-				}
+			apiKey, err := ensureAPIKey(backend)
+			if err != nil {
+				return err
 			}
 
 			// If we're doing an automatic install, only show the installation

@@ -1,7 +1,9 @@
 package commands
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"strings"
 )
 
@@ -22,4 +24,16 @@ func validateBackend(backend string) error {
 			backend, strings.Join(keys, ", "))
 	}
 	return nil
+}
+
+// ensureAPIKey retrieves the API key if needed
+func ensureAPIKey(backend string) (string, error) {
+	if backend == "openai" {
+		apiKey := os.Getenv("OPENAI_API_KEY")
+		if apiKey == "" {
+			return "", errors.New("OPENAI_API_KEY environment variable is required when using --backend=openai")
+		}
+		return apiKey, nil
+	}
+	return "", nil
 }
