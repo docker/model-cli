@@ -613,7 +613,7 @@ func (c *Client) doRequestWithAuth(method, path string, body io.Reader, backend,
 	req.Header.Set("User-Agent", "docker-model-cli/"+Version)
 
 	// Add Authorization header for OpenAI backend
-	if backend == "openai" && apiKey != "" {
+	if apiKey != "" {
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 	}
 
