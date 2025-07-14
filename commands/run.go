@@ -79,12 +79,26 @@ func readMultilineInput(cmd *cobra.Command, scanner *bufio.Scanner) (string, err
 
 func newRunCmd() *cobra.Command {
 	var debug bool
+	var backend string
 
 	const cmdArgs = "MODEL [PROMPT]"
 	c := &cobra.Command{
 		Use:   "run " + cmdArgs,
 		Short: "Run a model and interact with it using a submitted prompt or chat mode",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate backend if specified
+			if backend != "" {
+				if err := validateBackend(backend); err != nil {
+					return err
+				}
+			}
+
+			// Validate API key for OpenAI backend
+			apiKey, err := ensureAPIKey(backend)
+			if err != nil {
+				return err
+			}
+
 			model := args[0]
 			prompt := ""
 			if len(args) == 1 {
@@ -102,19 +116,22 @@ func newRunCmd() *cobra.Command {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
 
-			_, err := desktopClient.Inspect(model, false)
-			if err != nil {
-				if !errors.Is(err, desktop.ErrNotFound) {
-					return handleNotRunningError(handleClientError(err, "Failed to inspect model"))
-				}
-				cmd.Println("Unable to find model '" + model + "' locally. Pulling from the server.")
-				if err := pullModel(cmd, desktopClient, model); err != nil {
-					return err
+			// Do not validate the model in case of using OpenAI's backend, let OpenAI handle it
+			if backend != "openai" {
+				_, err := desktopClient.Inspect(model, false)
+				if err != nil {
+					if !errors.Is(err, desktop.ErrNotFound) {
+						return handleNotRunningError(handleClientError(err, "Failed to inspect model"))
+					}
+					cmd.Println("Unable to find model '" + model + "' locally. Pulling from the server.")
+					if err := pullModel(cmd, desktopClient, model); err != nil {
+						return err
+					}
 				}
 			}
 
 			if prompt != "" {
-				if err := desktopClient.Chat(model, prompt); err != nil {
+				if err := desktopClient.Chat(backend, model, prompt, apiKey); err != nil {
 					return handleClientError(err, "Failed to generate a response")
 				}
 				cmd.Println()
@@ -143,7 +160,7 @@ func newRunCmd() *cobra.Command {
 					continue
 				}
 
-				if err := desktopClient.Chat(model, userInput); err != nil {
+				if err := desktopClient.Chat(backend, model, userInput, apiKey); err != nil {
 					cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
 					continue
 				}
@@ -169,6 +186,7 @@ func newRunCmd() *cobra.Command {
 	}
 
 	c.Flags().BoolVar(&debug, "debug", false, "Enable debug logging")
+	c.Flags().StringVar(&backend, "backend", "", fmt.Sprintf("Specify the backend to use (%s)", ValidBackendsKeys()))
 
 	return c
 }
