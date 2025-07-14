@@ -5,19 +5,21 @@ import (
 	"strings"
 )
 
-// ValidBackends defines the list of supported backends
-var ValidBackends = []string{
-	"llama.cpp",
-	"openai",
+// ValidBackends is a map of valid backends
+var ValidBackends = map[string]bool{
+	"llama.cpp": true,
+	"openai":    true,
 }
 
 // validateBackend checks if the provided backend is valid
 func validateBackend(backend string) error {
-	for _, valid := range ValidBackends {
-		if backend == valid {
-			return nil
+	if !ValidBackends[backend] {
+		keys := make([]string, 0, len(ValidBackends))
+		for k := range ValidBackends {
+			keys = append(keys, k)
 		}
+		return fmt.Errorf("invalid backend '%s'. Valid backends are: %s",
+			backend, strings.Join(keys, ", "))
 	}
-	return fmt.Errorf("invalid backend '%s'. Valid backends are: %s",
-		backend, strings.Join(ValidBackends, ", "))
+	return nil
 }
