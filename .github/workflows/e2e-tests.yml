@@ -11,6 +11,9 @@ on:
         required: false
         default: "ai/smollm2"
 
+permissions:
+  contents: read
+
 jobs:
   e2e-shell-tests:
     runs-on: ${{ matrix.os }}
