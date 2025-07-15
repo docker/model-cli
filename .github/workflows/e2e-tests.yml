@@ -67,7 +67,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           mkdir "%ProgramData%\Docker\cli-plugins" || echo already exists
-          make BINARY_NAME=docker-model.exe install PLUGIN_DIR="%ProgramData%\Docker\cli-plugins"
+          make PLUGIN_NAME=docker-model.exe install PLUGIN_DIR="%ProgramData%\Docker\cli-plugins"
           dir "%ProgramData%\Docker\cli-plugins"
         shell: cmd
 
