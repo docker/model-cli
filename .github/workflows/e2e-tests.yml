@@ -2,8 +2,6 @@ name: E2E Shell Tests
 
 on:
   push:
-  pull_request:
-    branches: [ "main" ]
   workflow_dispatch:
     inputs:
       test_model:
@@ -68,10 +66,9 @@ jobs:
       - name: Install model-cli as Docker plugin (Windows)
         if: runner.os == 'Windows'
         run: |
-          set PLUGIN_DIR=%ProgramData%\Docker\cli-plugins
-          mkdir "%PLUGIN_DIR%" || echo already exists
-          make install
-          dir "%PLUGIN_DIR%"
+          mkdir "%ProgramData%\Docker\cli-plugins" || echo already exists
+          make install PLUGIN_DIR="%ProgramData%\Docker\cli-plugins"
+          dir "%ProgramData%\Docker\cli-plugins"
         shell: cmd
 
       - name: Test docker model version
