@@ -54,6 +54,7 @@ jobs:
       # Cross-platform Docker setup
       - name: Set up Docker
         uses: docker/setup-docker-action@v4
+        if: runner.os != 'Windows'
 
       - name: Install model-cli as Docker plugin (Linux/macOS)
         if: runner.os != 'Windows'
