@@ -30,6 +30,17 @@ jobs:
             shell-type: bash
             test-script: ./e2e/shells/zsh_test.sh
 
+          # macOS shells
+          - os: macos-latest
+            shell-name: bash
+            shell-type: bash
+            test-script: ./e2e/shells/bash_test.sh
+
+          - os: macos-latest
+            shell-name: zsh
+            shell-type: bash
+            test-script: ./e2e/shells/zsh_test.sh
+
           # Windows shells - DISABLED: Need to build a Windows-based DMR image first
           # - os: windows-latest
           #   shell-name: cmd
