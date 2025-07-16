@@ -30,16 +30,16 @@ jobs:
             shell-type: bash
             test-script: ./e2e/shells/zsh_test.sh
 
-          # Windows shells
-          - os: windows-latest
-            shell-name: cmd
-            shell-type: cmd
-            test-script: e2e\shells\cmd_test.bat
+          # Windows shells - DISABLED: Need to build a Windows-based DMR image first
+          # - os: windows-latest
+          #   shell-name: cmd
+          #   shell-type: cmd
+          #   test-script: e2e\shells\cmd_test.bat
 
-          - os: windows-latest
-            shell-name: git-bash
-            shell-type: bash
-            test-script: ./e2e/shells/mintty_test.sh
+          # - os: windows-latest
+          #   shell-name: git-bash
+          #   shell-type: bash
+          #   test-script: ./e2e/shells/mintty_test.sh
 
     steps:
       - name: Checkout repository
