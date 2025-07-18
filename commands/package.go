@@ -2,25 +2,30 @@ package commands
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
 	"io"
 	"path/filepath"
 
-	"github.com/docker/model-cli/commands/completion"
-	"github.com/docker/model-cli/desktop"
 	"github.com/docker/model-distribution/builder"
 	"github.com/docker/model-distribution/registry"
+	"github.com/docker/model-distribution/tarball"
+	"github.com/docker/model-distribution/types"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/spf13/cobra"
+
+	"github.com/docker/model-cli/commands/completion"
+	"github.com/docker/model-cli/desktop"
 )
 
 func newPackagedCmd() *cobra.Command {
 	var opts packageOptions
 
 	c := &cobra.Command{
-		Use:   "package --gguf <path> [--license <path>...] [--context-size <tokens>] --push TARGET",
-		Short: "Package a GGUF file into a Docker model OCI artifact, with optional licenses, and pushes it to the specified registry",
+		Use:   "package --gguf <path> [--license <path>...] [--context-size <tokens>] [--push] TARGET",
+		Short: "Package a GGUF file into a Docker model OCI artifact, with optional licenses. The package is sent to the model-runner, unless --push is specified",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return fmt.Errorf(
@@ -28,12 +33,6 @@ func newPackagedCmd() *cobra.Command {
 						"Usage:  %s\n\n"+
 						"See 'docker model package --help' for more information",
 					cmd.Use,
-				)
-			}
-			if opts.push != true {
-				return fmt.Errorf(
-					"This version of 'docker model package' requires --push and will write the resulting package directly to the registry.\n\n" +
-						"See 'docker model package --help' for more information",
 				)
 			}
 			if opts.ggufPath == "" {
@@ -73,7 +72,7 @@ func newPackagedCmd() *cobra.Command {
 
 	c.Flags().StringVar(&opts.ggufPath, "gguf", "", "absolute path to gguf file (required)")
 	c.Flags().StringArrayVarP(&opts.licensePaths, "license", "l", nil, "absolute path to a license file")
-	c.Flags().BoolVar(&opts.push, "push", false, "push to registry (required)")
+	c.Flags().BoolVar(&opts.push, "push", false, "push to registry. If not set, the package is loaded into the Model Runner content store.")
 	c.Flags().Uint64Var(&opts.contextSize, "context-size", 0, "context size in tokens")
 	return c
 }
@@ -86,10 +85,24 @@ type packageOptions struct {
 }
 
 func packageModel(cmd *cobra.Command, tag string, opts packageOptions) error {
-	cmd.PrintErrf("Packaging model %q\n", tag)
-	target, err := registry.NewClient(
-		registry.WithUserAgent("docker-model-cli/" + desktop.Version),
-	).NewTarget(tag)
+	var (
+		target builder.Target
+		err    error
+	)
+	if opts.push {
+		cmd.PrintErrln("Pushing model...%q\n", tag)
+		var err error
+		target, err = registry.NewClient(
+			registry.WithUserAgent("docker-model-cli/" + desktop.Version),
+		).NewTarget(tag)
+		if err != nil {
+			return err
+		}
+		cmd.PrintErrln("Pushing to registry...")
+	} else {
+		cmd.PrintErrln("Loading Model...")
+		target, err = newModelRunnerTarget(desktopClient, tag)
+	}
 	if err != nil {
 		return err
 	}
@@ -116,8 +129,6 @@ func packageModel(cmd *cobra.Command, tag string, opts packageOptions) error {
 		}
 	}
 
-	// Write the artifact to the registry
-	cmd.PrintErrln("Pushing to registry...")
 	pr, pw := io.Pipe()
 	done := make(chan error, 1)
 	go func() {
@@ -147,8 +158,69 @@ func packageModel(cmd *cobra.Command, tag string, opts packageOptions) error {
 		cmd.PrintErrln("Error streaming progress:", err)
 	}
 	if err := <-done; err != nil {
-		return fmt.Errorf("push: %w", err)
+		if opts.push {
+			return fmt.Errorf("push: %w", err)
+		}
+		return fmt.Errorf("failed to load model: %w", err)
 	}
-	cmd.PrintErrln("Model pushed successfully")
+
+	if opts.push {
+		cmd.PrintErrln("Model pushed successfully")
+	} else {
+		cmd.PrintErrln("Model loaded successfully")
+	}
 	return nil
+}
+
+type modelRunnerTarget struct {
+	client *desktop.Client
+	tag    name.Tag
+}
+
+func newModelRunnerTarget(client *desktop.Client, tag string) (*modelRunnerTarget, error) {
+	target := &modelRunnerTarget{
+		client: client,
+	}
+	if tag != "" {
+		var err error
+		target.tag, err = name.NewTag(tag)
+		if err != nil {
+			return nil, fmt.Errorf("invalid tag: %w", err)
+		}
+	}
+	return target, nil
+}
+
+func (t *modelRunnerTarget) Write(ctx context.Context, mdl types.ModelArtifact, progressWriter io.Writer) error {
+	pr, pw := io.Pipe()
+	errCh := make(chan error, 1)
+	go func() {
+		defer pw.Close()
+		target, err := tarball.NewTarget(pw)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		errCh <- target.Write(ctx, mdl, progressWriter)
+	}()
+
+	loadErr := t.client.LoadModel(ctx, pr)
+	writeErr := <-errCh
+
+	if loadErr != nil {
+		return loadErr
+	}
+	if writeErr != nil {
+		return writeErr
+	}
+	id, err := mdl.ID()
+	if err != nil {
+		return fmt.Errorf("get model ID: %w", err)
+	}
+	if t.tag.String() != "" {
+		if err := desktopClient.Tag(id, parseRepo(t.tag), t.tag.TagStr()); err != nil {
+			return fmt.Errorf("failed to tag model: %w", err)
+		}
+	}
+	return writeErr
 }

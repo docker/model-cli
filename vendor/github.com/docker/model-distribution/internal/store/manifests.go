@@ -1,6 +1,7 @@
 package store
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -17,17 +18,36 @@ func (s *LocalStore) manifestPath(hash v1.Hash) string {
 	return filepath.Join(s.rootPath, manifestsDir, hash.Algorithm, hash.Hex)
 }
 
-// writeManifest writes the model's manifest to the store
-func (s *LocalStore) writeManifest(mdl v1.Image) error {
-	digest, err := mdl.Digest()
+// WriteManifest writes the model's manifest to the store
+func (s *LocalStore) WriteManifest(hash v1.Hash, raw []byte) error {
+	manifest, err := v1.ParseManifest(bytes.NewReader(raw))
 	if err != nil {
-		return fmt.Errorf("get digest: %w", err)
+		return fmt.Errorf("parse manifest: %w", err)
 	}
-	rm, err := mdl.RawManifest()
+	if err := writeFile(s.manifestPath(hash), raw); err != nil {
+		return fmt.Errorf("write manifest: %w", err)
+	}
+
+	// Add the manifest to the index
+	idx, err := s.readIndex()
 	if err != nil {
-		return fmt.Errorf("get raw manifest: %w", err)
+		return fmt.Errorf("reading models: %w", err)
 	}
-	return writeFile(s.manifestPath(digest), rm)
+
+	return s.writeIndex(idx.Add(newEntryForManifest(hash, manifest)))
+}
+
+func newEntryForManifest(digest v1.Hash, manifest *v1.Manifest) IndexEntry {
+	files := make([]string, len(manifest.Layers)+1)
+	for i := range manifest.Layers {
+		files[i] = manifest.Layers[i].Digest.String()
+	}
+	files[len(manifest.Layers)] = manifest.Config.Digest.String()
+
+	return IndexEntry{
+		ID:    digest.String(),
+		Files: files,
+	}
 }
 
 // removeManifest removes the manifest file from the store

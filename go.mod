@@ -4,6 +4,10 @@ go 1.24
 
 toolchain go1.24.4
 
+replace github.com/docker/model-runner v0.0.0-20250711130825-8907b3ddf82e => ../model-runner
+
+replace github.com/docker/model-distribution v0.0.0-20250717222442-fb351a8da832 => ../model-distribution
+
 require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/cli v28.3.0+incompatible
@@ -11,8 +15,8 @@ require (
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
-	github.com/docker/model-distribution v0.0.0-20250710123110-a633223e127e
-	github.com/docker/model-runner v0.0.0-20250711130825-8907b3ddf82e
+	github.com/docker/model-distribution v0.0.0-20250724025158-b173151a7474
+	github.com/docker/model-runner v0.0.0-20250724025946-0dfa50af179a
 	github.com/google/go-containerregistry v0.20.6
 	github.com/mattn/go-isatty v0.0.17
 	github.com/nxadm/tail v1.4.8

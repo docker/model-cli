@@ -144,7 +144,7 @@ github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
-# github.com/docker/model-distribution v0.0.0-20250710123110-a633223e127e
+# github.com/docker/model-distribution v0.0.0-20250724025158-b173151a7474
 ## explicit; go 1.23.0
 github.com/docker/model-distribution/builder
 github.com/docker/model-distribution/distribution
@@ -154,8 +154,9 @@ github.com/docker/model-distribution/internal/partial
 github.com/docker/model-distribution/internal/progress
 github.com/docker/model-distribution/internal/store
 github.com/docker/model-distribution/registry
+github.com/docker/model-distribution/tarball
 github.com/docker/model-distribution/types
-# github.com/docker/model-runner v0.0.0-20250711130825-8907b3ddf82e
+# github.com/docker/model-runner v0.0.0-20250724025946-0dfa50af179a
 ## explicit; go 1.23.7
 github.com/docker/model-runner/pkg/diskusage
 github.com/docker/model-runner/pkg/environment
@@ -676,3 +677,5 @@ gopkg.in/yaml.v3
 # howett.net/plist v1.0.1
 ## explicit; go 1.12
 howett.net/plist
+# github.com/docker/model-runner v0.0.0-20250711130825-8907b3ddf82e => ../model-runner
+# github.com/docker/model-distribution v0.0.0-20250717222442-fb351a8da832 => ../model-distribution
