@@ -8,7 +8,7 @@ plink: docker_model.yaml
 options:
     - option: backend
       value_type: string
-      description: Specify the backend to use (openai, llama.cpp)
+      description: Specify the backend to use (llama.cpp, openai)
       deprecated: false
       hidden: true
       experimental: false
