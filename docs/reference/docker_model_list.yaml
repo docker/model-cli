@@ -10,7 +10,7 @@ options:
       value_type: string
       description: Specify the backend to use (llama.cpp, openai)
       deprecated: false
-      hidden: false
+      hidden: true
       experimental: false
       experimentalcli: false
       kubernetes: false

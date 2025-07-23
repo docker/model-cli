@@ -37,5 +37,7 @@ func ensureAPIKey(backend string) (string, error) {
 }
 
 func ValidBackendsKeys() string {
-	return strings.Join(slices.Collect(maps.Keys(ValidBackends)), ", ")
+	keys := slices.Collect(maps.Keys(ValidBackends))
+	slices.Sort(keys)
+	return strings.Join(keys, ", ")
 }
