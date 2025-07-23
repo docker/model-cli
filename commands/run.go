@@ -187,6 +187,7 @@ func newRunCmd() *cobra.Command {
 
 	c.Flags().BoolVar(&debug, "debug", false, "Enable debug logging")
 	c.Flags().StringVar(&backend, "backend", "", fmt.Sprintf("Specify the backend to use (%s)", ValidBackendsKeys()))
+	c.Flags().MarkHidden("backend")
 
 	return c
 }
