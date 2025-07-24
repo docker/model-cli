@@ -24,7 +24,7 @@ func newPackagedCmd() *cobra.Command {
 	var opts packageOptions
 
 	c := &cobra.Command{
-		Use:   "package --gguf <path> [--license <path>...] [--context-size <tokens>] [--push] TARGET",
+		Use:   "package --gguf <path> [--license <path>...] [--context-size <tokens>] [--push] [<tag>]",
 		Short: "Package a GGUF file into a Docker model OCI artifact, with optional licenses. The package is sent to the model-runner, unless --push is specified",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
@@ -61,7 +61,7 @@ func newPackagedCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := packageModel(cmd, args[0], opts); err != nil {
+			if err := packageModel(cmd, opts); err != nil {
 				cmd.PrintErrln("Failed to package model")
 				return fmt.Errorf("package model: %w", err)
 			}
@@ -72,7 +72,7 @@ func newPackagedCmd() *cobra.Command {
 
 	c.Flags().StringVar(&opts.ggufPath, "gguf", "", "absolute path to gguf file (required)")
 	c.Flags().StringArrayVarP(&opts.licensePaths, "license", "l", nil, "absolute path to a license file")
-	c.Flags().BoolVar(&opts.push, "push", false, "push to registry. If not set, the package is loaded into the Model Runner content store.")
+	c.Flags().BoolVar(&opts.push, "push", false, "push to registry (if not set, the model is loaded into the Model Runner content store.")
 	c.Flags().Uint64Var(&opts.contextSize, "context-size", 0, "context size in tokens")
 	return c
 }
@@ -82,26 +82,20 @@ type packageOptions struct {
 	licensePaths []string
 	push         bool
 	contextSize  uint64
+	tag          string
 }
 
-func packageModel(cmd *cobra.Command, tag string, opts packageOptions) error {
+func packageModel(cmd *cobra.Command, opts packageOptions) error {
 	var (
 		target builder.Target
 		err    error
 	)
 	if opts.push {
-		cmd.PrintErrln("Pushing model...%q\n", tag)
-		var err error
 		target, err = registry.NewClient(
 			registry.WithUserAgent("docker-model-cli/" + desktop.Version),
-		).NewTarget(tag)
-		if err != nil {
-			return err
-		}
-		cmd.PrintErrln("Pushing to registry...")
+		).NewTarget(opts.tag)
 	} else {
-		cmd.PrintErrln("Loading Model...")
-		target, err = newModelRunnerTarget(desktopClient, tag)
+		target, err = newModelRunnerTarget(desktopClient, opts.tag)
 	}
 	if err != nil {
 		return err
@@ -129,6 +123,11 @@ func packageModel(cmd *cobra.Command, tag string, opts packageOptions) error {
 		}
 	}
 
+	if opts.push {
+		cmd.PrintErrln("Pushing model to registry...")
+	} else {
+		cmd.PrintErrln("Loading model to Model Runner...")
+	}
 	pr, pw := io.Pipe()
 	done := make(chan error, 1)
 	go func() {
@@ -159,9 +158,9 @@ func packageModel(cmd *cobra.Command, tag string, opts packageOptions) error {
 	}
 	if err := <-done; err != nil {
 		if opts.push {
-			return fmt.Errorf("push: %w", err)
+			return fmt.Errorf("failed to save packaged model: %w", err)
 		}
-		return fmt.Errorf("failed to load model: %w", err)
+		return fmt.Errorf("failed to load packaged model: %w", err)
 	}
 
 	if opts.push {
@@ -172,6 +171,7 @@ func packageModel(cmd *cobra.Command, tag string, opts packageOptions) error {
 	return nil
 }
 
+// modelRunnerTarget loads model to Docker Model Runner via models/load endpoint
 type modelRunnerTarget struct {
 	client *desktop.Client
 	tag    name.Tag
@@ -208,10 +208,10 @@ func (t *modelRunnerTarget) Write(ctx context.Context, mdl types.ModelArtifact, 
 	writeErr := <-errCh
 
 	if loadErr != nil {
-		return loadErr
+		return fmt.Errorf("loading model archive: %w", loadErr)
 	}
 	if writeErr != nil {
-		return writeErr
+		return fmt.Errorf("writing model archive: %w", writeErr)
 	}
 	id, err := mdl.ID()
 	if err != nil {
@@ -219,8 +219,8 @@ func (t *modelRunnerTarget) Write(ctx context.Context, mdl types.ModelArtifact, 
 	}
 	if t.tag.String() != "" {
 		if err := desktopClient.Tag(id, parseRepo(t.tag), t.tag.TagStr()); err != nil {
-			return fmt.Errorf("failed to tag model: %w", err)
+			return fmt.Errorf("tag model: %w", err)
 		}
 	}
-	return writeErr
+	return nil
 }
