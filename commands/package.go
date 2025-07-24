@@ -24,13 +24,13 @@ func newPackagedCmd() *cobra.Command {
 	var opts packageOptions
 
 	c := &cobra.Command{
-		Use:   "package --gguf <path> [--license <path>...] [--context-size <tokens>] [--push] TAG",
+		Use:   "package --gguf <path> [--license <path>...] [--context-size <tokens>] [--push] MODEL",
 		Short: "Package a GGUF file into a Docker model OCI artifact, with optional licenses. The package is sent to the model-runner, unless --push is specified",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return fmt.Errorf(
 					"'docker model package' requires 1 argument.\n\n"+
-						"Usage:  %s\n\n"+
+						"Usage:  docker model %s\n\n"+
 						"See 'docker model package --help' for more information",
 					cmd.Use,
 				)
