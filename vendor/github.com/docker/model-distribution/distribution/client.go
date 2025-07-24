@@ -2,6 +2,7 @@ package distribution
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/docker/model-distribution/internal/progress"
 	"github.com/docker/model-distribution/internal/store"
 	"github.com/docker/model-distribution/registry"
+	"github.com/docker/model-distribution/tarball"
 	"github.com/docker/model-distribution/types"
 )
 
@@ -179,7 +181,7 @@ func (c *Client) PullModel(ctx context.Context, reference string, progressWriter
 
 		// Ensure model has the correct tag
 		if err := c.store.AddTags(remoteDigest.String(), []string{reference}); err != nil {
-			return fmt.Errorf("tagging modle: %w", err)
+			return fmt.Errorf("tagging model: %w", err)
 		}
 		return nil
 	} else {
@@ -204,6 +206,49 @@ func (c *Client) PullModel(ctx context.Context, reference string, progressWriter
 	}
 
 	return nil
+}
+
+// LoadModel loads the model from the reader to the store
+func (c *Client) LoadModel(r io.Reader, progressWriter io.Writer) (string, error) {
+	c.log.Infoln("Starting model load")
+
+	tr := tarball.NewReader(r)
+	for {
+		diffID, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			if errors.Is(err, io.ErrUnexpectedEOF) {
+				c.log.Infof("Model load interrupted (likely cancelled): %v", err)
+				return "", fmt.Errorf("model load interrupted: %w", err)
+			}
+			return "", fmt.Errorf("reading blob from stream: %w", err)
+		}
+		c.log.Infoln("Loading blob:", diffID)
+		if err := c.store.WriteBlob(diffID, tr); err != nil {
+			return "", fmt.Errorf("writing blob: %w", err)
+		}
+		c.log.Infoln("Loaded blob:", diffID)
+	}
+
+	manifest, digest, err := tr.Manifest()
+	if err != nil {
+		return "", fmt.Errorf("read manifest: %w", err)
+	}
+	c.log.Infoln("Loading manifest:", digest.String())
+	if err := c.store.WriteManifest(digest, manifest); err != nil {
+		return "", fmt.Errorf("write manifest: %w", err)
+	}
+	c.log.Infoln("Loaded model with ID:", digest.String())
+
+	if err := progress.WriteSuccess(progressWriter, "Model loaded successfully"); err != nil {
+		c.log.Warnf("Failed to write success message: %v", err)
+		// If we fail to write success message, don't try again
+		progressWriter = nil
+	}
+
+	return digest.String(), nil
 }
 
 // ListModels returns all available models

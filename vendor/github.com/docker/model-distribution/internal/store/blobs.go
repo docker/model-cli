@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/docker/model-distribution/internal/progress"
+
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
@@ -28,9 +30,8 @@ type blob interface {
 	Uncompressed() (io.ReadCloser, error)
 }
 
-// writeBlob write the blob to the store, reporting progress to the given channel.
-// If the blob is already in the store, it is a no-op.
-func (s *LocalStore) writeBlob(layer blob, progress chan<- v1.Update) error {
+// writeLayer write the layer blob to the store
+func (s *LocalStore) writeLayer(layer blob, updates chan<- v1.Update) error {
 	hash, err := layer.DiffID()
 	if err != nil {
 		return fmt.Errorf("get file hash: %w", err)
@@ -40,14 +41,24 @@ func (s *LocalStore) writeBlob(layer blob, progress chan<- v1.Update) error {
 		return nil
 	}
 
-	path := s.blobPath(hash)
 	lr, err := layer.Uncompressed()
 	if err != nil {
 		return fmt.Errorf("get blob contents: %w", err)
 	}
 	defer lr.Close()
-	r := withProgress(lr, progress)
+	r := progress.NewReader(lr, updates)
 
+	return s.WriteBlob(hash, r)
+}
+
+// WriteBlob writes the blob to the store, reporting progress to the given channel.
+// If the blob is already in the store, it is a no-op and the blob is not consumed from the reader.
+func (s *LocalStore) WriteBlob(diffID v1.Hash, r io.Reader) error {
+	if s.hasBlob(diffID) {
+		return nil
+	}
+
+	path := s.blobPath(diffID)
 	f, err := createFile(incompletePath(path))
 	if err != nil {
 		return fmt.Errorf("create blob file: %w", err)
@@ -56,7 +67,7 @@ func (s *LocalStore) writeBlob(layer blob, progress chan<- v1.Update) error {
 	defer f.Close()
 
 	if _, err := io.Copy(f, r); err != nil {
-		return fmt.Errorf("copy blob %q to store: %w", hash.String(), err)
+		return fmt.Errorf("copy blob %q to store: %w", diffID.String(), err)
 	}
 
 	f.Close() // Rename will fail on Windows if the file is still open.
@@ -84,17 +95,6 @@ func createFile(path string) (*os.File, error) {
 		return nil, fmt.Errorf("create parent directory %q: %w", filepath.Dir(path), err)
 	}
 	return os.Create(path)
-}
-
-// withProgress returns a reader that reports progress to the given channel.
-func withProgress(r io.Reader, progress chan<- v1.Update) io.Reader {
-	if progress == nil {
-		return r
-	}
-	return &ProgressReader{
-		Reader:       r,
-		ProgressChan: progress,
-	}
 }
 
 // incompletePath returns the path to the incomplete file for the given path.

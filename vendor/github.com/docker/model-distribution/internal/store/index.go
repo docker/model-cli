@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 
 	"github.com/google/go-containerregistry/pkg/name"
-	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
 // Index represents the index of all models in the store
@@ -137,38 +136,8 @@ type IndexEntry struct {
 	ID string `json:"id"`
 	// Tags are the list of tags associated with the model.
 	Tags []string `json:"tags"`
-	// Files are the GGUF files associated with the model.
+	// Files are the files associated with the model.
 	Files []string `json:"files"`
-}
-
-func newEntry(image v1.Image) (IndexEntry, error) {
-	digest, err := image.Digest()
-	if err != nil {
-		return IndexEntry{}, fmt.Errorf("getting digest: %w", err)
-	}
-
-	layers, err := image.Layers()
-	if err != nil {
-		return IndexEntry{}, fmt.Errorf("getting layers: %w", err)
-	}
-	files := make([]string, len(layers)+1)
-	for i, layer := range layers {
-		diffID, err := layer.DiffID()
-		if err != nil {
-			return IndexEntry{}, fmt.Errorf("getting diffID: %w", err)
-		}
-		files[i] = diffID.String()
-	}
-	cfgName, err := image.ConfigName()
-	if err != nil {
-		return IndexEntry{}, fmt.Errorf("getting config name: %w", err)
-	}
-	files[len(layers)] = cfgName.String()
-
-	return IndexEntry{
-		ID:    digest.String(),
-		Files: files,
-	}, nil
 }
 
 func (e IndexEntry) HasTag(tag string) bool {

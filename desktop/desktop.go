@@ -3,6 +3,7 @@ package desktop
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -702,5 +703,27 @@ func (c *Client) Tag(source, targetRepo, targetTag string) error {
 		return fmt.Errorf("tagging failed with status %s: %s", resp.Status, string(body))
 	}
 
+	return nil
+}
+
+func (c *Client) LoadModel(ctx context.Context, r io.Reader) error {
+	loadPath := fmt.Sprintf("%s/load", inference.ModelsPrefix)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.modelRunner.URL(loadPath), r)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-tar")
+	req.Header.Set("User-Agent", "docker-model-cli/"+Version)
+
+	resp, err := c.modelRunner.Client().Do(req)
+	if err != nil {
+		return c.handleQueryError(err, loadPath)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("load failed with status %s: %s", resp.Status, string(body))
+	}
 	return nil
 }
