@@ -144,7 +144,7 @@ github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
-# github.com/docker/model-distribution v0.0.0-20250724025158-b173151a7474
+# github.com/docker/model-distribution v0.0.0-20250724035854-a9454ee7284c
 ## explicit; go 1.23.0
 github.com/docker/model-distribution/builder
 github.com/docker/model-distribution/distribution

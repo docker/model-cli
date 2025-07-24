@@ -2,6 +2,7 @@ package store
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,6 +24,11 @@ func (s *LocalStore) WriteManifest(hash v1.Hash, raw []byte) error {
 	manifest, err := v1.ParseManifest(bytes.NewReader(raw))
 	if err != nil {
 		return fmt.Errorf("parse manifest: %w", err)
+	}
+	for _, layer := range manifest.Layers {
+		if !s.hasBlob(layer.Digest) {
+			return errors.New("missing blob %q for manifest - refusing to write unless all blobs exist")
+		}
 	}
 	if err := writeFile(s.manifestPath(hash), raw); err != nil {
 		return fmt.Errorf("write manifest: %w", err)

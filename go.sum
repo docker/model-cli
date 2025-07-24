@@ -78,8 +78,8 @@ github.com/docker/go-metrics v0.0.1/go.mod h1:cG1hvH2utMXtqgqqYE9plW6lDxS3/5ayHz
 github.com/docker/go-units v0.5.0 h1:69rxXcBk27SvSaaxTtLh/8llcHD8vYHT7WSdRZ/jvr4=
 github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDDbaIK4Dk=
 github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7/go.mod h1:cyGadeNEkKy96OOhEzfZl+yxihPEzKnqJwvfuSUqbZE=
-github.com/docker/model-distribution v0.0.0-20250724025158-b173151a7474 h1:F4MtfsvC/9/BMEjMQw8gku/hJ4xnXdMLnDE4z00Pcvw=
-github.com/docker/model-distribution v0.0.0-20250724025158-b173151a7474/go.mod h1:dThpO9JoG5Px3i+rTluAeZcqLGw8C0qepuEL4gL2o/c=
+github.com/docker/model-distribution v0.0.0-20250724035854-a9454ee7284c h1:hkMon8WnL995BHacRCEsbtPEO2mYsUmdsohJva15QDU=
+github.com/docker/model-distribution v0.0.0-20250724035854-a9454ee7284c/go.mod h1:dThpO9JoG5Px3i+rTluAeZcqLGw8C0qepuEL4gL2o/c=
 github.com/docker/model-runner v0.0.0-20250724025946-0dfa50af179a h1:hbXJ8P/v7Dk+yvqeGsBAyHxIq/mjjhW5UiIP8i3CONo=
 github.com/docker/model-runner v0.0.0-20250724025946-0dfa50af179a/go.mod h1:pmu0V0gxXVTzvjzkNm/jYDrIBccYTXBf8dL1zYm6sRQ=
 github.com/dvsekhvalnov/jose2go v0.0.0-20170216131308-f21a8cedbbae/go.mod h1:7BvyPhdbLxMXIYTFPLsyJRFMsKmOZnQmzh6Gb+uquuM=
