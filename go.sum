@@ -80,8 +80,8 @@ github.com/docker/go-units v0.5.0/go.mod h1:fgPhTUdO+D/Jk86RDLlptpiXQzgHJF7gydDD
 github.com/docker/libtrust v0.0.0-20160708172513-aabc10ec26b7/go.mod h1:cyGadeNEkKy96OOhEzfZl+yxihPEzKnqJwvfuSUqbZE=
 github.com/docker/model-distribution v0.0.0-20250724114133-a11d745e582c h1:w9MekYamXmWLe9ZWXWgNXJ7BLDDemXwB8WcF7wzHF5Q=
 github.com/docker/model-distribution v0.0.0-20250724114133-a11d745e582c/go.mod h1:dThpO9JoG5Px3i+rTluAeZcqLGw8C0qepuEL4gL2o/c=
-github.com/docker/model-runner v0.0.0-20250724115222-7777c2289067 h1:EGNLopxTPtPWcDDKpjYUeNUeFdc0vpEI3xw3h34UZOQ=
-github.com/docker/model-runner v0.0.0-20250724115222-7777c2289067/go.mod h1:rCzRjRXJ42E8JVIA69E9hErJVV5mnUpWdJ2POsktfRs=
+github.com/docker/model-runner v0.0.0-20250724122432-ecfa5e7e6807 h1:02vImD8wqUDv6VJ2cBLbqzbjn17IMYEi4ileCEjXMQ8=
+github.com/docker/model-runner v0.0.0-20250724122432-ecfa5e7e6807/go.mod h1:rCzRjRXJ42E8JVIA69E9hErJVV5mnUpWdJ2POsktfRs=
 github.com/dvsekhvalnov/jose2go v0.0.0-20170216131308-f21a8cedbbae/go.mod h1:7BvyPhdbLxMXIYTFPLsyJRFMsKmOZnQmzh6Gb+uquuM=
 github.com/elastic/go-sysinfo v1.15.3 h1:W+RnmhKFkqPTCRoFq2VCTmsT4p/fwpo+3gKNQsn1XU0=
 github.com/elastic/go-sysinfo v1.15.3/go.mod h1:K/cNrqYTDrSoMh2oDkYEMS2+a72GRxMvNP+GC+vRIlo=

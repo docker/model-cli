@@ -156,7 +156,7 @@ github.com/docker/model-distribution/internal/store
 github.com/docker/model-distribution/registry
 github.com/docker/model-distribution/tarball
 github.com/docker/model-distribution/types
-# github.com/docker/model-runner v0.0.0-20250724115222-7777c2289067
+# github.com/docker/model-runner v0.0.0-20250724122432-ecfa5e7e6807
 ## explicit; go 1.23.7
 github.com/docker/model-runner/pkg/diskusage
 github.com/docker/model-runner/pkg/environment

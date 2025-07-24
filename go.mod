@@ -12,7 +12,7 @@ require (
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
 	github.com/docker/model-distribution v0.0.0-20250724114133-a11d745e582c
-	github.com/docker/model-runner v0.0.0-20250724115222-7777c2289067
+	github.com/docker/model-runner v0.0.0-20250724122432-ecfa5e7e6807
 	github.com/google/go-containerregistry v0.20.6
 	github.com/mattn/go-isatty v0.0.17
 	github.com/nxadm/tail v1.4.8
