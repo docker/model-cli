@@ -144,7 +144,7 @@ github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
-# github.com/docker/model-distribution v0.0.0-20250724035854-a9454ee7284c
+# github.com/docker/model-distribution v0.0.0-20250724114133-a11d745e582c
 ## explicit; go 1.23.0
 github.com/docker/model-distribution/builder
 github.com/docker/model-distribution/distribution
@@ -156,10 +156,11 @@ github.com/docker/model-distribution/internal/store
 github.com/docker/model-distribution/registry
 github.com/docker/model-distribution/tarball
 github.com/docker/model-distribution/types
-# github.com/docker/model-runner v0.0.0-20250724025946-0dfa50af179a
+# github.com/docker/model-runner v0.0.0-20250724115222-7777c2289067
 ## explicit; go 1.23.7
 github.com/docker/model-runner/pkg/diskusage
 github.com/docker/model-runner/pkg/environment
+github.com/docker/model-runner/pkg/gpuinfo
 github.com/docker/model-runner/pkg/inference
 github.com/docker/model-runner/pkg/inference/backends/llamacpp
 github.com/docker/model-runner/pkg/inference/config
@@ -171,6 +172,19 @@ github.com/docker/model-runner/pkg/internal/jsonutil
 github.com/docker/model-runner/pkg/logging
 github.com/docker/model-runner/pkg/metrics
 github.com/docker/model-runner/pkg/tailbuffer
+# github.com/elastic/go-sysinfo v1.15.3
+## explicit; go 1.21
+github.com/elastic/go-sysinfo
+github.com/elastic/go-sysinfo/internal/registry
+github.com/elastic/go-sysinfo/providers/aix
+github.com/elastic/go-sysinfo/providers/darwin
+github.com/elastic/go-sysinfo/providers/linux
+github.com/elastic/go-sysinfo/providers/shared
+github.com/elastic/go-sysinfo/providers/windows
+github.com/elastic/go-sysinfo/types
+# github.com/elastic/go-windows v1.0.2
+## explicit; go 1.18
+github.com/elastic/go-windows
 # github.com/felixge/httpsnoop v1.0.4
 ## explicit; go 1.13
 github.com/felixge/httpsnoop
@@ -360,6 +374,11 @@ github.com/prometheus/client_model/go
 ## explicit; go 1.23.0
 github.com/prometheus/common/expfmt
 github.com/prometheus/common/model
+# github.com/prometheus/procfs v0.15.1
+## explicit; go 1.20
+github.com/prometheus/procfs
+github.com/prometheus/procfs/internal/fs
+github.com/prometheus/procfs/internal/util
 # github.com/rivo/uniseg v0.4.7
 ## explicit; go 1.18
 github.com/rivo/uniseg
@@ -677,5 +696,3 @@ gopkg.in/yaml.v3
 # howett.net/plist v1.0.1
 ## explicit; go 1.12
 howett.net/plist
-# github.com/docker/model-runner v0.0.0-20250711130825-8907b3ddf82e => ../model-runner
-# github.com/docker/model-distribution v0.0.0-20250717222442-fb351a8da832 => ../model-distribution

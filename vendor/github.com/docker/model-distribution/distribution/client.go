@@ -2,9 +2,9 @@ package distribution
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 
@@ -219,7 +219,11 @@ func (c *Client) LoadModel(r io.Reader, progressWriter io.Writer) (string, error
 			break
 		}
 		if err != nil {
-			log.Fatalf("Error reading blobs from stream: %v", err)
+			if errors.Is(err, io.ErrUnexpectedEOF) {
+				c.log.Infof("Model load interrupted (likely cancelled): %v", err)
+				return "", fmt.Errorf("model load interrupted: %w", err)
+			}
+			return "", fmt.Errorf("reading blob from stream: %w", err)
 		}
 		c.log.Infoln("Loading blob:", diffID)
 		if err := c.store.WriteBlob(diffID, tr); err != nil {

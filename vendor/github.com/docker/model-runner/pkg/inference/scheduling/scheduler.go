@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/docker/model-distribution/distribution"
+	"github.com/docker/model-runner/pkg/gpuinfo"
 	"github.com/docker/model-runner/pkg/inference"
 	"github.com/docker/model-runner/pkg/inference/models"
 	"github.com/docker/model-runner/pkg/logging"
@@ -43,7 +44,7 @@ type Scheduler struct {
 	// openAIRecorder is used to record OpenAI API inference requests and responses.
 	openAIRecorder *metrics.OpenAIRecorder
 	// lock is used to synchronize access to the scheduler's router.
-	lock sync.Mutex
+	lock sync.RWMutex
 }
 
 // NewScheduler creates a new inference scheduler.
@@ -55,6 +56,7 @@ func NewScheduler(
 	httpClient *http.Client,
 	allowedOrigins []string,
 	tracker *metrics.Tracker,
+	gpuInfo *gpuinfo.GPUInfo,
 ) *Scheduler {
 	openAIRecorder := metrics.NewOpenAIRecorder(log.WithField("component", "openai-recorder"), modelManager)
 
@@ -65,7 +67,7 @@ func NewScheduler(
 		defaultBackend: defaultBackend,
 		modelManager:   modelManager,
 		installer:      newInstaller(log, backends, httpClient),
-		loader:         newLoader(log, backends, modelManager, openAIRecorder),
+		loader:         newLoader(log, backends, modelManager, openAIRecorder, gpuInfo),
 		router:         http.NewServeMux(),
 		tracker:        tracker,
 		openAIRecorder: openAIRecorder,
@@ -510,7 +512,7 @@ func parseBackendMode(mode string) inference.BackendMode {
 
 // ServeHTTP implements net/http.Handler.ServeHTTP.
 func (s *Scheduler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 	s.router.ServeHTTP(w, r)
 }

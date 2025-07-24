@@ -4,10 +4,6 @@ go 1.24
 
 toolchain go1.24.4
 
-replace github.com/docker/model-runner v0.0.0-20250711130825-8907b3ddf82e => ../model-runner
-
-replace github.com/docker/model-distribution v0.0.0-20250717222442-fb351a8da832 => ../model-distribution
-
 require (
 	github.com/containerd/errdefs v1.0.0
 	github.com/docker/cli v28.3.0+incompatible
@@ -15,8 +11,8 @@ require (
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
-	github.com/docker/model-distribution v0.0.0-20250724035854-a9454ee7284c
-	github.com/docker/model-runner v0.0.0-20250724025946-0dfa50af179a
+	github.com/docker/model-distribution v0.0.0-20250724114133-a11d745e582c
+	github.com/docker/model-runner v0.0.0-20250724115222-7777c2289067
 	github.com/google/go-containerregistry v0.20.6
 	github.com/mattn/go-isatty v0.0.17
 	github.com/nxadm/tail v1.4.8
@@ -47,6 +43,8 @@ require (
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.3 // indirect
+	github.com/elastic/go-sysinfo v1.15.3 // indirect
+	github.com/elastic/go-windows v1.0.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/fvbommel/sortorder v1.1.0 // indirect
@@ -81,6 +79,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.65.0 // indirect
+	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rs/dnscache v0.0.0-20230804202142-fc85eb664529 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect

@@ -15,11 +15,10 @@ import (
 	"github.com/docker/model-distribution/distribution"
 	"github.com/docker/model-distribution/registry"
 	"github.com/docker/model-distribution/types"
-	"github.com/sirupsen/logrus"
-
 	"github.com/docker/model-runner/pkg/diskusage"
 	"github.com/docker/model-runner/pkg/inference"
 	"github.com/docker/model-runner/pkg/logging"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -42,7 +41,7 @@ type Manager struct {
 	// registryClient is the client for model registry.
 	registryClient *registry.Client
 	// lock is used to synchronize access to the models manager's router.
-	lock sync.Mutex
+	lock sync.RWMutex
 }
 
 type ClientConfig struct {
@@ -165,6 +164,10 @@ func (m *Manager) handleCreateModel(w http.ResponseWriter, r *http.Request) {
 	// Pull the model. In the future, we may support additional operations here
 	// besides pulling (such as model building).
 	if err := m.PullModel(request.From, r, w); err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			m.log.Infof("Request canceled/timed out while pulling model %q", request.From)
+			return
+		}
 		if errors.Is(err, registry.ErrInvalidReference) {
 			m.log.Warnf("Invalid model reference %q: %v", request.From, err)
 			http.Error(w, "Invalid model reference", http.StatusBadRequest)
@@ -554,8 +557,8 @@ func (m *Manager) GetDiskUsage() (int64, error, int) {
 
 // ServeHTTP implement net/http.Handler.ServeHTTP.
 func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	m.lock.Lock()
-	defer m.lock.Unlock()
+	m.lock.RLock()
+	defer m.lock.RUnlock()
 	m.router.ServeHTTP(w, r)
 }
 

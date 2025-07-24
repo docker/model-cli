@@ -14,6 +14,10 @@ import (
 	"github.com/docker/model-runner/pkg/logging"
 )
 
+// maximumRecordsPerModel is the maximum number of records that will be stored
+// per model.
+const maximumRecordsPerModel = 10
+
 type responseRecorder struct {
 	http.ResponseWriter
 	body       *bytes.Buffer
@@ -99,7 +103,7 @@ func (r *OpenAIRecorder) RecordRequest(model string, req *http.Request, body []b
 
 	record := &RequestResponsePair{
 		ID:        recordID,
-		Model:     modelID,
+		Model:     model,
 		Method:    req.Method,
 		URL:       req.URL.Path,
 		Request:   string(body),
@@ -107,17 +111,28 @@ func (r *OpenAIRecorder) RecordRequest(model string, req *http.Request, body []b
 		UserAgent: req.UserAgent(),
 	}
 
-	if r.records[modelID] == nil {
-		r.records[modelID] = &ModelData{
-			Records: make([]*RequestResponsePair, 0, 10),
+	modelData := r.records[modelID]
+	if modelData == nil {
+		modelData = &ModelData{
+			Records: make([]*RequestResponsePair, 0, maximumRecordsPerModel),
 			Config:  inference.BackendConfiguration{},
 		}
+		r.records[modelID] = modelData
 	}
 
-	r.records[modelID].Records = append(r.records[modelID].Records, record)
-
-	if len(r.records[modelID].Records) > 10 {
-		r.records[modelID].Records = r.records[modelID].Records[1:]
+	// Ideally we would use a ring buffer or a linked list for storing records,
+	// but we want this data returnable as JSON, so we have to live with this
+	// slightly inefficieny memory shuffle. Note that truncating the front of
+	// the slice and continually appending would cause the slice's capacity to
+	// grow unbounded.
+	if len(modelData.Records) == maximumRecordsPerModel {
+		copy(
+			modelData.Records[:maximumRecordsPerModel-1],
+			modelData.Records[1:],
+		)
+		modelData.Records[maximumRecordsPerModel-1] = record
+	} else {
+		modelData.Records = append(modelData.Records, record)
 	}
 
 	return recordID
