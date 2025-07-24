@@ -24,7 +24,7 @@ func newPackagedCmd() *cobra.Command {
 	var opts packageOptions
 
 	c := &cobra.Command{
-		Use:   "package --gguf <path> [--license <path>...] [--context-size <tokens>] [--push] [<tag>]",
+		Use:   "package --gguf <path> [--license <path>...] [--context-size <tokens>] [--push] TAG",
 		Short: "Package a GGUF file into a Docker model OCI artifact, with optional licenses. The package is sent to the model-runner, unless --push is specified",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
@@ -61,6 +61,7 @@ func newPackagedCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.tag = args[0]
 			if err := packageModel(cmd, opts); err != nil {
 				cmd.PrintErrln("Failed to package model")
 				return fmt.Errorf("package model: %w", err)
