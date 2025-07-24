@@ -33,7 +33,7 @@ func isDesktopContext(ctx context.Context, cli *command.DockerCli) bool {
 		if strings.Contains(serverInfo.KernelVersion, "-microsoft-standard-WSL2") {
 			// We can use Docker Desktop from within a WSL2 integrated distro.
 			// https://github.com/search?q=repo%3Amicrosoft%2FWSL2-Linux-Kernel+path%3A%2F%5Earch%5C%2F.*%5C%2Fconfigs%5C%2Fconfig-wsl%2F+CONFIG_LOCALVERSION&type=code
-			return true
+			return serverInfo.OperatingSystem == "Docker Desktop"
 		}
 		return false
 	}
