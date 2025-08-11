@@ -101,7 +101,7 @@ func newRunCmd() *cobra.Command {
 				return err
 			}
 
-			model := args[0]
+			model := completion.AddDefaultNamespace(args[0])
 			prompt := ""
 			args_len := len(args)
 			if args_len > 1 {

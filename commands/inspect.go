@@ -23,6 +23,8 @@ func newInspectCmd() *cobra.Command {
 						"See 'docker model inspect --help' for more information",
 				)
 			}
+
+			args[0] = completion.AddDefaultNamespace(args[0])
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -47,7 +49,7 @@ func newInspectCmd() *cobra.Command {
 }
 
 func inspectModel(args []string, openai bool, remote bool, desktopClient *desktop.Client) (string, error) {
-	modelName := args[0]
+	modelName := completion.AddDefaultNamespace(args[0])
 	if openai {
 		model, err := desktopClient.InspectOpenAI(modelName)
 		if err != nil {
