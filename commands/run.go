@@ -99,7 +99,7 @@ func newRunCmd() *cobra.Command {
 				return err
 			}
 
-			model := args[0]
+			model := completion.AddDefaultNamespace(args[0])
 			prompt := ""
 			if len(args) == 1 {
 				if debug {

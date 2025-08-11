@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/docker/go-units"
@@ -127,6 +128,7 @@ func prettyPrintModels(models []dmrm.Model) string {
 			continue
 		}
 		for _, tag := range m.Tags {
+			tag = strings.TrimPrefix(tag, "ai/")
 			appendRow(table, tag, m)
 		}
 	}

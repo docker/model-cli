@@ -36,6 +36,7 @@ func newPullCmd() *cobra.Command {
 }
 
 func pullModel(cmd *cobra.Command, desktopClient *desktop.Client, model string) error {
+	model = completion.AddDefaultNamespace(model)
 	var progress func(string)
 	if isatty.IsTerminal(os.Stdout.Fd()) {
 		progress = TUIProgress

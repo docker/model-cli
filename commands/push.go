@@ -34,6 +34,7 @@ func newPushCmd() *cobra.Command {
 }
 
 func pushModel(cmd *cobra.Command, desktopClient *desktop.Client, model string) error {
+	model = completion.AddDefaultNamespace(model)
 	response, progressShown, err := desktopClient.Push(model, TUIProgress)
 
 	// Add a newline before any output (success or error) if progress was shown.
