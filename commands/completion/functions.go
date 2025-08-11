@@ -3,6 +3,7 @@ package completion
 import (
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
+	"strings"
 )
 
 func NoComplete(_ *cobra.Command, _ []string, _ string) ([]string, cobra.ShellCompDirective) {
@@ -30,4 +31,13 @@ func ModelNames(desktopClient func() *desktop.Client, limit int) cobra.Completio
 		}
 		return names, cobra.ShellCompDirectiveNoFileComp
 	}
+}
+
+// ensures the model string contains a slash, and if not, prepends "ai/".
+func AddDefaultNamespace(model string) string {
+	if !strings.Contains(model, "/") {
+		return "ai/" + model
+	}
+
+	return model
 }
