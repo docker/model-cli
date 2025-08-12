@@ -13,8 +13,9 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/docker/model-distribution v0.0.0-20250724114133-a11d745e582c
 	github.com/docker/model-runner v0.0.0-20250724122432-ecfa5e7e6807
+	github.com/fatih/color v1.15.0
 	github.com/google/go-containerregistry v0.20.6
-	github.com/mattn/go-isatty v0.0.17
+	github.com/mattn/go-isatty v0.0.20
 	github.com/nxadm/tail v1.4.8
 	github.com/olekukonko/tablewriter v0.0.5
 	github.com/pkg/errors v0.9.1
@@ -62,6 +63,7 @@ require (
 	github.com/jaypipes/pcidb v1.0.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect

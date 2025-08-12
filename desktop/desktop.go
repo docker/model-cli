@@ -18,6 +18,7 @@ import (
 	"github.com/docker/model-runner/pkg/inference"
 	dmrm "github.com/docker/model-runner/pkg/inference/models"
 	"github.com/docker/model-runner/pkg/inference/scheduling"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 )
@@ -362,6 +363,14 @@ func (c *Client) fullModelID(id string) (string, error) {
 	return "", fmt.Errorf("model with ID %s not found", id)
 }
 
+type chatPrinterState int
+
+const (
+	chatPrinterNone chatPrinterState = iota
+	chatPrinterContent
+	chatPrinterReasoning
+)
+
 func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 	model = normalizeHuggingFaceModelName(model)
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
@@ -411,6 +420,8 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 		return fmt.Errorf("error response: status=%d body=%s", resp.StatusCode, body)
 	}
 
+	printerState := chatPrinterNone
+	reasoningFmt := color.New(color.FgWhite).Add(color.Italic)
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -433,9 +444,26 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 			return fmt.Errorf("error parsing stream response: %w", err)
 		}
 
-		if len(streamResp.Choices) > 0 && streamResp.Choices[0].Delta.Content != "" {
-			chunk := streamResp.Choices[0].Delta.Content
-			fmt.Print(chunk)
+		if len(streamResp.Choices) > 0 {
+			if streamResp.Choices[0].Delta.ReasoningContent != "" {
+				chunk := streamResp.Choices[0].Delta.ReasoningContent
+				if printerState == chatPrinterContent {
+					fmt.Print("\n\n")
+				}
+				if printerState != chatPrinterReasoning {
+					reasoningFmt.Println("Thinking:")
+				}
+				printerState = chatPrinterReasoning
+				reasoningFmt.Print(chunk)
+			}
+			if streamResp.Choices[0].Delta.Content != "" {
+				chunk := streamResp.Choices[0].Delta.Content
+				if printerState == chatPrinterReasoning {
+					fmt.Print("\n\n")
+				}
+				printerState = chatPrinterContent
+				fmt.Print(chunk)
+			}
 		}
 	}
 
