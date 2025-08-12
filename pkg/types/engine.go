@@ -5,9 +5,12 @@ package types
 type ModelRunnerEngineKind uint8
 
 const (
+	// ModelRunnerEngineKindUnknown represents an engine whose type can not be
+	// determined.
+	ModelRunnerEngineKindUnknown ModelRunnerEngineKind = iota
 	// ModelRunnerEngineKindMoby represents a non-Desktop/Cloud engine on which
 	// the Model CLI command is responsible for managing a Model Runner.
-	ModelRunnerEngineKindMoby ModelRunnerEngineKind = iota
+	ModelRunnerEngineKindMoby
 	// ModelRunnerEngineKindMobyManual represents a non-Desktop/Cloud engine
 	// that's explicitly targeted by a MODEL_RUNNER_HOST environment variable on
 	// which the user is responsible for managing a Model Runner.
