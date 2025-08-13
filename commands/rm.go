@@ -21,6 +21,8 @@ func newRemoveCmd() *cobra.Command {
 						"See 'docker model rm --help' for more information",
 				)
 			}
+
+			args[0] = completion.AddDefaultNamespace(args[0])
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
