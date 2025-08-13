@@ -1,0 +1,242 @@
+openapi: "3.1.0"
+info:
+  title: Model Runner API
+  version: "1.0"
+  description: |
+    API documentation for the Model Runner service.
+
+    This API allows you to:
+      - Pull (create) models from a registry into the local store
+      - Load models from file uploads
+      - List all locally stored models
+      - Get details for a specific model (local or remote)
+      - Delete models from the local store (with optional force)
+      - Tag models with a repository and tag
+      - Push models to a registry
+
+servers:
+  - url: http://localhost:8080
+
+paths:
+  /models/create:
+    post:
+      operationId: createModel
+      summary: Create (pull) a model
+      description: Pull a model from a registry into the local store.
+      tags:
+        - models
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModelCreateRequest'
+      responses:
+        '200':
+          description: Model pulled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Model'
+        '400':
+          description: Invalid request body
+        '401':
+          description: Unauthorized
+        '404':
+          description: Model not found
+        '500':
+          description: Internal server error
+
+  /models/load:
+    post:
+      operationId: loadModel
+      summary: Load a model from file
+      description: Load a model from a file upload into the local store.
+      tags:
+        - models
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Model loaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Model'
+        '500':
+          description: Internal server error
+
+  /models:
+    get:
+      operationId: listModels
+      summary: List models
+      description: List all models in the local store.
+      tags:
+        - models
+      responses:
+        '200':
+          description: List of models
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Model'
+        '500':
+          description: Internal server error
+
+  /models/{name}:
+    get:
+      operationId: getModel
+      summary: Get model
+      description: Get details for a specific model. If the `remote` query parameter is true, fetch from the registry.
+      tags:
+        - models
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: remote
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Model details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Model'
+        '404':
+          description: Model not found
+        '500':
+          description: Internal server error
+    delete:
+      operationId: deleteModel
+      summary: Delete model
+      description: Delete a model from the local store. Use the `force` query parameter to force deletion even if the model has multiple tags.
+      tags:
+        - models
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: force
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Model deleted
+          content:
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: Model not found
+        '409':
+          description: Conflict (e.g., model is in use or has multiple tags and force is not set)
+        '500':
+          description: Internal server error
+
+  /models/{name}/tag:
+    post:
+      operationId: tagModel
+      summary: Tag model
+      description: Tag a model with a repository and tag. Both `repo` and `tag` query parameters are required.
+      tags:
+        - models
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: repo
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: tag
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '201':
+          description: Model tagged successfully
+        '400':
+          description: Missing repo or tag
+        '404':
+          description: Model not found
+        '500':
+          description: Internal server error
+
+  /models/{name}/push:
+    post:
+      operationId: pushModel
+      summary: Push model
+      description: Push a model to the registry.
+      tags:
+        - models
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Model pushed successfully
+        '400':
+          description: Invalid model reference
+        '401':
+          description: Unauthorized
+        '404':
+          description: Model not found
+        '500':
+          description: Internal server error
+
+components:
+  schemas:
+    ModelCreateRequest:
+      type: object
+      required:
+        - from
+      properties:
+        from:
+          type: string
+          description: Model reference to pull
+
+    Model:
+      type: object
+      properties:
+        ID:
+          type: string
+          description: Unique identifier for the model
+        Tags:
+          type: array
+          items:
+            type: string
+          description: List of tags associated with the model
+        Created:
+          type: integer
+          format: int64
+          description: Unix timestamp when the model was created
+        Config:
+          type: object
+          description: Model configuration (arbitrary JSON object)
