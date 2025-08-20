@@ -10,12 +10,11 @@ import (
 	"time"
 
 	"github.com/docker/model-runner/pkg/environment"
-	"github.com/docker/model-runner/pkg/gpuinfo"
 	"github.com/docker/model-runner/pkg/inference"
+	"github.com/docker/model-runner/pkg/inference/memory"
 	"github.com/docker/model-runner/pkg/inference/models"
 	"github.com/docker/model-runner/pkg/logging"
 	"github.com/docker/model-runner/pkg/metrics"
-	"github.com/elastic/go-sysinfo"
 )
 
 const (
@@ -113,7 +112,7 @@ func newLoader(
 	backends map[string]inference.Backend,
 	modelManager *models.Manager,
 	openAIRecorder *metrics.OpenAIRecorder,
-	gpuInfo *gpuinfo.GPUInfo,
+	sysMemInfo memory.SystemMemoryInfo,
 ) *loader {
 	// Compute the number of runner slots to allocate. Because of RAM and VRAM
 	// limitations, it's unlikely that we'll ever be able to fully populate
@@ -135,32 +134,7 @@ func newLoader(
 	}
 
 	// Compute the amount of available memory.
-	// TODO(p1-0tr): improve error handling
-	vramSize, err := gpuInfo.GetVRAMSize()
-	if err != nil {
-		vramSize = 1
-		log.Warnf("Could not read VRAM size: %s", err)
-	} else {
-		log.Infof("Running on system with %dMB VRAM", vramSize/1024/1024)
-	}
-	ramSize := uint64(1)
-	hostInfo, err := sysinfo.Host()
-	if err != nil {
-		log.Warnf("Could not read host info: %s", err)
-	} else {
-		ram, err := hostInfo.Memory()
-		if err != nil {
-			log.Warnf("Could not read host RAM size: %s", err)
-		} else {
-			ramSize = ram.Total
-			log.Infof("Running on system with %dMB RAM", ramSize/1024/1024)
-		}
-	}
-
-	totalMemory := inference.RequiredMemory{
-		RAM:  ramSize,
-		VRAM: vramSize,
-	}
+	totalMemory := sysMemInfo.GetTotalMemory()
 
 	// Create the loader.
 	l := &loader{
@@ -420,11 +394,21 @@ func (l *loader) load(ctx context.Context, backendName, modelID, modelRef string
 	if rc, ok := l.runnerConfigs[runnerKey{backendName, modelID, mode}]; ok {
 		runnerConfig = &rc
 	}
-	memory, err := backend.GetRequiredMemoryForModel(modelID, runnerConfig)
-	if err != nil {
+	memory, err := backend.GetRequiredMemoryForModel(ctx, modelID, runnerConfig)
+	var parseErr *inference.ErrGGUFParse
+	if errors.As(err, &parseErr) {
+		// TODO(p1-0tr): For now override memory checks in case model can't be parsed
+		// e.g. model is too new for gguf-parser-go to know. We should provide a cleaner
+		// way to bypass these checks.
+		l.log.Warnf("Could not parse model(%s), memory checks will be ignored for it. Error: %s", modelID, parseErr)
+		memory = &inference.RequiredMemory{
+			RAM:  0,
+			VRAM: 0,
+		}
+	} else if err != nil {
 		return nil, err
 	}
-	l.log.Infof("Loading %s, which will require %dMB RAM and %dMB VRAM", modelID, memory.RAM/1024/1024, memory.VRAM/1024/1024)
+	l.log.Infof("Loading %s, which will require %d MB RAM and %d MB VRAM on a system with %d MB RAM and %d MB VRAM", modelID, memory.RAM/1024/1024, memory.VRAM/1024/1024, l.totalMemory.RAM/1024/1024, l.totalMemory.VRAM/1024/1024)
 	if l.totalMemory.RAM == 1 {
 		l.log.Warnf("RAM size unknown. Assume model will fit, but only one.")
 		memory.RAM = 1

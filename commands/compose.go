@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/docker/model-cli/pkg/types"
-	"github.com/spf13/pflag"
 	"slices"
 	"strings"
 
+	"github.com/docker/model-cli/pkg/types"
+	"github.com/spf13/pflag"
+
 	"github.com/docker/model-cli/desktop"
 	"github.com/docker/model-runner/pkg/inference/backends/llamacpp"
-	"github.com/docker/model-runner/pkg/inference/scheduling"
 	dmrm "github.com/docker/model-runner/pkg/inference/models"
+	"github.com/docker/model-runner/pkg/inference/scheduling"
 	"github.com/spf13/cobra"
 )
 
@@ -155,7 +156,7 @@ func downloadModelsOnlyIfNotFound(desktopClient *desktop.Client, models []string
 			}
 			return false
 		}) {
-			_, _, err = desktopClient.Pull(model, func(s string) {
+			_, _, err = desktopClient.Pull(model, false, func(s string) {
 				_ = sendInfo(s)
 			})
 			if err != nil {

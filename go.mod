@@ -11,8 +11,8 @@ require (
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
-	github.com/docker/model-distribution v0.0.0-20250724114133-a11d745e582c
-	github.com/docker/model-runner v0.0.0-20250724122432-ecfa5e7e6807
+	github.com/docker/model-distribution v0.0.0-20250813080006-2a983516ebb8
+	github.com/docker/model-runner v0.0.0-20250822151118-d8ed37445584
 	github.com/fatih/color v1.15.0
 	github.com/google/go-containerregistry v0.20.6
 	github.com/mattn/go-isatty v0.0.20

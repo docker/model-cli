@@ -106,9 +106,9 @@ func (c *Client) Status() Status {
 	}
 }
 
-func (c *Client) Pull(model string, progress func(string)) (string, bool, error) {
+func (c *Client) Pull(model string, ignoreRuntimeMemoryCheck bool, progress func(string)) (string, bool, error) {
 	model = normalizeHuggingFaceModelName(model)
-	jsonData, err := json.Marshal(dmrm.ModelCreateRequest{From: model})
+	jsonData, err := json.Marshal(dmrm.ModelCreateRequest{From: model, IgnoreRuntimeMemoryCheck: ignoreRuntimeMemoryCheck})
 	if err != nil {
 		return "", false, fmt.Errorf("error marshaling request: %w", err)
 	}

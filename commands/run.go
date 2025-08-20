@@ -80,6 +80,7 @@ func readMultilineInput(cmd *cobra.Command, scanner *bufio.Scanner) (string, err
 func newRunCmd() *cobra.Command {
 	var debug bool
 	var backend string
+	var ignoreRuntimeMemoryCheck bool
 
 	const cmdArgs = "MODEL [PROMPT]"
 	c := &cobra.Command{
@@ -124,7 +125,7 @@ func newRunCmd() *cobra.Command {
 						return handleNotRunningError(handleClientError(err, "Failed to inspect model"))
 					}
 					cmd.Println("Unable to find model '" + model + "' locally. Pulling from the server.")
-					if err := pullModel(cmd, desktopClient, model); err != nil {
+					if err := pullModel(cmd, desktopClient, model, ignoreRuntimeMemoryCheck); err != nil {
 						return err
 					}
 				}
@@ -188,6 +189,7 @@ func newRunCmd() *cobra.Command {
 	c.Flags().BoolVar(&debug, "debug", false, "Enable debug logging")
 	c.Flags().StringVar(&backend, "backend", "", fmt.Sprintf("Specify the backend to use (%s)", ValidBackendsKeys()))
 	c.Flags().MarkHidden("backend")
+	c.Flags().BoolVar(&ignoreRuntimeMemoryCheck, "ignore-runtime-memory-check", false, "Do not block pull if estimated runtime memory for model exceeds system resources.")
 
 	return c
 }
