@@ -11,7 +11,9 @@ import (
 	"github.com/docker/model-distribution/types"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 )
 
 const (
@@ -106,7 +108,51 @@ func (c *Client) Model(ctx context.Context, reference string) (types.ModelArtifa
 		}
 		return nil, NewRegistryError(reference, "UNKNOWN", err.Error(), err)
 	}
+
 	return &artifact{remoteImg}, nil
+}
+
+func (c *Client) BlobURL(reference string, digest v1.Hash) (string, error) {
+	// Parse the reference
+	ref, err := name.ParseReference(reference)
+	if err != nil {
+		return "", NewReferenceError(reference, err)
+	}
+
+	return fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
+		ref.Context().Registry.Scheme(),
+		ref.Context().Registry.RegistryStr(),
+		ref.String(),
+		digest.String()), nil
+}
+
+func (c *Client) BearerToken(ctx context.Context, reference string) (string, error) {
+	// Parse the reference
+	ref, err := name.ParseReference(reference)
+	if err != nil {
+		return "", NewReferenceError(reference, err)
+	}
+
+	var auth authn.Authenticator
+	if c.auth != nil {
+		auth = c.auth
+	} else {
+		auth, err = c.keychain.Resolve(ref.Context())
+		if err != nil {
+			return "", fmt.Errorf("resolving credentials: %w", err)
+		}
+	}
+
+	pr, err := transport.Ping(ctx, ref.Context().Registry, c.transport)
+	if err != nil {
+		return "", fmt.Errorf("pinging registry: %w", err)
+	}
+
+	tok, err := transport.Exchange(ctx, ref.Context().Registry, auth, c.transport, []string{ref.Scope(transport.PullScope)}, pr)
+	if err != nil {
+		return "", fmt.Errorf("getting registry token: %w", err)
+	}
+	return tok.Token, nil
 }
 
 type Target struct {

@@ -36,7 +36,7 @@ func TestPullHuggingFaceModel(t *testing.T) {
 		Body:       io.NopCloser(bytes.NewBufferString(`{"type":"success","message":"Model pulled successfully"}`)),
 	}, nil)
 
-	_, _, err := client.Pull(modelName, func(s string) {})
+	_, _, err := client.Pull(modelName, false, func(s string) {})
 	assert.NoError(t, err)
 }
 
@@ -122,7 +122,7 @@ func TestNonHuggingFaceModel(t *testing.T) {
 		Body:       io.NopCloser(bytes.NewBufferString(`{"type":"success","message":"Model pulled successfully"}`)),
 	}, nil)
 
-	_, _, err := client.Pull(modelName, func(s string) {})
+	_, _, err := client.Pull(modelName, false, func(s string) {})
 	assert.NoError(t, err)
 }
 
