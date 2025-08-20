@@ -33,8 +33,9 @@ type OpenAIChatResponse struct {
 	Model   string `json:"model"`
 	Choices []struct {
 		Delta struct {
-			Content string `json:"content"`
-			Role    string `json:"role,omitempty"`
+			Content          string `json:"content"`
+			Role             string `json:"role,omitempty"`
+			ReasoningContent string `json:"reasoning_content,omitempty"`
 		} `json:"delta"`
 		Index        int    `json:"index"`
 		FinishReason string `json:"finish_reason"`

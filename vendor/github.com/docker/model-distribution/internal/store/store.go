@@ -6,8 +6,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/docker/model-distribution/internal/progress"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
+
+	"github.com/docker/model-distribution/internal/progress"
 )
 
 const (
@@ -219,7 +220,7 @@ func (s *LocalStore) Write(mdl v1.Image, tags []string, w io.Writer) error {
 			progressChan = pr.Updates()
 		}
 
-		err := s.writeBlob(layer, progressChan)
+		err := s.writeLayer(layer, progressChan)
 
 		if progressChan != nil {
 			close(progressChan)
@@ -234,32 +235,21 @@ func (s *LocalStore) Write(mdl v1.Image, tags []string, w io.Writer) error {
 	}
 
 	// Write the manifest
-	if err := s.writeManifest(mdl); err != nil {
-		return fmt.Errorf("writing manifest: %w", err)
-	}
-
-	// Add the model to the index
-	idx, err := s.readIndex()
+	digest, err := mdl.Digest()
 	if err != nil {
-		return fmt.Errorf("reading models: %w", err)
+		return fmt.Errorf("get digest: %w", err)
 	}
-	entry, err := newEntry(mdl)
+	rm, err := mdl.RawManifest()
 	if err != nil {
-		return fmt.Errorf("creating index entry: %w", err)
+		return fmt.Errorf("get raw manifest: %w", err)
 	}
-
-	// Add the model tags
-	idx = idx.Add(entry)
-	for _, tag := range tags {
-		updatedIdx, err := idx.Tag(entry.ID, tag)
-		if err != nil {
-			fmt.Printf("Warning: failed to tag model %q with tag %q: %v\n", entry.ID, tag, err)
-			continue
-		}
-		idx = updatedIdx
+	if err := s.WriteManifest(digest, rm); err != nil {
+		return fmt.Errorf("write manifest: %w", err)
 	}
-
-	return s.writeIndex(idx)
+	if err := s.AddTags(digest.String(), tags); err != nil {
+		return fmt.Errorf("adding tags: %w", err)
+	}
+	return err
 }
 
 // Read reads a model from the store by reference (either tag or ID)
@@ -281,25 +271,4 @@ func (s *LocalStore) Read(reference string) (*Model, error) {
 	}
 
 	return nil, ErrModelNotFound
-}
-
-// ProgressReader wraps an io.Reader to track reading progress
-type ProgressReader struct {
-	Reader       io.Reader
-	ProgressChan chan<- v1.Update
-	Total        int64
-}
-
-func (pr *ProgressReader) Read(p []byte) (int, error) {
-	n, err := pr.Reader.Read(p)
-	pr.Total += int64(n)
-	if err == io.EOF {
-		pr.ProgressChan <- v1.Update{Complete: pr.Total}
-	} else if n > 0 {
-		select {
-		case pr.ProgressChan <- v1.Update{Complete: pr.Total}:
-		default: // if the progress channel is full, it skips sending rather than blocking the Read() call.
-		}
-	}
-	return n, err
 }

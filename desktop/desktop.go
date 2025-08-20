@@ -3,6 +3,7 @@ package desktop
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -17,6 +18,7 @@ import (
 	"github.com/docker/model-runner/pkg/inference"
 	dmrm "github.com/docker/model-runner/pkg/inference/models"
 	"github.com/docker/model-runner/pkg/inference/scheduling"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 )
@@ -361,6 +363,14 @@ func (c *Client) fullModelID(id string) (string, error) {
 	return "", fmt.Errorf("model with ID %s not found", id)
 }
 
+type chatPrinterState int
+
+const (
+	chatPrinterNone chatPrinterState = iota
+	chatPrinterContent
+	chatPrinterReasoning
+)
+
 func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 	model = normalizeHuggingFaceModelName(model)
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
@@ -410,6 +420,8 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 		return fmt.Errorf("error response: status=%d body=%s", resp.StatusCode, body)
 	}
 
+	printerState := chatPrinterNone
+	reasoningFmt := color.New(color.FgWhite).Add(color.Italic)
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -432,9 +444,26 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 			return fmt.Errorf("error parsing stream response: %w", err)
 		}
 
-		if len(streamResp.Choices) > 0 && streamResp.Choices[0].Delta.Content != "" {
-			chunk := streamResp.Choices[0].Delta.Content
-			fmt.Print(chunk)
+		if len(streamResp.Choices) > 0 {
+			if streamResp.Choices[0].Delta.ReasoningContent != "" {
+				chunk := streamResp.Choices[0].Delta.ReasoningContent
+				if printerState == chatPrinterContent {
+					fmt.Print("\n\n")
+				}
+				if printerState != chatPrinterReasoning {
+					reasoningFmt.Println("Thinking:")
+				}
+				printerState = chatPrinterReasoning
+				reasoningFmt.Print(chunk)
+			}
+			if streamResp.Choices[0].Delta.Content != "" {
+				chunk := streamResp.Choices[0].Delta.Content
+				if printerState == chatPrinterReasoning {
+					fmt.Print("\n\n")
+				}
+				printerState = chatPrinterContent
+				fmt.Print(chunk)
+			}
 		}
 	}
 
@@ -702,5 +731,27 @@ func (c *Client) Tag(source, targetRepo, targetTag string) error {
 		return fmt.Errorf("tagging failed with status %s: %s", resp.Status, string(body))
 	}
 
+	return nil
+}
+
+func (c *Client) LoadModel(ctx context.Context, r io.Reader) error {
+	loadPath := fmt.Sprintf("%s/load", inference.ModelsPrefix)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.modelRunner.URL(loadPath), r)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-tar")
+	req.Header.Set("User-Agent", "docker-model-cli/"+Version)
+
+	resp, err := c.modelRunner.Client().Do(req)
+	if err != nil {
+		return c.handleQueryError(err, loadPath)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("load failed with status %s: %s", resp.Status, string(body))
+	}
 	return nil
 }
