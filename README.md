@@ -12,7 +12,7 @@ A powerful command-line interface for managing, running, packaging, and deployin
 - **Tag, Pull, Push, Remove, Unload**: Full lifecycle management for model artifacts.
 - **Compose & Desktop Integration**: Advanced orchestration and desktop support for model backends.
 
-## Installation
+## Building
 1. **Clone the repo:**
    ```bash
    git clone https://github.com/docker/model-cli.git
@@ -59,10 +59,6 @@ Tell me a joke.
 ```
 
 ## Advanced
-- **Compose Integration:**
-  Use `model compose up` to orchestrate model backends with Docker Compose.
-- **OpenAI Backend:**
-  Use `--backend openai` and provide your API key for OpenAI-compatible models.
 - **Packaging:**
   Add licenses and set context size when packaging models for distribution.
 
@@ -79,6 +75,3 @@ Tell me a joke.
 ## License
 [Apache 2.0](LICENSE)
 
----
-
-Docker Model CLI — The fastest way to run, manage, and ship AI models with Docker.
