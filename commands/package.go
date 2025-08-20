@@ -73,7 +73,7 @@ func newPackagedCmd() *cobra.Command {
 
 	c.Flags().StringVar(&opts.ggufPath, "gguf", "", "absolute path to gguf file (required)")
 	c.Flags().StringArrayVarP(&opts.licensePaths, "license", "l", nil, "absolute path to a license file")
-	c.Flags().BoolVar(&opts.push, "push", false, "push to registry (if not set, the model is loaded into the Model Runner content store.")
+	c.Flags().BoolVar(&opts.push, "push", false, "push to registry (if not set, the model is loaded into the Model Runner content store)")
 	c.Flags().Uint64Var(&opts.contextSize, "context-size", 0, "context size in tokens")
 	return c
 }
