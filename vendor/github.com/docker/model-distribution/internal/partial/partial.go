@@ -65,20 +65,32 @@ type WithLayers interface {
 	Layers() ([]v1.Layer, error)
 }
 
-func GGUFPath(i WithLayers) (string, error) {
-	return layerPathByMediaType(i, types.MediaTypeGGUF)
+func GGUFPaths(i WithLayers) ([]string, error) {
+	return layerPathsByMediaType(i, types.MediaTypeGGUF)
 }
 
 func MMPROJPath(i WithLayers) (string, error) {
-	return layerPathByMediaType(i, types.MediaTypeMultimodalProjector)
+	paths, err := layerPathsByMediaType(i, types.MediaTypeMultimodalProjector)
+	if err != nil {
+		return "", fmt.Errorf("get mmproj layer paths: %w", err)
+	}
+	if len(paths) == 0 {
+		return "", fmt.Errorf("model does not contain any layer of type %q", types.MediaTypeMultimodalProjector)
+	}
+	if len(paths) > 1 {
+		return "", fmt.Errorf("found %d files of type %q, expected exactly 1",
+			len(paths), types.MediaTypeMultimodalProjector)
+	}
+	return paths[0], err
 }
 
-// layerPathByMediaType is a generic helper function that finds a layer by media type and returns its path
-func layerPathByMediaType(i WithLayers, mediaType ggcr.MediaType) (string, error) {
+// layerPathsByMediaType is a generic helper function that finds a layer by media type and returns its path
+func layerPathsByMediaType(i WithLayers, mediaType ggcr.MediaType) ([]string, error) {
 	layers, err := i.Layers()
 	if err != nil {
-		return "", fmt.Errorf("get layers: %w", err)
+		return nil, fmt.Errorf("get layers: %w", err)
 	}
+	var paths []string
 	for _, l := range layers {
 		mt, err := l.MediaType()
 		if err != nil || mt != mediaType {
@@ -86,11 +98,11 @@ func layerPathByMediaType(i WithLayers, mediaType ggcr.MediaType) (string, error
 		}
 		layer, ok := l.(*Layer)
 		if !ok {
-			return "", fmt.Errorf("%s Layer is not available locally", mediaType)
+			return nil, fmt.Errorf("%s Layer is not available locally", mediaType)
 		}
-		return layer.Path, nil
+		paths = append(paths, layer.Path)
 	}
-	return "", fmt.Errorf("model does not contain a %s layer", mediaType)
+	return paths, nil
 }
 
 func ManifestForLayers(i WithLayers) (*v1.Manifest, error) {

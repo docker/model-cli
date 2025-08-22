@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 
 	"github.com/sirupsen/logrus"
 
@@ -159,20 +158,12 @@ func (c *Client) PullModel(ctx context.Context, reference string, progressWriter
 	localModel, err := c.store.Read(remoteDigest.String())
 	if err == nil {
 		c.log.Infoln("Model found in local store:", reference)
-		ggufPath, err := localModel.GGUFPath()
+		cfg, err := localModel.Config()
 		if err != nil {
-			return fmt.Errorf("getting gguf path: %w", err)
+			return fmt.Errorf("getting cached model config: %w", err)
 		}
 
-		// Get file size for progress reporting
-		fileInfo, err := os.Stat(ggufPath)
-		if err != nil {
-			return fmt.Errorf("getting file info: %w", err)
-		}
-
-		// Report progress for local model
-		size := fileInfo.Size()
-		err = progress.WriteSuccess(progressWriter, fmt.Sprintf("Using cached model: %.2f MB", float64(size)/1024/1024))
+		err = progress.WriteSuccess(progressWriter, fmt.Sprintf("Using cached model: %s", cfg.Size))
 		if err != nil {
 			c.log.Warnf("Writing progress: %v", err)
 			// If we fail to write progress, don't try again
@@ -401,6 +392,11 @@ func (c *Client) ResetStore() error {
 		return fmt.Errorf("resetting store: %w", err)
 	}
 	return nil
+}
+
+// GetBundle returns a types.Bundle containing the model, creating one as necessary
+func (c *Client) GetBundle(ref string) (types.ModelBundle, error) {
+	return c.store.BundleForModel(ref)
 }
 
 func checkCompat(image types.ModelArtifact) error {

@@ -110,8 +110,8 @@ func (m *Model) LayerByDiffID(hash v1.Hash) (v1.Layer, error) {
 	return m.LayerByDigest(hash)
 }
 
-func (m *Model) GGUFPath() (string, error) {
-	return mdpartial.GGUFPath(m)
+func (m *Model) GGUFPaths() ([]string, error) {
+	return mdpartial.GGUFPaths(m)
 }
 
 func (m *Model) MMPROJPath() (string, error) {

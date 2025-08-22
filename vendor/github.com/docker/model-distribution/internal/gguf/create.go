@@ -13,13 +13,23 @@ import (
 )
 
 func NewModel(path string) (*Model, error) {
-	layer, err := partial.NewLayer(path, types.MediaTypeGGUF)
-	if err != nil {
-		return nil, fmt.Errorf("create gguf layer: %w", err)
+	shards := parser.CompleteShardGGUFFilename(path)
+	if len(shards) == 0 {
+		shards = []string{path} // single file
 	}
-	diffID, err := layer.DiffID()
-	if err != nil {
-		return nil, fmt.Errorf("get gguf layer diffID: %w", err)
+	layers := make([]v1.Layer, len(shards))
+	diffIDs := make([]v1.Hash, len(shards))
+	for i, shard := range shards {
+		layer, err := partial.NewLayer(shard, types.MediaTypeGGUF)
+		if err != nil {
+			return nil, fmt.Errorf("create gguf layer: %w", err)
+		}
+		diffID, err := layer.DiffID()
+		if err != nil {
+			return nil, fmt.Errorf("get gguf layer diffID: %w", err)
+		}
+		layers[i] = layer
+		diffIDs[i] = diffID
 	}
 
 	created := time.Now()
@@ -30,13 +40,11 @@ func NewModel(path string) (*Model, error) {
 				Created: &created,
 			},
 			RootFS: v1.RootFS{
-				Type: "rootfs",
-				DiffIDs: []v1.Hash{
-					diffID,
-				},
+				Type:    "rootfs",
+				DiffIDs: diffIDs,
 			},
 		},
-		layers: []v1.Layer{layer},
+		layers: layers,
 	}, nil
 }
 

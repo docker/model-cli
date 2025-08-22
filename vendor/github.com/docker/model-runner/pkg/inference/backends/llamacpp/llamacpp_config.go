@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/docker/model-distribution/types"
+
 	"github.com/docker/model-runner/pkg/inference"
 )
 
@@ -35,18 +36,13 @@ func NewDefaultLlamaCppConfig() *Config {
 }
 
 // GetArgs implements BackendConfig.GetArgs.
-func (c *Config) GetArgs(model types.Model, socket string, mode inference.BackendMode, config *inference.BackendConfiguration) ([]string, error) {
+func (c *Config) GetArgs(bundle types.ModelBundle, socket string, mode inference.BackendMode, config *inference.BackendConfiguration) ([]string, error) {
 	// Start with the arguments from LlamaCppConfig
 	args := append([]string{}, c.Args...)
 
-	modelPath, err := model.GGUFPath()
-	if err != nil {
-		return nil, fmt.Errorf("get gguf path: %w", err)
-	}
-
-	modelCfg, err := model.Config()
-	if err != nil {
-		return nil, fmt.Errorf("get model config: %w", err)
+	modelPath := bundle.GGUFPath()
+	if modelPath == "" {
+		return nil, fmt.Errorf("GGUF file required by llama.cpp backend")
 	}
 
 	// Add model and socket arguments
@@ -57,7 +53,8 @@ func (c *Config) GetArgs(model types.Model, socket string, mode inference.Backen
 		args = append(args, "--embeddings")
 	}
 
-	args = append(args, "--ctx-size", strconv.FormatUint(GetContextSize(&modelCfg, config), 10))
+	// Add context size from model config or backend config
+	args = append(args, "--ctx-size", strconv.FormatUint(GetContextSize(bundle.RuntimeConfig(), config), 10))
 
 	// Add arguments from backend config
 	if config != nil {
@@ -65,17 +62,16 @@ func (c *Config) GetArgs(model types.Model, socket string, mode inference.Backen
 	}
 
 	// Add arguments for Multimodal projector
-	path, err := model.MMPROJPath()
-	if path != "" && err == nil {
+	if path := bundle.MMPROJPath(); path != "" {
 		args = append(args, "--mmproj", path)
 	}
 
 	return args, nil
 }
 
-func GetContextSize(modelCfg *types.Config, backendCfg *inference.BackendConfiguration) uint64 {
+func GetContextSize(modelCfg types.Config, backendCfg *inference.BackendConfiguration) uint64 {
 	// Model config takes precedence
-	if modelCfg != nil && modelCfg.ContextSize != nil {
+	if modelCfg.ContextSize != nil {
 		return *modelCfg.ContextSize
 	}
 	// else use backend config

@@ -7,13 +7,14 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/docker/model-distribution/internal/progress"
-	"github.com/docker/model-distribution/types"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+
+	"github.com/docker/model-distribution/internal/progress"
+	"github.com/docker/model-distribution/types"
 )
 
 const (
@@ -122,7 +123,7 @@ func (c *Client) BlobURL(reference string, digest v1.Hash) (string, error) {
 	return fmt.Sprintf("%s://%s/v2/%s/blobs/%s",
 		ref.Context().Registry.Scheme(),
 		ref.Context().Registry.RegistryStr(),
-		ref.String(),
+		ref.Context().RepositoryStr(),
 		digest.String()), nil
 }
 
