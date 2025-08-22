@@ -25,7 +25,9 @@ func newPackagedCmd() *cobra.Command {
 
 	c := &cobra.Command{
 		Use:   "package --gguf <path> [--license <path>...] [--context-size <tokens>] [--push] MODEL",
-		Short: "Package a GGUF file into a Docker model OCI artifact, with optional licenses. The package is sent to the model-runner, unless --push is specified",
+		Short: "Package a GGUF file into a Docker model OCI artifact, with optional licenses.",
+		Long: "Package a GGUF file into a Docker model OCI artifact, with optional licenses. The package is sent to the model-runner, unless --push is specified.\n" +
+			"When packaging a sharded model --gguf should point to the first shard. All shard files should be siblings and should include the index in the file name (e.g. model-00001-of-00015.gguf).",
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) != 1 {
 				return fmt.Errorf(
