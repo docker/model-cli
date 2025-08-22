@@ -11,7 +11,7 @@ When packaging a sharded model --gguf should point to the first shard. All shard
 | `--context-size`  | `uint64`      | `0`     | context size in tokens                                                                 |
 | `--gguf`          | `string`      |         | absolute path to gguf file (required)                                                  |
 | `-l`, `--license` | `stringArray` |         | absolute path to a license file                                                        |
-| `--push`          | `bool`        |         | push to registry (if not set, the model is loaded into the Model Runner content store. |
+| `--push`          | `bool`        |         | push to registry (if not set, the model is loaded into the Model Runner content store) |
 
 
 <!---MARKER_GEN_END-->

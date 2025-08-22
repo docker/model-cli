@@ -42,7 +42,7 @@ options:
       value_type: bool
       default_value: "false"
       description: |
-        push to registry (if not set, the model is loaded into the Model Runner content store.
+        push to registry (if not set, the model is loaded into the Model Runner content store)
       deprecated: false
       hidden: false
       experimental: false
