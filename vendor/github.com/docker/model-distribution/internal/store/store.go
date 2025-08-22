@@ -103,14 +103,21 @@ func (s *LocalStore) Delete(ref string) (string, []string, error) {
 		return "", nil, ErrModelNotFound
 	}
 
-	// Remove manifest file
-	if digest, err := v1.NewHash(model.ID); err != nil {
-		fmt.Printf("Warning: failed to parse manifest digest %s: %v\n", digest, err)
-	} else if err := s.removeManifest(digest); err != nil {
-		fmt.Printf("Warning: failed to remove manifest %q: %v\n",
-			digest, err,
-		)
+	digest, err := v1.NewHash(model.ID)
+	if err != nil {
+		return "", nil, fmt.Errorf("parse manifest digest %q: %w", model.ID, err)
 	}
+
+	// Remove manifest file
+	if err := s.removeManifest(digest); err != nil {
+		fmt.Printf("Warning: failed to remove manifest %q: %v\n", digest, err)
+	}
+
+	// Remove bundle if one exists
+	if err := s.removeBundle(digest); err != nil {
+		fmt.Printf("Warning: failed to remove bundle %q: %v\n", digest, err)
+	}
+
 	// Before deleting blobs, check if they are referenced by other models
 	blobRefs := make(map[string]int)
 	for _, m := range idx.Models {

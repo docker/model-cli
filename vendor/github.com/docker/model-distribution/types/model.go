@@ -6,7 +6,7 @@ import (
 
 type Model interface {
 	ID() (string, error)
-	GGUFPath() (string, error)
+	GGUFPaths() ([]string, error)
 	MMPROJPath() (string, error)
 	Config() (Config, error)
 	Tags() []string
@@ -18,4 +18,11 @@ type ModelArtifact interface {
 	Config() (Config, error)
 	Descriptor() (Descriptor, error)
 	v1.Image
+}
+
+type ModelBundle interface {
+	RootDir() string
+	GGUFPath() string
+	MMPROJPath() string
+	RuntimeConfig() Config
 }
