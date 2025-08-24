@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -102,13 +103,29 @@ func newRunCmd() *cobra.Command {
 
 			model := args[0]
 			prompt := ""
-			if len(args) == 1 {
-				if debug {
-					cmd.Printf("Running model %s\n", model)
+			args_len := len(args)
+			if args_len > 1 {
+				prompt = strings.Join(args[1:], " ")
+			}
+
+			fi, err := os.Stdin.Stat()
+			if err == nil && (fi.Mode()&os.ModeCharDevice) == 0 {
+				// Read all from stdin
+				reader := bufio.NewReader(os.Stdin)
+				input, err := io.ReadAll(reader)
+				if err == nil {
+					if prompt != "" {
+						prompt += "\n\n"
+					}
+
+					prompt += string(input)
 				}
-			} else {
-				prompt = args[1]
-				if debug {
+			}
+
+			if debug {
+				if prompt == "" {
+					cmd.Printf("Running model %s\n", model)
+				} else {
 					cmd.Printf("Running model %s with prompt %s\n", model, prompt)
 				}
 			}
@@ -180,9 +197,7 @@ func newRunCmd() *cobra.Command {
 					"See 'docker model run --help' for more information",
 			)
 		}
-		if len(args) > 2 {
-			return fmt.Errorf("too many arguments, expected " + cmdArgs)
-		}
+
 		return nil
 	}
 
