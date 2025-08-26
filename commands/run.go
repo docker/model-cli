@@ -229,8 +229,8 @@ func promptModel(h *history.History, placeholder string) prompt {
 
 	text := textinput.New()
 	text.Placeholder = placeholder
-	text.Prompt = ">>> "
-	text.Width = width - 5
+	text.Prompt = "> "
+	text.Width = width - len(text.Prompt) - 1
 	text.Cursor.Blink = false
 	text.ShowSuggestions = true
 	text.Focus()
