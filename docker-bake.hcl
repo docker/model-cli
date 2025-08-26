@@ -17,7 +17,10 @@ group "default" {
 }
 
 group "validate" {
-  targets = ["validate-docs"]
+  targets = [
+    "validate-docs",
+    "validate-tests"
+  ]
 }
 
 target "validate-docs" {
@@ -36,4 +39,10 @@ target "update-docs" {
   }
   target = "docs-update"
   output = ["./docs/reference"]
+}
+
+target "validate-tests" {
+  inherits = ["_common"]
+  target = "test"
+  output = ["type=cacheonly"]
 }
