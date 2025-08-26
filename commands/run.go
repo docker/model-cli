@@ -167,9 +167,8 @@ func newRunCmd() *cobra.Command {
 				case strings.HasPrefix(question, "/"):
 					printHelp(helpUnknownCommand)
 
-				case strings.HasPrefix(question, `"""`):
-					initialText := strings.TrimPrefix(question, `"""`)
-					restOfText, err := readMultilineString(cmd.Context(), initialText)
+				case strings.HasPrefix(question, `"""`) || strings.HasPrefix(question, `'''`):
+					restOfText, err := readMultilineString(cmd.Context(), os.Stdin, question)
 					if err != nil {
 						return err
 					}
@@ -323,44 +322,63 @@ func copyToClipboard(command string) error {
 	return nil
 }
 
-// readMultilineString reads a multiline string from stdin, starting with the initial text if provided.
-// The initialText parameter is optional and can be used to provide a starting point for the input.
-// It reads from stdin until it encounters a closing triple quote (""").
-func readMultilineString(ctx context.Context, initialText string) (string, error) {
+// readMultilineString reads a multiline string from r, starting with the initial text if provided.
+// The text must start either with triple quotes (""") or single quotes (”'). readMultilineString
+// will scan the input until a matching closing quote is found, or return an error if the input
+// is not properly closed. It returns the string content without the surrounding quotes but
+// preserving the original newlines and indentation.
+func readMultilineString(ctx context.Context, r io.Reader, initialText string) (string, error) {
 	var question string
 
 	// Start with the initial text if provided
 	if initialText != "" {
-		question = initialText + "\n"
+		tr := strings.NewReader(initialText)
+		mr := io.MultiReader(tr, r)
+		r = mr
+	}
+
+	br := bufio.NewReader(r)
+
+	// Read the first 3 bytes
+	pd := make([]byte, 3)
+	if _, err := io.ReadFull(br, pd); err != nil {
+		return "", err
+	}
+	prefix := string(pd)
+	if prefix != `"""` && prefix != `'''` {
+		return "", fmt.Errorf("invalid multiline string prefix: %q", prefix)
 	}
 
 	for {
 		fmt.Print("... ")
 
-		line, err := readLine(ctx)
+		line, err := readLine(ctx, br)
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return "", fmt.Errorf("unclosed multiline input: %w", err)
+			}
 			return "", err
 		}
 
-		question += line + "\n"
-		if strings.TrimSpace(line) == `"""` || strings.HasSuffix(strings.TrimSpace(line), `"""`) {
+		question += line
+		if strings.TrimSpace(line) == prefix || strings.HasSuffix(strings.TrimSpace(line), prefix) {
 			break
 		}
 	}
 
-	// Find and remove the closing triple quotes
+	// Find and remove the closing triple terminator
 	content := question
-	if idx := strings.LastIndex(content, `"""`); idx >= 0 {
+	if idx := strings.LastIndex(content, prefix); idx >= 0 {
 		before := content[:idx]
-		after := content[idx+3:]
+		after := content[idx+len(prefix):]
 		content = before + after
 	}
 
 	return strings.TrimRight(content, "\n"), nil
 }
 
-// readLine reads a single line from stdin.
-func readLine(ctx context.Context) (string, error) {
+// readLine reads a single line from r.
+func readLine(ctx context.Context, r *bufio.Reader) (string, error) {
 	lines := make(chan string)
 	errs := make(chan error)
 
@@ -368,9 +386,8 @@ func readLine(ctx context.Context) (string, error) {
 		defer close(lines)
 		defer close(errs)
 
-		reader := bufio.NewReader(os.Stdin)
-		line, err := reader.ReadString('\n')
-		if err != nil {
+		line, err := r.ReadString('\n')
+		if err != nil && line == "" {
 			errs <- err
 		} else {
 			lines <- line
