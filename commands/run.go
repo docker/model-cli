@@ -258,10 +258,7 @@ func (p *prompt) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case tea.KeyEnter:
 			p.Finalize()
 			return p, tea.Quit
-		case tea.KeyCtrlC:
-			p.text.SetValue("")
-			return p, nil
-		case tea.KeyCtrlD:
+		case tea.KeyCtrlC, tea.KeyCtrlD:
 			p.text.SetValue("/bye")
 			p.Finalize()
 			return p, tea.Quit
