@@ -31,7 +31,8 @@ const controllerContainerName = "docker-model-runner"
 // It does nothing for Desktop and Cloud engine kinds.
 func copyDockerConfigToContainer(ctx context.Context, dockerClient *client.Client, containerID string, engineKind types.ModelRunnerEngineKind) error {
 	// Do nothing for Desktop and Cloud engine kinds
-	if engineKind == types.ModelRunnerEngineKindDesktop || engineKind == types.ModelRunnerEngineKindCloud {
+	if engineKind == types.ModelRunnerEngineKindDesktop || engineKind == types.ModelRunnerEngineKindCloud ||
+		os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") == "1" {
 		return nil
 	}
 
