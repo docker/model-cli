@@ -168,7 +168,8 @@ func newRunCmd() *cobra.Command {
 					printHelp(helpUnknownCommand)
 
 				case strings.HasPrefix(question, `"""`) || strings.HasPrefix(question, `'''`):
-					restOfText, err := readMultilineString(cmd.Context(), os.Stdin, question)
+					initialText := question + "\n"
+					restOfText, err := readMultilineString(cmd.Context(), os.Stdin, initialText)
 					if err != nil {
 						return err
 					}
@@ -347,8 +348,6 @@ func readMultilineString(ctx context.Context, r io.Reader, initialText string) (
 	}
 
 	for {
-		fmt.Print("... ")
-
 		line, err := readLine(ctx, br)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
@@ -361,6 +360,7 @@ func readMultilineString(ctx context.Context, r io.Reader, initialText string) (
 		if strings.TrimSpace(line) == prefix || strings.HasSuffix(strings.TrimSpace(line), prefix) {
 			break
 		}
+		fmt.Print("... ")
 	}
 
 	// Find and remove the closing triple terminator
