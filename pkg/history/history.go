@@ -11,6 +11,8 @@ import (
 
 const MaxHistoryLength = 100
 
+// History manages the command history for the CLI. Only single-line commands are stored.
+// Multi-line commands are silently ignored for the time being.
 type History struct {
 	configPath string
 	history    []string
@@ -85,34 +87,25 @@ func (h *History) Suggestions(text string) []string {
 	return suggestions
 }
 
-// Previous returns the previous input in the history based on the current input and cursor position.
-func (h *History) Previous(text string, cursorPosition int, from int) (int, string) {
-	n := len(h.history)
-	text = strings.ToLower(text[0:cursorPosition])
-	for dec := range n - 1 {
-		index := mod(from-dec-1, n)
-		line := h.history[index]
-		if strings.HasPrefix(strings.ToLower(line), text) {
-			return index, line
-		}
+// Previous returns the previous input in the history based on the current, cursor position and history index.
+// It returns the new text, history index and cursor position (which might be equal to the input).
+func (h *History) Previous(text string, cursorPosition int, historyIndex int) (newText string, newHistoryIndex int, newCursorPosition int) {
+	if historyIndex == -1 && len(h.history) > 0 {
+		historyIndex = len(h.history)
 	}
-	return from, text
+	if historyIndex > 0 && len(h.history) > 0 {
+		newIndex := historyIndex - 1
+		return h.history[newIndex], newIndex, len(h.history[newIndex])
+	}
+	return text, historyIndex, cursorPosition
 }
 
-// Next returns the next input in the history based on the current input and cursor position.
-func (h *History) Next(text string, cursorPosition int, from int) (int, string) {
-	n := len(h.history)
-	text = strings.ToLower(text[0:cursorPosition])
-	for inc := range n - 1 {
-		index := mod(from+inc+1, n)
-		line := h.history[index]
-		if strings.HasPrefix(strings.ToLower(line), text) {
-			return index, line
-		}
+// Next returns the next input in the history based on the current, cursor position and history index.
+// It returns the new text, history index and cursor position (which might be equal to the input).
+func (h *History) Next(text string, cursorPosition int, historyIndex int) (newText string, newHistoryIndex int, newCursorPosition int) {
+	if historyIndex < len(h.history)-1 && historyIndex >= 0 {
+		newIndex := historyIndex + 1
+		return h.history[newIndex], newIndex, len(h.history[newIndex])
 	}
-	return from, text
-}
-
-func mod(a, b int) int {
-	return (a%b + b) % b
+	return text, historyIndex, cursorPosition
 }

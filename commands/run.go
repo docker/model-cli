@@ -182,7 +182,9 @@ func newRunCmd() *cobra.Command {
 						cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
 						return nil
 					}
-					h.Append(question)
+					if err := h.Append(question); err != nil {
+						return fmt.Errorf("unable to update history: %w", err)
+					}
 					lastCommand = question
 					cmd.Println()
 				}
@@ -238,7 +240,7 @@ func promptModel(h *history.History, placeholder string) prompt {
 	return prompt{
 		text:         text,
 		history:      h,
-		historyIndex: 0,
+		historyIndex: -1,
 	}
 }
 
@@ -271,7 +273,7 @@ func (p *prompt) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if p.history != nil {
 				position := p.text.Position()
 				var text string
-				p.historyIndex, text = p.history.Previous(p.text.Value(), position, p.historyIndex)
+				text, p.historyIndex, position = p.history.Previous(p.text.Value(), position, p.historyIndex)
 				p.text.SetValue(text)
 				p.text.SetCursor(position)
 			}
@@ -279,7 +281,7 @@ func (p *prompt) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if p.history != nil {
 				position := p.text.Position()
 				var text string
-				p.historyIndex, text = p.history.Next(p.text.Value(), position, p.historyIndex)
+				text, p.historyIndex, position = p.history.Next(p.text.Value(), position, p.historyIndex)
 				p.text.SetValue(text)
 				p.text.SetCursor(position)
 			}
