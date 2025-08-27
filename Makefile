@@ -60,7 +60,7 @@ mock:
 
 unit-tests:
 	@echo "Running unit tests..."
-	@go test -v ./...
+	@go test -race -v ./...
 	@echo "Unit tests completed!"
 
 clean:
