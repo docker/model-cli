@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"time"
@@ -50,7 +51,7 @@ func newListCmd() *cobra.Command {
 			if _, err := ensureStandaloneRunnerAvailable(cmd.Context(), standaloneInstallPrinter); err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
-			models, err := listModels(openai, backend, desktopClient, quiet, jsonFormat, apiKey)
+			models, err := listModels(cmd.Context(), openai, backend, desktopClient, quiet, jsonFormat, apiKey)
 			if err != nil {
 				return err
 			}
@@ -67,16 +68,16 @@ func newListCmd() *cobra.Command {
 	return c
 }
 
-func listModels(openai bool, backend string, desktopClient *desktop.Client, quiet bool, jsonFormat bool, apiKey string) (string, error) {
+func listModels(ctx context.Context, openai bool, backend string, desktopClient *desktop.Client, quiet bool, jsonFormat bool, apiKey string) (string, error) {
 	if openai || backend == "openai" {
-		models, err := desktopClient.ListOpenAI(backend, apiKey)
+		models, err := desktopClient.ListOpenAI(ctx, backend, apiKey)
 		if err != nil {
 			err = handleClientError(err, "Failed to list models")
 			return "", handleNotRunningError(err)
 		}
 		return formatter.ToStandardJSON(models)
 	}
-	models, err := desktopClient.List()
+	models, err := desktopClient.List(ctx)
 	if err != nil {
 		err = handleClientError(err, "Failed to list models")
 		return "", handleNotRunningError(err)

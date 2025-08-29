@@ -3,8 +3,9 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/docker/model-cli/pkg/types"
 	"os"
+
+	"github.com/docker/model-cli/pkg/types"
 
 	"github.com/docker/cli/cli-plugins/hooks"
 	"github.com/docker/model-cli/commands/completion"
@@ -22,7 +23,7 @@ func newStatusCmd() *cobra.Command {
 			if err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
-			status := desktopClient.Status()
+			status := desktopClient.Status(cmd.Context())
 			if status.Error != nil {
 				return handleClientError(status.Error, "Failed to get Docker Model Runner status")
 			}

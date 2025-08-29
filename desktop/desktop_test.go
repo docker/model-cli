@@ -36,7 +36,7 @@ func TestPullHuggingFaceModel(t *testing.T) {
 		Body:       io.NopCloser(bytes.NewBufferString(`{"type":"success","message":"Model pulled successfully"}`)),
 	}, nil)
 
-	_, _, err := client.Pull(modelName, false, func(s string) {})
+	_, _, err := client.Pull(t.Context(), modelName, false, func(s string) {})
 	assert.NoError(t, err)
 }
 
@@ -63,7 +63,7 @@ func TestChatHuggingFaceModel(t *testing.T) {
 		Body:       io.NopCloser(bytes.NewBufferString("data: {\"choices\":[{\"delta\":{\"content\":\"Hello there!\"}}]}\n")),
 	}, nil)
 
-	err := client.Chat("", modelName, prompt, "")
+	err := client.Chat(t.Context(), "", modelName, prompt, "")
 	assert.NoError(t, err)
 }
 
@@ -97,7 +97,7 @@ func TestInspectHuggingFaceModel(t *testing.T) {
 		}`)),
 	}, nil)
 
-	model, err := client.Inspect(modelName, false)
+	model, err := client.Inspect(t.Context(), modelName, false)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedLowercase, model.Tags[0])
 }
@@ -122,7 +122,7 @@ func TestNonHuggingFaceModel(t *testing.T) {
 		Body:       io.NopCloser(bytes.NewBufferString(`{"type":"success","message":"Model pulled successfully"}`)),
 	}, nil)
 
-	_, _, err := client.Pull(modelName, false, func(s string) {})
+	_, _, err := client.Pull(t.Context(), modelName, false, func(s string) {})
 	assert.NoError(t, err)
 }
 
@@ -145,7 +145,7 @@ func TestPushHuggingFaceModel(t *testing.T) {
 		Body:       io.NopCloser(bytes.NewBufferString(`{"type":"success","message":"Model pushed successfully"}`)),
 	}, nil)
 
-	_, _, err := client.Push(modelName, func(s string) {})
+	_, _, err := client.Push(t.Context(), modelName, func(s string) {})
 	assert.NoError(t, err)
 }
 
@@ -168,7 +168,7 @@ func TestRemoveHuggingFaceModel(t *testing.T) {
 		Body:       io.NopCloser(bytes.NewBufferString("Model removed successfully")),
 	}, nil)
 
-	_, err := client.Remove([]string{modelName}, false)
+	_, err := client.Remove(t.Context(), []string{modelName}, false)
 	assert.NoError(t, err)
 }
 
@@ -193,7 +193,7 @@ func TestTagHuggingFaceModel(t *testing.T) {
 		Body:       io.NopCloser(bytes.NewBufferString("Tag created successfully")),
 	}, nil)
 
-	assert.NoError(t, client.Tag(sourceModel, targetRepo, targetTag))
+	assert.NoError(t, client.Tag(t.Context(), sourceModel, targetRepo, targetTag))
 }
 
 func TestInspectOpenAIHuggingFaceModel(t *testing.T) {
@@ -220,7 +220,7 @@ func TestInspectOpenAIHuggingFaceModel(t *testing.T) {
 		}`)),
 	}, nil)
 
-	model, err := client.InspectOpenAI(modelName)
+	model, err := client.InspectOpenAI(t.Context(), modelName)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedLowercase, model.ID)
 }
