@@ -27,7 +27,7 @@ func newRemoveCmd() *cobra.Command {
 			if _, err := ensureStandaloneRunnerAvailable(cmd.Context(), cmd); err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
-			response, err := desktopClient.Remove(args, force)
+			response, err := desktopClient.Remove(cmd.Context(), args, force)
 			if response != "" {
 				cmd.Print(response)
 			}

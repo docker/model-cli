@@ -39,7 +39,7 @@ func newConfigureCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return desktopClient.ConfigureBackend(opts)
+			return desktopClient.ConfigureBackend(cmd.Context(), opts)
 		},
 		ValidArgsFunction: completion.ModelNames(getDesktopClient, -1),
 	}

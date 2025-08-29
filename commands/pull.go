@@ -47,7 +47,7 @@ func pullModel(cmd *cobra.Command, desktopClient *desktop.Client, model string, 
 	} else {
 		progress = RawProgress
 	}
-	response, progressShown, err := desktopClient.Pull(model, ignoreRuntimeMemoryCheck, progress)
+	response, progressShown, err := desktopClient.Pull(cmd.Context(), model, ignoreRuntimeMemoryCheck, progress)
 
 	// Add a newline before any output (success or error) if progress was shown.
 	if progressShown {

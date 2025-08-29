@@ -20,7 +20,7 @@ func ModelNames(desktopClient func() *desktop.Client, limit int) cobra.Completio
 		if limit > 0 && len(args) >= limit {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		models, err := desktopClient().List()
+		models, err := desktopClient().List(cmd.Context())
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError
 		}

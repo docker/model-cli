@@ -15,7 +15,7 @@ func newDFCmd() *cobra.Command {
 		Use:   "df",
 		Short: "Show Docker Model Runner disk usage",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			df, err := desktopClient.DF()
+			df, err := desktopClient.DF(cmd.Context())
 			if err != nil {
 				err = handleClientError(err, "Failed to list running models")
 				return handleNotRunningError(err)

@@ -17,7 +17,7 @@ func newPSCmd() *cobra.Command {
 		Use:   "ps",
 		Short: "List running models",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			ps, err := desktopClient.PS()
+			ps, err := desktopClient.PS(cmd.Context())
 			if err != nil {
 				err = handleClientError(err, "Failed to list running models")
 				return handleNotRunningError(err)

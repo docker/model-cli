@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,7 +58,7 @@ func newUpCommand() *cobra.Command {
 				return errors.New("unable to determine standalone runner endpoint")
 			}
 
-			if err := downloadModelsOnlyIfNotFound(desktopClient, models); err != nil {
+			if err := downloadModelsOnlyIfNotFound(cmd.Context(), desktopClient, models); err != nil {
 				return err
 			}
 
@@ -69,7 +70,7 @@ func newUpCommand() *cobra.Command {
 			}
 
 			for _, model := range models {
-				if err := desktopClient.ConfigureBackend(scheduling.ConfigureRequest{
+				if err := desktopClient.ConfigureBackend(cmd.Context(), scheduling.ConfigureRequest{
 					Model:           model,
 					ContextSize:     ctxSize,
 					RawRuntimeFlags: rawRuntimeFlags,
@@ -137,8 +138,8 @@ func newMetadataCommand(upCmd, downCmd *cobra.Command) *cobra.Command {
 	return c
 }
 
-func downloadModelsOnlyIfNotFound(desktopClient *desktop.Client, models []string) error {
-	modelsDownloaded, err := desktopClient.List()
+func downloadModelsOnlyIfNotFound(ctx context.Context, desktopClient *desktop.Client, models []string) error {
+	modelsDownloaded, err := desktopClient.List(ctx)
 	if err != nil {
 		_ = sendErrorf("Failed to get models list: %v", err)
 		return err
@@ -156,7 +157,7 @@ func downloadModelsOnlyIfNotFound(desktopClient *desktop.Client, models []string
 			}
 			return false
 		}) {
-			_, _, err = desktopClient.Pull(model, false, func(s string) {
+			_, _, err = desktopClient.Pull(ctx, model, false, func(s string) {
 				_ = sendInfo(s)
 			})
 			if err != nil {
