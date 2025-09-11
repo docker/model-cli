@@ -12,7 +12,7 @@ import (
 
 const (
 	enableViaCLI = "Enable Docker Model Runner via the CLI → docker desktop enable model-runner"
-	enableViaGUI = "Enable Docker Model Runner via the GUI → Go to Settings->Features in development->Enable Docker Model Runner"
+	enableViaGUI = "Enable Docker Model Runner via the GUI → Go to Settings->AI->Enable Docker Model Runner"
 )
 
 var notRunningErr = fmt.Errorf("Docker Model Runner is not running. Please start it and try again.\n")
