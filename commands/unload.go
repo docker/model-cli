@@ -17,7 +17,7 @@ func newUnloadCmd() *cobra.Command {
 		Use:   "unload " + cmdArgs,
 		Short: "Unload running models",
 		RunE: func(cmd *cobra.Command, models []string) error {
-			unloadResp, err := desktopClient.Unload(desktop.UnloadRequest{All: all, Backend: backend, Models: models})
+			unloadResp, err := desktopClient.Unload(cmd.Context(), desktop.UnloadRequest{All: all, Backend: backend, Models: models})
 			if err != nil {
 				err = handleClientError(err, "Failed to unload models")
 				return handleNotRunningError(err)

@@ -42,7 +42,7 @@ func tagModel(cmd *cobra.Command, desktopClient *desktop.Client, source, target 
 		return fmt.Errorf("invalid tag: %w", err)
 	}
 	// Make tag request with model runner client
-	if err := desktopClient.Tag(source, parseRepo(tag), tag.TagStr()); err != nil {
+	if err := desktopClient.Tag(cmd.Context(), source, parseRepo(tag), tag.TagStr()); err != nil {
 		return fmt.Errorf("failed to tag model: %w", err)
 	}
 	cmd.Printf("Model %q tagged successfully with %q\n", source, target)

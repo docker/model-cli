@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/docker/model-cli/pkg/types"
 	"os"
 	"time"
+
+	"github.com/docker/model-cli/pkg/types"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/model-cli/commands/completion"
@@ -32,7 +33,7 @@ const (
 // version can take several seconds.
 func waitForStandaloneRunnerAfterInstall(ctx context.Context) error {
 	for tries := installWaitTries; tries > 0; tries-- {
-		if status := desktopClient.Status(); status.Error == nil && status.Running {
+		if status := desktopClient.Status(ctx); status.Error == nil && status.Running {
 			return nil
 		}
 		select {

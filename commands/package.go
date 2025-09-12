@@ -221,7 +221,7 @@ func (t *modelRunnerTarget) Write(ctx context.Context, mdl types.ModelArtifact, 
 		return fmt.Errorf("get model ID: %w", err)
 	}
 	if t.tag.String() != "" {
-		if err := desktopClient.Tag(id, parseRepo(t.tag), t.tag.TagStr()); err != nil {
+		if err := desktopClient.Tag(ctx, id, parseRepo(t.tag), t.tag.TagStr()); err != nil {
 			return fmt.Errorf("tag model: %w", err)
 		}
 	}

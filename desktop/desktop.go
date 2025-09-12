@@ -65,9 +65,9 @@ func normalizeHuggingFaceModelName(model string) string {
 	return model
 }
 
-func (c *Client) Status() Status {
+func (c *Client) Status(ctx context.Context) Status {
 	// TODO: Query "/".
-	resp, err := c.doRequest(http.MethodGet, inference.ModelsPrefix, nil)
+	resp, err := c.doRequest(ctx, http.MethodGet, inference.ModelsPrefix, nil)
 	if err != nil {
 		err = c.handleQueryError(err, inference.ModelsPrefix)
 		if errors.Is(err, ErrServiceUnavailable) {
@@ -83,7 +83,7 @@ func (c *Client) Status() Status {
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusOK {
 		var status []byte
-		statusResp, err := c.doRequest(http.MethodGet, inference.InferencePrefix+"/status", nil)
+		statusResp, err := c.doRequest(ctx, http.MethodGet, inference.InferencePrefix+"/status", nil)
 		if err != nil {
 			status = []byte(fmt.Sprintf("error querying status: %v", err))
 		} else {
@@ -106,7 +106,7 @@ func (c *Client) Status() Status {
 	}
 }
 
-func (c *Client) Pull(model string, ignoreRuntimeMemoryCheck bool, progress func(string)) (string, bool, error) {
+func (c *Client) Pull(ctx context.Context, model string, ignoreRuntimeMemoryCheck bool, progress func(string)) (string, bool, error) {
 	model = normalizeHuggingFaceModelName(model)
 	jsonData, err := json.Marshal(dmrm.ModelCreateRequest{From: model, IgnoreRuntimeMemoryCheck: ignoreRuntimeMemoryCheck})
 	if err != nil {
@@ -115,6 +115,7 @@ func (c *Client) Pull(model string, ignoreRuntimeMemoryCheck bool, progress func
 
 	createPath := inference.ModelsPrefix + "/create"
 	resp, err := c.doRequest(
+		ctx,
 		http.MethodPost,
 		createPath,
 		bytes.NewReader(jsonData),
@@ -174,10 +175,11 @@ func (c *Client) Pull(model string, ignoreRuntimeMemoryCheck bool, progress func
 	return "", progressShown, fmt.Errorf("unexpected end of stream while pulling model %s", model)
 }
 
-func (c *Client) Push(model string, progress func(string)) (string, bool, error) {
+func (c *Client) Push(ctx context.Context, model string, progress func(string)) (string, bool, error) {
 	model = normalizeHuggingFaceModelName(model)
 	pushPath := inference.ModelsPrefix + "/" + model + "/push"
 	resp, err := c.doRequest(
+		ctx,
 		http.MethodPost,
 		pushPath,
 		nil, // Assuming no body is needed for the push request
@@ -225,9 +227,9 @@ func (c *Client) Push(model string, progress func(string)) (string, bool, error)
 	return "", progressShown, fmt.Errorf("unexpected end of stream while pushing model %s", model)
 }
 
-func (c *Client) List() ([]dmrm.Model, error) {
+func (c *Client) List(ctx context.Context) ([]dmrm.Model, error) {
 	modelsRoute := inference.ModelsPrefix
-	body, err := c.listRaw(modelsRoute, "")
+	body, err := c.listRaw(ctx, modelsRoute, "")
 	if err != nil {
 		return []dmrm.Model{}, err
 	}
@@ -240,14 +242,14 @@ func (c *Client) List() ([]dmrm.Model, error) {
 	return modelsJson, nil
 }
 
-func (c *Client) ListOpenAI(backend, apiKey string) (dmrm.OpenAIModelList, error) {
+func (c *Client) ListOpenAI(ctx context.Context, backend, apiKey string) (dmrm.OpenAIModelList, error) {
 	if backend == "" {
 		backend = DefaultBackend
 	}
 	modelsRoute := fmt.Sprintf("%s/%s/v1/models", inference.InferencePrefix, backend)
 
 	// Use doRequestWithAuth to support API key authentication
-	resp, err := c.doRequestWithAuth(http.MethodGet, modelsRoute, nil, "openai", apiKey)
+	resp, err := c.doRequestWithAuth(ctx, http.MethodGet, modelsRoute, nil, "openai", apiKey)
 	if err != nil {
 		return dmrm.OpenAIModelList{}, c.handleQueryError(err, modelsRoute)
 	}
@@ -269,19 +271,19 @@ func (c *Client) ListOpenAI(backend, apiKey string) (dmrm.OpenAIModelList, error
 	return modelsJson, nil
 }
 
-func (c *Client) Inspect(model string, remote bool) (dmrm.Model, error) {
+func (c *Client) Inspect(ctx context.Context, model string, remote bool) (dmrm.Model, error) {
 	model = normalizeHuggingFaceModelName(model)
 	if model != "" {
 		if !strings.Contains(strings.Trim(model, "/"), "/") {
 			// Do an extra API call to check if the model parameter isn't a model ID.
-			modelId, err := c.fullModelID(model)
+			modelId, err := c.fullModelID(ctx, model)
 			if err != nil {
 				return dmrm.Model{}, fmt.Errorf("invalid model name: %s", model)
 			}
 			model = modelId
 		}
 	}
-	rawResponse, err := c.listRawWithQuery(fmt.Sprintf("%s/%s", inference.ModelsPrefix, model), model, remote)
+	rawResponse, err := c.listRawWithQuery(ctx, fmt.Sprintf("%s/%s", inference.ModelsPrefix, model), model, remote)
 	if err != nil {
 		return dmrm.Model{}, err
 	}
@@ -293,17 +295,17 @@ func (c *Client) Inspect(model string, remote bool) (dmrm.Model, error) {
 	return modelInspect, nil
 }
 
-func (c *Client) InspectOpenAI(model string) (dmrm.OpenAIModel, error) {
+func (c *Client) InspectOpenAI(ctx context.Context, model string) (dmrm.OpenAIModel, error) {
 	model = normalizeHuggingFaceModelName(model)
 	modelsRoute := inference.InferencePrefix + "/v1/models"
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
 		var err error
-		if model, err = c.fullModelID(model); err != nil {
+		if model, err = c.fullModelID(ctx, model); err != nil {
 			return dmrm.OpenAIModel{}, fmt.Errorf("invalid model name: %s", model)
 		}
 	}
-	rawResponse, err := c.listRaw(fmt.Sprintf("%s/%s", modelsRoute, model), model)
+	rawResponse, err := c.listRaw(ctx, fmt.Sprintf("%s/%s", modelsRoute, model), model)
 	if err != nil {
 		return dmrm.OpenAIModel{}, err
 	}
@@ -314,16 +316,16 @@ func (c *Client) InspectOpenAI(model string) (dmrm.OpenAIModel, error) {
 	return modelInspect, nil
 }
 
-func (c *Client) listRaw(route string, model string) ([]byte, error) {
-	return c.listRawWithQuery(route, model, false)
+func (c *Client) listRaw(ctx context.Context, route string, model string) ([]byte, error) {
+	return c.listRawWithQuery(ctx, route, model, false)
 }
 
-func (c *Client) listRawWithQuery(route string, model string, remote bool) ([]byte, error) {
+func (c *Client) listRawWithQuery(ctx context.Context, route string, model string, remote bool) ([]byte, error) {
 	if remote {
 		route += "?remote=true"
 	}
 
-	resp, err := c.doRequest(http.MethodGet, route, nil)
+	resp, err := c.doRequest(ctx, http.MethodGet, route, nil)
 	if err != nil {
 		return nil, c.handleQueryError(err, route)
 	}
@@ -343,8 +345,8 @@ func (c *Client) listRawWithQuery(route string, model string, remote bool) ([]by
 	return body, nil
 }
 
-func (c *Client) fullModelID(id string) (string, error) {
-	bodyResponse, err := c.listRaw(inference.ModelsPrefix, "")
+func (c *Client) fullModelID(ctx context.Context, id string) (string, error) {
+	bodyResponse, err := c.listRaw(ctx, inference.ModelsPrefix, "")
 	if err != nil {
 		return "", err
 	}
@@ -371,11 +373,11 @@ const (
 	chatPrinterReasoning
 )
 
-func (c *Client) Chat(backend, model, prompt, apiKey string) error {
+func (c *Client) Chat(ctx context.Context, backend, model, prompt, apiKey string) error {
 	model = normalizeHuggingFaceModelName(model)
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
-		if expanded, err := c.fullModelID(model); err == nil {
+		if expanded, err := c.fullModelID(ctx, model); err == nil {
 			model = expanded
 		}
 	}
@@ -404,6 +406,7 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 	}
 
 	resp, err := c.doRequestWithAuth(
+		ctx,
 		http.MethodPost,
 		completionsPath,
 		bytes.NewReader(jsonData),
@@ -474,13 +477,13 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 	return nil
 }
 
-func (c *Client) Remove(models []string, force bool) (string, error) {
+func (c *Client) Remove(ctx context.Context, models []string, force bool) (string, error) {
 	modelRemoved := ""
 	for _, model := range models {
 		model = normalizeHuggingFaceModelName(model)
 		// Check if not a model ID passed as parameter.
 		if !strings.Contains(model, "/") {
-			if expanded, err := c.fullModelID(model); err == nil {
+			if expanded, err := c.fullModelID(ctx, model); err == nil {
 				model = expanded
 			}
 		}
@@ -492,7 +495,7 @@ func (c *Client) Remove(models []string, force bool) (string, error) {
 			strconv.FormatBool(force),
 		)
 
-		resp, err := c.doRequest(http.MethodDelete, removePath, nil)
+		resp, err := c.doRequest(ctx, http.MethodDelete, removePath, nil)
 		if err != nil {
 			return modelRemoved, c.handleQueryError(err, removePath)
 		}
@@ -542,9 +545,9 @@ type BackendStatus struct {
 	LastUsed time.Time `json:"last_used,omitempty"`
 }
 
-func (c *Client) PS() ([]BackendStatus, error) {
+func (c *Client) PS(ctx context.Context) ([]BackendStatus, error) {
 	psPath := inference.InferencePrefix + "/ps"
-	resp, err := c.doRequest(http.MethodGet, psPath, nil)
+	resp, err := c.doRequest(ctx, http.MethodGet, psPath, nil)
 	if err != nil {
 		return []BackendStatus{}, c.handleQueryError(err, psPath)
 	}
@@ -569,9 +572,9 @@ type DiskUsage struct {
 	DefaultBackendDiskUsage int64 `json:"default_backend_disk_usage"`
 }
 
-func (c *Client) DF() (DiskUsage, error) {
+func (c *Client) DF(ctx context.Context) (DiskUsage, error) {
 	dfPath := inference.InferencePrefix + "/df"
-	resp, err := c.doRequest(http.MethodGet, dfPath, nil)
+	resp, err := c.doRequest(ctx, http.MethodGet, dfPath, nil)
 	if err != nil {
 		return DiskUsage{}, c.handleQueryError(err, dfPath)
 	}
@@ -602,14 +605,14 @@ type UnloadResponse struct {
 	UnloadedRunners int `json:"unloaded_runners"`
 }
 
-func (c *Client) Unload(req UnloadRequest) (UnloadResponse, error) {
+func (c *Client) Unload(ctx context.Context, req UnloadRequest) (UnloadResponse, error) {
 	unloadPath := inference.InferencePrefix + "/unload"
 	jsonData, err := json.Marshal(req)
 	if err != nil {
 		return UnloadResponse{}, fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	resp, err := c.doRequest(http.MethodPost, unloadPath, bytes.NewReader(jsonData))
+	resp, err := c.doRequest(ctx, http.MethodPost, unloadPath, bytes.NewReader(jsonData))
 	if err != nil {
 		return UnloadResponse{}, c.handleQueryError(err, unloadPath)
 	}
@@ -633,14 +636,14 @@ func (c *Client) Unload(req UnloadRequest) (UnloadResponse, error) {
 	return unloadResp, nil
 }
 
-func (c *Client) ConfigureBackend(request scheduling.ConfigureRequest) error {
+func (c *Client) ConfigureBackend(ctx context.Context, request scheduling.ConfigureRequest) error {
 	configureBackendPath := inference.InferencePrefix + "/_configure"
 	jsonData, err := json.Marshal(request)
 	if err != nil {
 		return fmt.Errorf("error marshaling request: %w", err)
 	}
 
-	resp, err := c.doRequest(http.MethodPost, configureBackendPath, bytes.NewReader(jsonData))
+	resp, err := c.doRequest(ctx, http.MethodPost, configureBackendPath, bytes.NewReader(jsonData))
 	if err != nil {
 		return c.handleQueryError(err, configureBackendPath)
 	}
@@ -658,13 +661,13 @@ func (c *Client) ConfigureBackend(request scheduling.ConfigureRequest) error {
 }
 
 // doRequest is a helper function that performs HTTP requests and handles 503 responses
-func (c *Client) doRequest(method, path string, body io.Reader) (*http.Response, error) {
-	return c.doRequestWithAuth(method, path, body, "", "")
+func (c *Client) doRequest(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
+	return c.doRequestWithAuth(ctx, method, path, body, "", "")
 }
 
 // doRequestWithAuth is a helper function that performs HTTP requests with optional authentication
-func (c *Client) doRequestWithAuth(method, path string, body io.Reader, backend, apiKey string) (*http.Response, error) {
-	req, err := http.NewRequest(method, c.modelRunner.URL(path), body)
+func (c *Client) doRequestWithAuth(ctx context.Context, method, path string, body io.Reader, backend, apiKey string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, c.modelRunner.URL(path), body)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -699,12 +702,12 @@ func (c *Client) handleQueryError(err error, path string) error {
 	return fmt.Errorf("error querying %s: %w", path, err)
 }
 
-func (c *Client) Tag(source, targetRepo, targetTag string) error {
+func (c *Client) Tag(ctx context.Context, source, targetRepo, targetTag string) error {
 	source = normalizeHuggingFaceModelName(source)
 	// Check if the source is a model ID, and expand it if necessary
 	if !strings.Contains(strings.Trim(source, "/"), "/") {
 		// Do an extra API call to check if the model parameter might be a model ID
-		if expanded, err := c.fullModelID(source); err == nil {
+		if expanded, err := c.fullModelID(ctx, source); err == nil {
 			source = expanded
 		}
 	}
@@ -717,7 +720,7 @@ func (c *Client) Tag(source, targetRepo, targetTag string) error {
 		targetTag,
 	)
 
-	resp, err := c.doRequest(http.MethodPost, tagPath, nil)
+	resp, err := c.doRequest(ctx, http.MethodPost, tagPath, nil)
 	if err != nil {
 		return c.handleQueryError(err, tagPath)
 	}

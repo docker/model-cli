@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/docker/model-cli/commands/completion"
@@ -32,7 +33,7 @@ func newInspectCmd() *cobra.Command {
 			if openai && remote {
 				return fmt.Errorf("--remote flag cannot be used with --openai flag")
 			}
-			inspectedModel, err := inspectModel(args, openai, remote, desktopClient)
+			inspectedModel, err := inspectModel(cmd.Context(), args, openai, remote, desktopClient)
 			if err != nil {
 				return err
 			}
@@ -46,17 +47,17 @@ func newInspectCmd() *cobra.Command {
 	return c
 }
 
-func inspectModel(args []string, openai bool, remote bool, desktopClient *desktop.Client) (string, error) {
+func inspectModel(ctx context.Context, args []string, openai bool, remote bool, desktopClient *desktop.Client) (string, error) {
 	modelName := args[0]
 	if openai {
-		model, err := desktopClient.InspectOpenAI(modelName)
+		model, err := desktopClient.InspectOpenAI(ctx, modelName)
 		if err != nil {
 			err = handleClientError(err, "Failed to get model "+modelName)
 			return "", handleNotRunningError(err)
 		}
 		return formatter.ToStandardJSON(model)
 	}
-	model, err := desktopClient.Inspect(modelName, remote)
+	model, err := desktopClient.Inspect(ctx, modelName, remote)
 	if err != nil {
 		err = handleClientError(err, "Failed to get model "+modelName)
 		return "", handleNotRunningError(err)

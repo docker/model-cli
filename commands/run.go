@@ -2,10 +2,12 @@ package commands
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"strings"
 
 	"github.com/docker/model-cli/commands/completion"
@@ -136,7 +138,7 @@ func newRunCmd() *cobra.Command {
 
 			// Do not validate the model in case of using OpenAI's backend, let OpenAI handle it
 			if backend != "openai" {
-				_, err := desktopClient.Inspect(model, false)
+				_, err := desktopClient.Inspect(cmd.Context(), model, false)
 				if err != nil {
 					if !errors.Is(err, desktop.ErrNotFound) {
 						return handleNotRunningError(handleClientError(err, "Failed to inspect model"))
@@ -149,7 +151,7 @@ func newRunCmd() *cobra.Command {
 			}
 
 			if prompt != "" {
-				if err := desktopClient.Chat(backend, model, prompt, apiKey); err != nil {
+				if err := desktopClient.Chat(cmd.Context(), backend, model, prompt, apiKey); err != nil {
 					return handleClientError(err, "Failed to generate a response")
 				}
 				cmd.Println()
@@ -178,8 +180,12 @@ func newRunCmd() *cobra.Command {
 					continue
 				}
 
-				if err := desktopClient.Chat(backend, model, userInput, apiKey); err != nil {
-					cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
+				if err := cancellableChat(cmd.Context(), desktopClient, backend, model, userInput, apiKey); err != nil {
+					if errors.Is(err, context.Canceled) {
+						fmt.Println("\nChat cancelled - Press Ctrl-C again to exit.")
+					} else {
+						cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
+					}
 					continue
 				}
 
@@ -207,4 +213,15 @@ func newRunCmd() *cobra.Command {
 	c.Flags().BoolVar(&ignoreRuntimeMemoryCheck, "ignore-runtime-memory-check", false, "Do not block pull if estimated runtime memory for model exceeds system resources.")
 
 	return c
+}
+
+// cancellableChat sends a chat request that can be cancelled with Ctrl-C, both on Unix and Windows.
+func cancellableChat(ctx context.Context, desktopClient *desktop.Client, backend, model, userInput, apiKey string) error {
+	// Create a NotifyContext that will handle os.Interrupt by cancelling the chat request.
+	// Calling stop at the end restores the previous signal handling, allowing Ctrl-C to exit the program.
+	// On Windows, the mapping from CTRL_C_EVENT to os.Interrupt can be seen at
+	// https://github.com/golang/go/blob/13bb48e6fbc35419a28747688426eb3684242fbc/src/runtime/os_windows.go#L1029
+	chatContext, stop := signal.NotifyContext(ctx, os.Interrupt)
+	defer stop()
+	return desktopClient.Chat(chatContext, backend, model, userInput, apiKey)
 }
