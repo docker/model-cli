@@ -63,7 +63,7 @@ func newPackagedCmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			opts.tag = args[0]
+			opts.tag = completion.AddDefaultNamespace(args[0])
 			if err := packageModel(cmd, opts); err != nil {
 				cmd.PrintErrln("Failed to package model")
 				return fmt.Errorf("package model: %w", err)

@@ -54,6 +54,8 @@ func newUnloadCmd() *cobra.Command {
 					"See 'docker model unload --help' for more information.",
 			)
 		}
+
+		args[0] = completion.AddDefaultNamespace(args[0])
 		return nil
 	}
 	c.Flags().BoolVar(&all, "all", false, "Unload all running models")
