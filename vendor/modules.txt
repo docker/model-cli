@@ -144,7 +144,7 @@ github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.5.0
 ## explicit
 github.com/docker/go-units
-# github.com/docker/model-distribution v0.0.0-20250822172258-8fe9daa4a4da
+# github.com/docker/model-distribution v0.0.0-20250905083217-3f098b3d8058
 ## explicit; go 1.23.0
 github.com/docker/model-distribution/builder
 github.com/docker/model-distribution/distribution
@@ -157,7 +157,7 @@ github.com/docker/model-distribution/internal/store
 github.com/docker/model-distribution/registry
 github.com/docker/model-distribution/tarball
 github.com/docker/model-distribution/types
-# github.com/docker/model-runner v0.0.0-20250822173738-5341c9fc2974
+# github.com/docker/model-runner v0.0.0-20250911130340-38bb0171c947
 ## explicit; go 1.23.7
 github.com/docker/model-runner/pkg/diskusage
 github.com/docker/model-runner/pkg/environment
@@ -173,6 +173,8 @@ github.com/docker/model-runner/pkg/internal/dockerhub
 github.com/docker/model-runner/pkg/internal/jsonutil
 github.com/docker/model-runner/pkg/logging
 github.com/docker/model-runner/pkg/metrics
+github.com/docker/model-runner/pkg/middleware
+github.com/docker/model-runner/pkg/sandbox
 github.com/docker/model-runner/pkg/tailbuffer
 # github.com/elastic/go-sysinfo v1.15.3
 ## explicit; go 1.21
@@ -309,6 +311,10 @@ github.com/klauspost/compress/internal/le
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
+# github.com/kolesnikovae/go-winjob v1.0.0
+## explicit; go 1.14
+github.com/kolesnikovae/go-winjob
+github.com/kolesnikovae/go-winjob/jobapi
 # github.com/mattn/go-colorable v0.1.13
 ## explicit; go 1.15
 github.com/mattn/go-colorable
@@ -531,7 +537,7 @@ golang.org/x/net/trace
 golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
 golang.org/x/sync/singleflight
-# golang.org/x/sys v0.33.0
+# golang.org/x/sys v0.35.0
 ## explicit; go 1.23.0
 golang.org/x/sys/cpu
 golang.org/x/sys/unix

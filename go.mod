@@ -11,8 +11,8 @@ require (
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/docker/go-units v0.5.0
-	github.com/docker/model-distribution v0.0.0-20250822172258-8fe9daa4a4da
-	github.com/docker/model-runner v0.0.0-20250822173738-5341c9fc2974
+	github.com/docker/model-distribution v0.0.0-20250905083217-3f098b3d8058
+	github.com/docker/model-runner v0.0.0-20250911130340-38bb0171c947
 	github.com/fatih/color v1.15.0
 	github.com/google/go-containerregistry v0.20.6
 	github.com/mattn/go-isatty v0.0.20
@@ -63,6 +63,7 @@ require (
 	github.com/jaypipes/pcidb v1.0.1 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.18.0 // indirect
+	github.com/kolesnikovae/go-winjob v1.0.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
@@ -103,7 +104,7 @@ require (
 	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8 // indirect
 	golang.org/x/mod v0.25.0 // indirect
 	golang.org/x/net v0.41.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.26.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	golang.org/x/tools v0.34.0 // indirect

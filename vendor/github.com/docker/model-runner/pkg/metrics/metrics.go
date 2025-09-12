@@ -26,10 +26,9 @@ type TrackerRoundTripper struct {
 }
 
 func (h *TrackerRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	clonedReq := req.Clone(req.Context())
-	ctx, cancel := context.WithTimeout(clonedReq.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(req.Context(), 5*time.Second)
 	defer cancel()
-	clonedReq = clonedReq.WithContext(ctx)
+	clonedReq := req.Clone(ctx)
 	clonedReq.Header.Set("x-docker-model-runner", "true")
 	return h.Transport.RoundTrip(clonedReq)
 }
