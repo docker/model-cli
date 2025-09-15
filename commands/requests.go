@@ -3,6 +3,7 @@ package commands
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/docker/model-cli/commands/completion"
@@ -27,16 +28,19 @@ func newRequestsCmd() *cobra.Command {
 			if _, err := ensureStandaloneRunnerAvailable(cmd.Context(), cmd); err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
-			if follow {
-				responseBody, err := desktopClient.RequestsStream(model, includeExisting)
-				if err != nil {
-					errMsg := "Failed to get requests stream"
-					if model != "" {
-						errMsg = errMsg + " for" + model
-					}
-					err = handleClientError(err, errMsg)
-					return handleNotRunningError(err)
+
+			responseBody, cancel, err := desktopClient.Requests(model, follow, includeExisting)
+			if err != nil {
+				errMsg := "Failed to get requests"
+				if model != "" {
+					errMsg = errMsg + " for " + model
 				}
+				err = handleClientError(err, errMsg)
+				return handleNotRunningError(err)
+			}
+			defer cancel()
+
+			if follow {
 				scanner := bufio.NewScanner(responseBody)
 				cmd.Println("Connected to request stream. Press Ctrl+C to stop.")
 				var currentEvent string
@@ -56,18 +60,14 @@ func newRequestsCmd() *cobra.Command {
 					}
 				}
 				cmd.Println("Stream closed by server.")
-				return nil
-			}
-			requests, err := desktopClient.RequestsList(model)
-			if err != nil {
-				errMsg := "Failed to get requests"
-				if model != "" {
-					errMsg = errMsg + " for" + model
+			} else {
+				body, err := io.ReadAll(responseBody)
+				if err != nil {
+					return fmt.Errorf("failed to read response body: %w", err)
 				}
-				err = handleClientError(err, errMsg)
-				return handleNotRunningError(err)
+				cmd.Print(string(body))
 			}
-			cmd.Print(requests)
+
 			return nil
 		},
 		ValidArgsFunction: completion.NoComplete,

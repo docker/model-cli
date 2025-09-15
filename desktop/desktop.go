@@ -657,61 +657,61 @@ func (c *Client) ConfigureBackend(request scheduling.ConfigureRequest) error {
 	return nil
 }
 
-func (c *Client) RequestsStream(modelFilter string, includeExisting bool) (io.ReadCloser, error) {
-	path := c.modelRunner.URL(inference.InferencePrefix + "/requests/stream")
+// Requests returns a response body and a cancel function to ensure proper cleanup.
+func (c *Client) Requests(modelFilter string, streaming bool, includeExisting bool) (io.ReadCloser, func(), error) {
+	path := c.modelRunner.URL(inference.InferencePrefix + "/requests")
 	var queryParams []string
 	if modelFilter != "" {
 		queryParams = append(queryParams, "model="+modelFilter)
 	}
-	if includeExisting {
+	if includeExisting && streaming {
 		queryParams = append(queryParams, "include_existing=true")
 	}
 	if len(queryParams) > 0 {
 		path += "?" + strings.Join(queryParams, "&")
 	}
+
 	req, err := http.NewRequest(http.MethodGet, path, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	req.Header.Set("Accept", "text/event-stream")
-	req.Header.Set("Cache-Control", "no-cache")
+
+	if streaming {
+		req.Header.Set("Accept", "text/event-stream")
+		req.Header.Set("Cache-Control", "no-cache")
+	} else {
+		req.Header.Set("Accept", "application/json")
+	}
 	req.Header.Set("User-Agent", "docker-model-cli/"+Version)
+
 	resp, err := c.modelRunner.Client().Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to stream: %w", err)
+		if streaming {
+			return nil, nil, c.handleQueryError(fmt.Errorf("failed to connect to stream: %w", err), path)
+		}
+		return nil, nil, c.handleQueryError(err, path)
 	}
+
 	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusNotFound {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			return nil, nil, fmt.Errorf("%s", strings.TrimSpace(string(body)))
+		}
+
 		resp.Body.Close()
-		return nil, fmt.Errorf("stream request failed with status: %d", resp.StatusCode)
-	}
-	return resp.Body, nil
-}
-
-func (c *Client) RequestsList(modelFilter string) (string, error) {
-	path := inference.InferencePrefix + "/requests"
-	if modelFilter != "" {
-		path += "?model=" + modelFilter
-	}
-	resp, err := c.doRequest(http.MethodGet, path, nil)
-	if err != nil {
-		return "", c.handleQueryError(err, path)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
-		return "", fmt.Errorf("failed to list requests: %s", resp.Status)
+		if streaming {
+			return nil, nil, fmt.Errorf("stream request failed with status: %d", resp.StatusCode)
+		}
+		return nil, nil, fmt.Errorf("failed to list requests: %s", resp.Status)
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
+	// Return the response body and a cancel function that closes it.
+	cancel := func() {
+		resp.Body.Close()
 	}
 
-	if resp.StatusCode == http.StatusNotFound {
-		return "", fmt.Errorf("%s", strings.TrimSpace(string(body)))
-	}
-
-	return string(body), nil
+	return resp.Body, cancel, nil
 }
 
 // doRequest is a helper function that performs HTTP requests and handles 503 responses
