@@ -371,7 +371,9 @@ const (
 	chatPrinterReasoning
 )
 
-func (c *Client) Chat(backend, model, prompt, apiKey string) error {
+// Chat sends a chat message to the model, prints the response to the standard output
+// and then returns it as a slice of the received chunks.
+func (c *Client) Chat(backend, model, prompt, apiKey string) ([]string, error) {
 	model = normalizeHuggingFaceModelName(model)
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
@@ -393,7 +395,7 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return fmt.Errorf("error marshaling request: %w", err)
+		return nil, fmt.Errorf("error marshaling request: %w", err)
 	}
 
 	var completionsPath string
@@ -411,18 +413,19 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 		apiKey,
 	)
 	if err != nil {
-		return c.handleQueryError(err, completionsPath)
+		return nil, c.handleQueryError(err, completionsPath)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("error response: status=%d body=%s", resp.StatusCode, body)
+		return nil, fmt.Errorf("error response: status=%d body=%s", resp.StatusCode, body)
 	}
 
 	printerState := chatPrinterNone
 	reasoningFmt := color.New(color.FgWhite).Add(color.Italic)
 	scanner := bufio.NewScanner(resp.Body)
+	var chunks []string
 	for scanner.Scan() {
 		line := scanner.Text()
 		if line == "" {
@@ -441,7 +444,7 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 
 		var streamResp OpenAIChatResponse
 		if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
-			return fmt.Errorf("error parsing stream response: %w", err)
+			return nil, fmt.Errorf("error parsing stream response: %w", err)
 		}
 
 		if len(streamResp.Choices) > 0 {
@@ -463,15 +466,16 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 				}
 				printerState = chatPrinterContent
 				fmt.Print(chunk)
+				chunks = append(chunks, chunk)
 			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading response stream: %w", err)
+		return nil, fmt.Errorf("error reading response stream: %w", err)
 	}
 
-	return nil
+	return chunks, nil
 }
 
 func (c *Client) Remove(models []string, force bool) (string, error) {

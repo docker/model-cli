@@ -2,81 +2,47 @@ package commands
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
+	"github.com/docker/model-cli/pkg/history"
 	"github.com/spf13/cobra"
+	"golang.design/x/clipboard"
+	"golang.org/x/term"
 )
 
-// readMultilineInput reads input from stdin, supporting both single-line and multiline input.
-// For multiline input, it detects triple-quoted strings and shows continuation prompts.
-func readMultilineInput(cmd *cobra.Command, scanner *bufio.Scanner) (string, error) {
-	cmd.Print("> ")
+const (
+	helpCommands = `Available Commands:
+  /bye          Exit
+  /copy         Copy the last response to the clipboard
+  /?, /help     Show this help
+  /? shortcuts  Help for keyboard shortcuts
 
-	if !scanner.Scan() {
-		if err := scanner.Err(); err != nil {
-			return "", fmt.Errorf("error reading input: %v", err)
-		}
-		return "", fmt.Errorf("EOF")
-	}
+Use """ to begin and end a multi-line message.`
 
-	line := scanner.Text()
+	helpShortcuts = `Available keyboard shortcuts:
+  Ctrl + a      Move to the beginning of the line (Home)
+  Ctrl + e      Move to the end of the line (End)
+   Alt + b      Move left
+   Alt + f      Move right
+  Ctrl + k      Delete the sentence after the cursor
+  Ctrl + u      Delete the sentence before the cursor
+  Ctrl + w      Delete the word before the cursor
+  Ctrl + d      Delete the character under the cursor`
 
-	// Check if this is the start of a multiline input (triple quotes)
-	tripleQuoteStart := ""
-	if strings.HasPrefix(line, `"""`) {
-		tripleQuoteStart = `"""`
-	} else if strings.HasPrefix(line, "'''") {
-		tripleQuoteStart = "'''"
-	}
-
-	// If no triple quotes, return a single line
-	if tripleQuoteStart == "" {
-		return line, nil
-	}
-
-	// Check if the triple quotes are closed on the same line
-	restOfLine := line[3:]
-	if strings.HasSuffix(restOfLine, tripleQuoteStart) && len(restOfLine) >= 3 {
-		// Complete multiline string on single line
-		return line, nil
-	}
-
-	// Start collecting multiline input
-	var multilineInput strings.Builder
-	multilineInput.WriteString(line)
-	multilineInput.WriteString("\n")
-
-	// Continue reading lines until we find the closing triple quotes
-	for {
-		cmd.Print("... ")
-
-		if !scanner.Scan() {
-			if err := scanner.Err(); err != nil {
-				return "", fmt.Errorf("error reading input: %v", err)
-			}
-			return "", fmt.Errorf("unclosed multiline input (EOF)")
-		}
-
-		line = scanner.Text()
-		multilineInput.WriteString(line)
-
-		// Check if this line contains the closing triple quotes
-		if strings.Contains(line, tripleQuoteStart) {
-			// Found closing quotes, we're done
-			break
-		}
-
-		multilineInput.WriteString("\n")
-	}
-
-	return multilineInput.String(), nil
-}
+	helpUnknownCommand = "Unknown command..."
+	helpNothingToCopy  = "Nothing to copy..."
+	helpCopied         = "Done! Response copied to clipboard."
+	placeholder        = "Start chatting! (/bye to quit, /? for help)"
+)
 
 func newRunCmd() *cobra.Command {
 	var debug bool
@@ -148,44 +114,97 @@ func newRunCmd() *cobra.Command {
 				}
 			}
 
+			// If the input is a pipe, read it
+			if stdinIsPiped() {
+				promptBytes, err := io.ReadAll(os.Stdin)
+				if err != nil {
+					return fmt.Errorf("failed to read stdin: %w", err)
+				}
+				// If we already had a prompt received as an argument, add the stdin contents to it
+				if prompt != "" {
+					prompt += "\n"
+				}
+				prompt += string(promptBytes)
+			}
+
 			if prompt != "" {
-				if err := desktopClient.Chat(backend, model, prompt, apiKey); err != nil {
+				if _, err := desktopClient.Chat(backend, model, prompt, apiKey); err != nil {
 					return handleClientError(err, "Failed to generate a response")
 				}
 				cmd.Println()
 				return nil
 			}
 
-			scanner := bufio.NewScanner(os.Stdin)
 			cmd.Println("Interactive chat mode started. Type '/bye' to exit.")
 
-			for {
-				userInput, err := readMultilineInput(cmd, scanner)
-				if err != nil {
-					if err.Error() == "EOF" {
-						cmd.Println("\nChat session ended.")
-						break
-					}
-					return fmt.Errorf("Error reading input: %v", err)
-				}
-
-				if strings.ToLower(strings.TrimSpace(userInput)) == "/bye" {
-					cmd.Println("Chat session ended.")
-					break
-				}
-
-				if strings.TrimSpace(userInput) == "" {
-					continue
-				}
-
-				if err := desktopClient.Chat(backend, model, userInput, apiKey); err != nil {
-					cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
-					continue
-				}
-
-				cmd.Println()
+			h, err := history.New(dockerCLI)
+			if err != nil {
+				return fmt.Errorf("unable to initialize history: %w", err)
 			}
-			return nil
+
+			var lastCommand string
+			var lastResp []string
+			for {
+				var promptPlaceholder string
+				if lastCommand == "" {
+					promptPlaceholder = placeholder
+				}
+				prompt := promptModel(h, promptPlaceholder)
+
+				p := tea.NewProgram(&prompt)
+				if _, err := p.Run(); err != nil {
+					return err
+				}
+
+				question := prompt.Text()
+				switch {
+				case question == "/bye":
+					return nil
+
+				case strings.TrimSpace(question) == "":
+					continue
+
+				case question == "/help" || question == "/?":
+					printHelp(helpCommands)
+
+				case question == "/? shortcuts":
+					printHelp(helpShortcuts)
+
+				case question == "/copy":
+					if len(lastResp) == 0 {
+						printHelp(helpNothingToCopy)
+						continue
+					}
+					if err := copyToClipboard(strings.Join(lastResp, "")); err != nil {
+						return err
+					}
+					printHelp(helpCopied)
+
+				case strings.HasPrefix(question, "/"):
+					printHelp(helpUnknownCommand)
+
+				case strings.HasPrefix(question, `"""`) || strings.HasPrefix(question, `'''`):
+					initialText := question + "\n"
+					restOfText, err := readMultilineString(cmd.Context(), os.Stdin, initialText)
+					if err != nil {
+						return err
+					}
+					question = restOfText
+					fallthrough
+
+				default:
+					lastResp, err = desktopClient.Chat(backend, model, question, apiKey)
+					if err != nil {
+						cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
+						return nil
+					}
+					if err := h.Append(question); err != nil {
+						return fmt.Errorf("unable to update history: %w", err)
+					}
+					lastCommand = question
+					cmd.Println()
+				}
+			}
 		},
 		ValidArgsFunction: completion.ModelNames(getDesktopClient, 1),
 	}
@@ -207,4 +226,202 @@ func newRunCmd() *cobra.Command {
 	c.Flags().BoolVar(&ignoreRuntimeMemoryCheck, "ignore-runtime-memory-check", false, "Do not block pull if estimated runtime memory for model exceeds system resources.")
 
 	return c
+}
+
+func printHelp(status string) {
+	fmt.Print(status)
+	fmt.Println()
+	fmt.Println()
+}
+
+type prompt struct {
+	text         textinput.Model
+	history      *history.History
+	historyIndex int
+}
+
+func promptModel(h *history.History, placeholder string) prompt {
+	width, _, _ := term.GetSize(int(os.Stdout.Fd()))
+
+	text := textinput.New()
+	text.Placeholder = placeholder
+	text.Prompt = "> "
+	text.Width = width - len(text.Prompt) - 1
+	text.Cursor.Blink = false
+	text.ShowSuggestions = true
+	text.Focus()
+
+	return prompt{
+		text:         text,
+		history:      h,
+		historyIndex: -1,
+	}
+}
+
+func (p *prompt) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (p *prompt) Finalize() {
+	p.text.Blur()
+	p.text.Placeholder = ""
+	p.text.SetSuggestions(nil)
+}
+
+func (p *prompt) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.Type {
+		case tea.KeyEnter:
+			p.Finalize()
+			return p, tea.Quit
+		case tea.KeyCtrlC, tea.KeyCtrlD:
+			p.text.SetValue("/bye")
+			p.Finalize()
+			return p, tea.Quit
+		case tea.KeyEsc:
+			p.text.SetValue("")
+			p.Finalize()
+			return p, tea.Quit
+		case tea.KeyUp:
+			if p.history != nil {
+				position := p.text.Position()
+				var text string
+				text, p.historyIndex, position = p.history.Previous(p.text.Value(), position, p.historyIndex)
+				p.text.SetValue(text)
+				p.text.SetCursor(position)
+			}
+		case tea.KeyDown:
+			if p.history != nil {
+				position := p.text.Position()
+				var text string
+				text, p.historyIndex, position = p.history.Next(p.text.Value(), position, p.historyIndex)
+				p.text.SetValue(text)
+				p.text.SetCursor(position)
+			}
+		}
+	case tea.WindowSizeMsg:
+		p.text.Width = msg.Width - 5
+		return p, nil
+	default:
+		if current := p.text.Value(); current == "/" {
+			p.text.SetSuggestions([]string{"/help", "/bye", "/copy", "/?", "/? shortcuts"})
+		} else if p.history != nil {
+			p.text.SetSuggestions(p.history.Suggestions(current))
+		} else {
+			p.text.SetSuggestions(nil)
+		}
+	}
+
+	var cmd tea.Cmd
+	p.text, cmd = p.text.Update(msg)
+	return p, cmd
+}
+
+func (p *prompt) Text() string {
+	return p.text.Value()
+}
+
+func (p *prompt) View() string {
+	return p.text.View() + "\n"
+}
+
+func copyToClipboard(command string) error {
+	err := clipboard.Init()
+	if err != nil {
+		return nil
+	}
+
+	clipboard.Write(clipboard.FmtText, []byte(command))
+	return nil
+}
+
+// readMultilineString reads a multiline string from r, starting with the initial text if provided.
+// The text must start either with triple quotes (""") or single quotes (”'). readMultilineString
+// will scan the input until a matching closing quote is found, or return an error if the input
+// is not properly closed. It returns the string content without the surrounding quotes but
+// preserving the original newlines and indentation.
+func readMultilineString(ctx context.Context, r io.Reader, initialText string) (string, error) {
+	var question string
+
+	// Start with the initial text if provided
+	if initialText != "" {
+		tr := strings.NewReader(initialText)
+		mr := io.MultiReader(tr, r)
+		r = mr
+	}
+
+	br := bufio.NewReader(r)
+
+	// Read the first 3 bytes
+	pd := make([]byte, 3)
+	if _, err := io.ReadFull(br, pd); err != nil {
+		return "", err
+	}
+	prefix := string(pd)
+	if prefix != `"""` && prefix != `'''` {
+		return "", fmt.Errorf("invalid multiline string prefix: %q", prefix)
+	}
+
+	for {
+		line, err := readLine(ctx, br)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return "", fmt.Errorf("unclosed multiline input: %w", err)
+			}
+			return "", err
+		}
+
+		question += line
+		if strings.TrimSpace(line) == prefix || strings.HasSuffix(strings.TrimSpace(line), prefix) {
+			break
+		}
+		fmt.Print("... ")
+	}
+
+	// Find and remove the closing triple terminator
+	content := question
+	if idx := strings.LastIndex(content, prefix); idx >= 0 {
+		before := content[:idx]
+		after := content[idx+len(prefix):]
+		content = before + after
+	}
+
+	return strings.TrimRight(content, "\n"), nil
+}
+
+// readLine reads a single line from r.
+func readLine(ctx context.Context, r *bufio.Reader) (string, error) {
+	lines := make(chan string)
+	errs := make(chan error)
+
+	go func() {
+		defer close(lines)
+		defer close(errs)
+
+		line, err := r.ReadString('\n')
+		if err != nil && line == "" {
+			errs <- err
+		} else {
+			lines <- line
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case err := <-errs:
+		return "", err
+	case line := <-lines:
+		return line, nil
+	}
+}
+
+// stdinIsPiped returns true if stdin is not a terminal (i.e., it is piped).
+func stdinIsPiped() bool {
+	stat, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return (stat.Mode() & os.ModeCharDevice) == 0
 }
