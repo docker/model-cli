@@ -311,8 +311,8 @@ github.com/klauspost/compress/internal/le
 github.com/klauspost/compress/internal/snapref
 github.com/klauspost/compress/zstd
 github.com/klauspost/compress/zstd/internal/xxhash
-# github.com/kolesnikovae/go-winjob v1.0.0
-## explicit; go 1.14
+# github.com/kolesnikovae/go-winjob v1.0.0 => github.com/docker/go-winjob v0.0.0-20250829235554-57b487ebcbc5
+## explicit; go 1.23.0
 github.com/kolesnikovae/go-winjob
 github.com/kolesnikovae/go-winjob/jobapi
 # github.com/mattn/go-colorable v0.1.13
@@ -710,3 +710,4 @@ gopkg.in/yaml.v3
 # howett.net/plist v1.0.1
 ## explicit; go 1.12
 howett.net/plist
+# github.com/kolesnikovae/go-winjob => github.com/docker/go-winjob v0.0.0-20250829235554-57b487ebcbc5

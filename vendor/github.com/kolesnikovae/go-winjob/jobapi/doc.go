@@ -1,3 +1,5 @@
+// +build windows
+
 // Package jobapi provides supplemental types and functions for low-level
 // interactions with the operating system to control job objects.
 //

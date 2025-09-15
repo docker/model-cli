@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package winjob
@@ -223,15 +224,15 @@ var (
 type basicLimit jobapi.LimitFlag
 
 func (l basicLimit) set(job *JobObject) {
-	job.ExtendedLimits.BasicLimitInformation.LimitFlags |= jobapi.LimitFlag(l)
+	job.ExtendedLimits.BasicLimitInformation.LimitFlags |= uint32(l)
 }
 
 func (l basicLimit) reset(job *JobObject) {
-	job.ExtendedLimits.BasicLimitInformation.LimitFlags &^= jobapi.LimitFlag(l)
+	job.ExtendedLimits.BasicLimitInformation.LimitFlags &^= uint32(l)
 }
 
 func (l basicLimit) IsSet(job *JobObject) bool {
-	return job.ExtendedLimits.BasicLimitInformation.LimitFlags&jobapi.LimitFlag(l) > 0
+	return job.ExtendedLimits.BasicLimitInformation.LimitFlags&uint32(l) > 0
 }
 
 func (l basicLimit) Value(job *JobObject) interface{} {
@@ -416,11 +417,11 @@ func (l priorityClassLimit) WithValue(x jobapi.PriorityClass) priorityClassLimit
 }
 
 func (l priorityClassLimit) LimitValue(job *JobObject) jobapi.PriorityClass {
-	return job.ExtendedLimits.BasicLimitInformation.PriorityClass
+	return jobapi.PriorityClass(job.ExtendedLimits.BasicLimitInformation.PriorityClass)
 }
 
 func (l priorityClassLimit) set(job *JobObject) {
-	job.ExtendedLimits.BasicLimitInformation.PriorityClass = l.prio
+	job.ExtendedLimits.BasicLimitInformation.PriorityClass = uint32(l.prio)
 	l.basicLimit.set(job)
 }
 

@@ -1,3 +1,4 @@
+//go:build windows
 // +build windows
 
 package winjob
@@ -45,9 +46,9 @@ func StartInJobObject(cmd *exec.Cmd, job *JobObject) error {
 // Resume resumes the process of the given command. The command should be
 // created with CREATE_SUSPENDED flag:
 //
-//  cmd.SysProcAttr = &windows.SysProcAttr{
-//    CreationFlags: windows.CREATE_SUSPENDED,
-//  }
+//	cmd.SysProcAttr = &windows.SysProcAttr{
+//		CreationFlags: windows.CREATE_SUSPENDED,
+//	}
 //
 // CREATE_SUSPENDED specifies that the primary thread of the new process is
 // created in a suspended state, and does not run until the ResumeThread
