@@ -84,6 +84,21 @@ func MMPROJPath(i WithLayers) (string, error) {
 	return paths[0], err
 }
 
+func ChatTemplatePath(i WithLayers) (string, error) {
+	paths, err := layerPathsByMediaType(i, types.MediaTypeChatTemplate)
+	if err != nil {
+		return "", fmt.Errorf("get chat template layer paths: %w", err)
+	}
+	if len(paths) == 0 {
+		return "", fmt.Errorf("model does not contain any layer of type %q", types.MediaTypeChatTemplate)
+	}
+	if len(paths) > 1 {
+		return "", fmt.Errorf("found %d files of type %q, expected exactly 1",
+			len(paths), types.MediaTypeChatTemplate)
+	}
+	return paths[0], err
+}
+
 // layerPathsByMediaType is a generic helper function that finds a layer by media type and returns its path
 func layerPathsByMediaType(i WithLayers, mediaType ggcr.MediaType) ([]string, error) {
 	layers, err := i.Layers()

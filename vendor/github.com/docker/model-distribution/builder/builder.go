@@ -55,6 +55,17 @@ func (b *Builder) WithMultimodalProjector(path string) (*Builder, error) {
 	}, nil
 }
 
+// WithChatTemplateFile adds a Jinja chat template file to the artifact which takes precedence over template from GGUF.
+func (b *Builder) WithChatTemplateFile(path string) (*Builder, error) {
+	templateLayer, err := partial.NewLayer(path, types.MediaTypeChatTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("chat template layer from %q: %w", path, err)
+	}
+	return &Builder{
+		model: mutate.AppendLayers(b.model, templateLayer),
+	}, nil
+}
+
 // Target represents a build target
 type Target interface {
 	Write(context.Context, types.ModelArtifact, io.Writer) error

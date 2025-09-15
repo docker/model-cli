@@ -70,6 +70,7 @@ type (
 	}
 )
 
+// EstimateStableDiffusionCppRun estimates the usages of the GGUF file in stable-diffusion.cpp.
 func (gf *GGUFFile) EstimateStableDiffusionCppRun(opts ...GGUFRunEstimateOption) (e StableDiffusionCppRunEstimate) {
 	// Options
 	var o _GGUFRunEstimateOptions
@@ -233,7 +234,7 @@ func (gf *GGUFFile) EstimateStableDiffusionCppRun(opts ...GGUFRunEstimateOption)
 		}
 
 		// Autoencoder.
-		if aeLs != nil {
+		if len(aeLs) != 0 {
 			e.Autoencoder.Devices[aeDevIdx].Weight = GGUFBytesScalar(aeLs.Bytes())
 			e.Autoencoder.Devices[aeDevIdx].Parameter = GGUFParametersScalar(aeLs.Elements())
 		}
@@ -245,10 +246,11 @@ func (gf *GGUFFile) EstimateStableDiffusionCppRun(opts ...GGUFRunEstimateOption)
 
 	// Computation.
 	{
-		// Bootstrap, compute metadata,
-		// see https://github.com/ggerganov/llama.cpp/blob/d6ef0e77dd25f54fb5856af47e3926cf6f36c281/llama.cpp#L16135-L16136.
-		cm := GGMLTensorOverhead()*GGMLComputationGraphNodesMaximum +
-			GGMLComputationGraphOverhead(GGMLComputationGraphNodesMaximum, false)
+		// See https://github.com/leejet/stable-diffusion.cpp/blob/10c6501bd05a697e014f1bee3a84e5664290c489/ggml_extend.hpp#L1058C9-L1058C23.
+		var maxNodes uint64 = 32768
+
+		// Bootstrap, compute metadata.
+		cm := GGMLTensorOverhead()*maxNodes + GGMLComputationGraphOverhead(maxNodes, false)
 		e.Devices[0].Computation = GGUFBytesScalar(cm)
 
 		// Work context,
@@ -350,7 +352,7 @@ func (gf *GGUFFile) EstimateStableDiffusionCppRun(opts ...GGUFRunEstimateOption)
 		}
 
 		// Decode usage.
-		if aeLs != nil && !*o.SDCFreeComputeMemoryImmediately {
+		if len(aeLs) != 0 && !*o.SDCFreeComputeMemoryImmediately {
 			// Bootstrap.
 			e.Autoencoder.Devices[aeDevIdx].Footprint += GGUFBytesScalar(100 * 1024 * 1024) /*100 MiB.*/
 

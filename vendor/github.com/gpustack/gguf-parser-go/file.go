@@ -419,6 +419,10 @@ func parseGGUFFile(fs []_GGUFFileReadSeeker, o _GGUFReadOptions) (_ *GGUFFile, e
 
 // Types for GGUF hierarchical tensors.
 type (
+	// GGUFTensorInfoFilter is a filter to filter out if the given tensor name matches.
+	// Return true if the name matches, and false otherwise.
+	GGUFTensorInfoFilter func(name string) bool
+
 	// IGGUFTensorInfos is an interface for GGUF tensor infos,
 	// which includes basic operations.
 	IGGUFTensorInfos interface {
@@ -435,9 +439,9 @@ type (
 		// and the number of names found.
 		Index(names []string) (infos map[string]GGUFTensorInfo, found int)
 		// Elements returns the number of elements(parameters).
-		Elements() uint64
+		Elements(filter ...GGUFTensorInfoFilter) uint64
 		// Bytes returns the number of bytes.
-		Bytes() uint64
+		Bytes(filter ...GGUFTensorInfoFilter) uint64
 		// Count returns the number of tensors.
 		Count() uint64
 	}
@@ -877,9 +881,15 @@ func (ti GGUFTensorInfo) Index(names []string) (infos map[string]GGUFTensorInfo,
 // Elements returns the number of elements of the GGUFTensorInfo,
 // which is inspired by
 // https://github.com/ggerganov/ggml/blob/a10a8b880c059b3b29356eb9a9f8df72f03cdb6a/src/ggml.c#L2597-L2601.
-func (ti GGUFTensorInfo) Elements() uint64 {
+func (ti GGUFTensorInfo) Elements(filter ...GGUFTensorInfoFilter) uint64 {
 	if ti.NDimensions == 0 {
 		return 0
+	}
+
+	for i := range filter {
+		if filter[i] != nil && !filter[i](ti.Name) {
+			return 0
+		}
 	}
 
 	ret := uint64(1)
@@ -892,7 +902,7 @@ func (ti GGUFTensorInfo) Elements() uint64 {
 // Bytes returns the number of bytes of the GGUFTensorInfo,
 // which is inspired by
 // https://github.com/ggerganov/ggml/blob/a10a8b880c059b3b29356eb9a9f8df72f03cdb6a/src/ggml.c#L2609-L2626.
-func (ti GGUFTensorInfo) Bytes() uint64 {
+func (ti GGUFTensorInfo) Bytes(filter ...GGUFTensorInfoFilter) uint64 {
 	if ti.NDimensions == 0 {
 		return 0
 	}
@@ -900,6 +910,12 @@ func (ti GGUFTensorInfo) Bytes() uint64 {
 	tt, ok := ti.Type.Trait()
 	if !ok {
 		panic(fmt.Errorf("invalid type: %v", ti.Type))
+	}
+
+	for i := range filter {
+		if filter[i] != nil && !filter[i](ti.Name) {
+			return 0
+		}
 	}
 
 	// https://github.com/ggerganov/ggml/blob/a10a8b880c059b3b29356eb9a9f8df72f03cdb6a/src/ggml.c#L3210-L3214
@@ -1061,7 +1077,7 @@ func (tis GGUFTensorInfos) layers() GGUFLayerTensorInfos {
 			}
 			l := pm[p].(*GGUFNamedTensorInfos)
 			l.GGUFLayerTensorInfos = append(l.GGUFLayerTensorInfos, tis[i])
-		case (ps[0] == "v" || ps[0] == "t") && ps[1] == "blk":
+		case (ps[0] == "v" || ps[0] == "t" || ps[0] == "a") && ps[1] == "blk":
 			// LLaMACpp CLIP.
 			p := ps[0]
 			if _, ok := pm[p]; !ok {
@@ -1282,19 +1298,19 @@ func (ltis GGUFLayerTensorInfos) Index(names []string) (infos map[string]GGUFTen
 }
 
 // Elements returns the number of elements of the GGUFLayerTensorInfos.
-func (ltis GGUFLayerTensorInfos) Elements() uint64 {
+func (ltis GGUFLayerTensorInfos) Elements(filter ...GGUFTensorInfoFilter) uint64 {
 	var ret uint64
 	for i := range ltis {
-		ret += ltis[i].Elements()
+		ret += ltis[i].Elements(filter...)
 	}
 	return ret
 }
 
 // Bytes returns the number of bytes of the GGUFLayerTensorInfos.
-func (ltis GGUFLayerTensorInfos) Bytes() uint64 {
+func (ltis GGUFLayerTensorInfos) Bytes(filter ...GGUFTensorInfoFilter) uint64 {
 	var ret uint64
 	for i := range ltis {
-		ret += ltis[i].Bytes()
+		ret += ltis[i].Bytes(filter...)
 	}
 	return ret
 }
@@ -1697,7 +1713,7 @@ func (rd _GGUFTensorInfoReader) Read() (ti GGUFTensorInfo, err error) {
 		}
 		ti.Type = GGMLType(v)
 		if ti.Type >= _GGMLTypeCount {
-			return ti, fmt.Errorf("invalid type: %v", ti.Type)
+			return ti, fmt.Errorf("%v: This quantized type is currently unsupported", ti.Type)
 		}
 	}
 

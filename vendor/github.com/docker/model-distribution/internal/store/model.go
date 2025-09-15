@@ -118,6 +118,10 @@ func (m *Model) MMPROJPath() (string, error) {
 	return mdpartial.MMPROJPath(m)
 }
 
+func (m *Model) ChatTemplatePath() (string, error) {
+	return mdpartial.ChatTemplatePath(m)
+}
+
 func (m *Model) Tags() []string {
 	return m.tags
 }
