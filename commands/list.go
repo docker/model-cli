@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/docker/go-units"
@@ -50,14 +52,18 @@ func newListCmd() *cobra.Command {
 			if _, err := ensureStandaloneRunnerAvailable(cmd.Context(), standaloneInstallPrinter); err != nil {
 				return fmt.Errorf("unable to initialize standalone model runner: %w", err)
 			}
-			models, err := listModels(openai, backend, desktopClient, quiet, jsonFormat, apiKey)
+			var modelFilter string
+			if len(args) > 0 {
+				modelFilter = args[0]
+			}
+			models, err := listModels(openai, backend, desktopClient, quiet, jsonFormat, apiKey, modelFilter)
 			if err != nil {
 				return err
 			}
 			cmd.Print(models)
 			return nil
 		},
-		ValidArgsFunction: completion.NoComplete,
+		ValidArgsFunction: completion.ModelNamesAndTags(getDesktopClient, 1),
 	}
 	c.Flags().BoolVar(&jsonFormat, "json", false, "List models in a JSON format")
 	c.Flags().BoolVar(&openai, "openai", false, "List models in an OpenAI format")
@@ -67,7 +73,7 @@ func newListCmd() *cobra.Command {
 	return c
 }
 
-func listModels(openai bool, backend string, desktopClient *desktop.Client, quiet bool, jsonFormat bool, apiKey string) (string, error) {
+func listModels(openai bool, backend string, desktopClient *desktop.Client, quiet bool, jsonFormat bool, apiKey string, modelFilter string) (string, error) {
 	if openai || backend == "openai" {
 		models, err := desktopClient.ListOpenAI(backend, apiKey)
 		if err != nil {
@@ -81,6 +87,25 @@ func listModels(openai bool, backend string, desktopClient *desktop.Client, quie
 		err = handleClientError(err, "Failed to list models")
 		return "", handleNotRunningError(err)
 	}
+
+	if modelFilter != "" {
+		var filteredModels []dmrm.Model
+		for _, m := range models {
+			hasMatchingTag := false
+			for _, tag := range m.Tags {
+				modelName, _, _ := strings.Cut(tag, ":")
+				if slices.Contains([]string{modelName, tag + ":latest", tag}, modelFilter) {
+					hasMatchingTag = true
+					break
+				}
+			}
+			if hasMatchingTag {
+				filteredModels = append(filteredModels, m)
+			}
+		}
+		models = filteredModels
+	}
+
 	if jsonFormat {
 		return formatter.ToStandardJSON(models)
 	}
