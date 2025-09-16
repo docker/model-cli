@@ -9,6 +9,7 @@ import (
 	"html"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -662,7 +663,7 @@ func (c *Client) Requests(modelFilter string, streaming bool, includeExisting bo
 	path := c.modelRunner.URL(inference.InferencePrefix + "/requests")
 	var queryParams []string
 	if modelFilter != "" {
-		queryParams = append(queryParams, "model="+modelFilter)
+		queryParams = append(queryParams, "model="+url.QueryEscape(modelFilter))
 	}
 	if includeExisting && streaming {
 		queryParams = append(queryParams, "include_existing=true")
