@@ -41,21 +41,27 @@ func (rr *responseRecorder) Flush() {
 }
 
 type RequestResponsePair struct {
-	ID         string    `json:"id"`
-	Model      string    `json:"model"`
-	Method     string    `json:"method"`
-	URL        string    `json:"url"`
-	Request    string    `json:"request"`
-	Response   string    `json:"response,omitempty"`
-	Error      string    `json:"error,omitempty"`
-	Timestamp  time.Time `json:"timestamp"`
-	StatusCode int       `json:"status_code"`
-	UserAgent  string    `json:"user_agent,omitempty"`
+	ID         string `json:"id"`
+	Model      string `json:"model"`
+	Method     string `json:"method"`
+	URL        string `json:"url"`
+	Request    string `json:"request"`
+	Response   string `json:"response,omitempty"`
+	Error      string `json:"error,omitempty"`
+	Timestamp  int64  `json:"timestamp"`
+	StatusCode int    `json:"status_code"`
+	UserAgent  string `json:"user_agent,omitempty"`
 }
 
 type ModelData struct {
 	Config  inference.BackendConfiguration `json:"config"`
 	Records []*RequestResponsePair         `json:"records"`
+}
+
+type ModelRecordsResponse struct {
+	Count int    `json:"count"`
+	Model string `json:"model"`
+	ModelData
 }
 
 type OpenAIRecorder struct {
@@ -108,7 +114,7 @@ func (r *OpenAIRecorder) RecordRequest(model string, req *http.Request, body []b
 		Method:    req.Method,
 		URL:       req.URL.Path,
 		Request:   string(body),
-		Timestamp: time.Now(),
+		Timestamp: time.Now().Unix(),
 		UserAgent: req.UserAgent(),
 	}
 
@@ -143,7 +149,7 @@ func (r *OpenAIRecorder) NewResponseRecorder(w http.ResponseWriter) http.Respons
 	rc := &responseRecorder{
 		ResponseWriter: w,
 		body:           &bytes.Buffer{},
-		statusCode:     http.StatusOK,
+		statusCode:     0,
 	}
 	return rc
 }
@@ -153,6 +159,10 @@ func (r *OpenAIRecorder) RecordResponse(id, model string, rw http.ResponseWriter
 
 	responseBody := rr.body.String()
 	statusCode := rr.statusCode
+	if statusCode == 0 {
+		// No status code was written (request canceled or failed before response).
+		statusCode = http.StatusRequestTimeout
+	}
 
 	var response string
 	if strings.Contains(responseBody, "data: ") {
@@ -190,7 +200,8 @@ func (r *OpenAIRecorder) RecordResponse(id, model string, rw http.ResponseWriter
 func (r *OpenAIRecorder) convertStreamingResponse(streamingBody string) string {
 	lines := strings.Split(streamingBody, "\n")
 	var contentBuilder strings.Builder
-	var lastChunk map[string]interface{}
+	var reasoningContentBuilder strings.Builder
+	var lastChoice, lastChunk map[string]interface{}
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "data: ") {
@@ -208,9 +219,13 @@ func (r *OpenAIRecorder) convertStreamingResponse(streamingBody string) string {
 
 			if choices, ok := chunk["choices"].([]interface{}); ok && len(choices) > 0 {
 				if choice, ok := choices[0].(map[string]interface{}); ok {
+					lastChoice = choice
 					if delta, ok := choice["delta"].(map[string]interface{}); ok {
 						if content, ok := delta["content"].(string); ok {
 							contentBuilder.WriteString(content)
+						}
+						if content, ok := delta["reasoning_content"].(string); ok {
+							reasoningContentBuilder.WriteString(content)
 						}
 					}
 				}
@@ -227,13 +242,18 @@ func (r *OpenAIRecorder) convertStreamingResponse(streamingBody string) string {
 	for key, value := range lastChunk {
 		finalResponse[key] = value
 	}
+	finalResponse["choices"] = []interface{}{lastChoice}
 
 	if choices, ok := finalResponse["choices"].([]interface{}); ok && len(choices) > 0 {
 		if choice, ok := choices[0].(map[string]interface{}); ok {
-			choice["message"] = map[string]interface{}{
+			message := map[string]interface{}{
 				"role":    "assistant",
 				"content": contentBuilder.String(),
 			}
+			if reasoningContentBuilder.Len() > 0 {
+				message["reasoning_content"] = reasoningContentBuilder.String()
+			}
+			choice["message"] = message
 			delete(choice, "delta")
 
 			if _, ok := choice["finish_reason"]; !ok {
@@ -252,30 +272,34 @@ func (r *OpenAIRecorder) convertStreamingResponse(streamingBody string) string {
 	return string(jsonResult)
 }
 
-func (r *OpenAIRecorder) GetRecordsByModelHandler() http.HandlerFunc {
+func (r *OpenAIRecorder) GetRecordsHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
 		model := req.URL.Query().Get("model")
 
 		if model == "" {
-			http.Error(w, "A 'model' query parameter is required", http.StatusBadRequest)
+			// Retrieve all records for all models.
+			allRecords := r.getAllRecords()
+			if allRecords == nil {
+				// No records found.
+				http.Error(w, "No records found", http.StatusNotFound)
+				return
+			}
+			if err := json.NewEncoder(w).Encode(allRecords); err != nil {
+				http.Error(w, fmt.Sprintf("Failed to encode all records: %v", err),
+					http.StatusInternalServerError)
+				return
+			}
 		} else {
 			// Retrieve records for the specified model.
-			records := r.GetRecordsByModel(model)
+			records := r.getRecordsByModel(model)
 			if records == nil {
 				// No records found for the specified model.
 				http.Error(w, fmt.Sprintf("No records found for model '%s'", model), http.StatusNotFound)
 				return
 			}
-
-			modelID := r.modelManager.ResolveModelID(model)
-			if err := json.NewEncoder(w).Encode(map[string]interface{}{
-				"model":   model,
-				"records": records,
-				"count":   len(records),
-				"config":  r.records[modelID].Config,
-			}); err != nil {
+			if err := json.NewEncoder(w).Encode(records); err != nil {
 				http.Error(w, fmt.Sprintf("Failed to encode records for model '%s': %v", model, err),
 					http.StatusInternalServerError)
 				return
@@ -284,16 +308,45 @@ func (r *OpenAIRecorder) GetRecordsByModelHandler() http.HandlerFunc {
 	}
 }
 
-func (r *OpenAIRecorder) GetRecordsByModel(model string) []*RequestResponsePair {
+func (r *OpenAIRecorder) getAllRecords() []ModelRecordsResponse {
+	r.m.RLock()
+	defer r.m.RUnlock()
+
+	if len(r.records) == 0 {
+		return nil
+	}
+
+	result := make([]ModelRecordsResponse, 0, len(r.records))
+
+	for modelID, modelData := range r.records {
+		result = append(result, ModelRecordsResponse{
+			Count: len(modelData.Records),
+			Model: modelID,
+			ModelData: ModelData{
+				Config:  modelData.Config,
+				Records: modelData.Records,
+			},
+		})
+	}
+
+	return result
+}
+
+func (r *OpenAIRecorder) getRecordsByModel(model string) []ModelRecordsResponse {
 	modelID := r.modelManager.ResolveModelID(model)
 
 	r.m.RLock()
 	defer r.m.RUnlock()
 
 	if modelData, exists := r.records[modelID]; exists {
-		result := make([]*RequestResponsePair, len(modelData.Records))
-		copy(result, modelData.Records)
-		return result
+		return []ModelRecordsResponse{{
+			Count: len(modelData.Records),
+			Model: modelID,
+			ModelData: ModelData{
+				Config:  modelData.Config,
+				Records: modelData.Records,
+			},
+		}}
 	}
 
 	return nil

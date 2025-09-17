@@ -9,6 +9,7 @@ import (
 	"html"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -655,6 +656,63 @@ func (c *Client) ConfigureBackend(request scheduling.ConfigureRequest) error {
 	}
 
 	return nil
+}
+
+// Requests returns a response body and a cancel function to ensure proper cleanup.
+func (c *Client) Requests(modelFilter string, streaming bool, includeExisting bool) (io.ReadCloser, func(), error) {
+	path := c.modelRunner.URL(inference.InferencePrefix + "/requests")
+	var queryParams []string
+	if modelFilter != "" {
+		queryParams = append(queryParams, "model="+url.QueryEscape(modelFilter))
+	}
+	if includeExisting && streaming {
+		queryParams = append(queryParams, "include_existing=true")
+	}
+	if len(queryParams) > 0 {
+		path += "?" + strings.Join(queryParams, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, path, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if streaming {
+		req.Header.Set("Accept", "text/event-stream")
+		req.Header.Set("Cache-Control", "no-cache")
+	} else {
+		req.Header.Set("Accept", "application/json")
+	}
+	req.Header.Set("User-Agent", "docker-model-cli/"+Version)
+
+	resp, err := c.modelRunner.Client().Do(req)
+	if err != nil {
+		if streaming {
+			return nil, nil, c.handleQueryError(fmt.Errorf("failed to connect to stream: %w", err), path)
+		}
+		return nil, nil, c.handleQueryError(err, path)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		if resp.StatusCode == http.StatusNotFound {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			return nil, nil, fmt.Errorf("%s", strings.TrimSpace(string(body)))
+		}
+
+		resp.Body.Close()
+		if streaming {
+			return nil, nil, fmt.Errorf("stream request failed with status: %d", resp.StatusCode)
+		}
+		return nil, nil, fmt.Errorf("failed to list requests: %s", resp.Status)
+	}
+
+	// Return the response body and a cancel function that closes it.
+	cancel := func() {
+		resp.Body.Close()
+	}
+
+	return resp.Body, cancel, nil
 }
 
 // doRequest is a helper function that performs HTTP requests and handles 503 responses

@@ -1,0 +1,20 @@
+codecov:
+  notify:
+    require_ci_to_pass: yes
+
+  comment:
+    layout: "reach, diff"
+    behavior: default
+
+  coverage:
+    range: 50..80
+    round: down
+    precision: 0
+    status:
+      project:
+        default:
+          target: 80
+      patch:
+        default:
+          target: auto
+          threshold: 5

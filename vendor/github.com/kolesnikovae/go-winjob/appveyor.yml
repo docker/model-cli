@@ -1,0 +1,26 @@
+version: "{build}"
+
+os: Windows Server 2012 R2
+
+platform: x64
+
+clone_folder: c:\gopath\src\github.com\kolesnikovae\go-winjob
+
+environment:
+  GOVERSION: 1.14
+  GOPATH: c:\gopath
+  GO111MODULE: on
+
+build_script:
+  - cd c:\gopath\src\github.com\kolesnikovae\go-winjob
+  - git branch
+  - go get -t ./...
+
+test_script:
+  - ps: Add-AppveyorTest "Unit Tests" -Outcome Running
+  - go test -v --cover --coverprofile=coverage.txt github.com/kolesnikovae/go-winjob/...
+  - choco install codecov --yes
+  - codecov -f coverage.txt -X fix
+  - ps: Update-AppveyorTest "Unit Tests" -Outcome Passed
+
+deploy: off
