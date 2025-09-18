@@ -74,6 +74,7 @@ func newPackagedCmd() *cobra.Command {
 	}
 
 	c.Flags().StringVar(&opts.ggufPath, "gguf", "", "absolute path to gguf file (required)")
+	c.Flags().StringVar(&opts.chatTemplatePath, "chat-template", "", "absolute path to chat template file (must be Jinja format)")
 	c.Flags().StringArrayVarP(&opts.licensePaths, "license", "l", nil, "absolute path to a license file")
 	c.Flags().BoolVar(&opts.push, "push", false, "push to registry (if not set, the model is loaded into the Model Runner content store)")
 	c.Flags().Uint64Var(&opts.contextSize, "context-size", 0, "context size in tokens")
@@ -81,11 +82,12 @@ func newPackagedCmd() *cobra.Command {
 }
 
 type packageOptions struct {
-	ggufPath     string
-	licensePaths []string
-	push         bool
-	contextSize  uint64
-	tag          string
+	chatTemplatePath string
+	contextSize      uint64
+	ggufPath         string
+	licensePaths     []string
+	push             bool
+	tag              string
 }
 
 func packageModel(cmd *cobra.Command, opts packageOptions) error {
@@ -123,6 +125,13 @@ func packageModel(cmd *cobra.Command, opts packageOptions) error {
 		pkg, err = pkg.WithLicense(path)
 		if err != nil {
 			return fmt.Errorf("add license file: %w", err)
+		}
+	}
+
+	if opts.chatTemplatePath != "" {
+		cmd.PrintErrf("Adding chat template file from %q\n", opts.chatTemplatePath)
+		if pkg, err = pkg.WithChatTemplateFile(opts.chatTemplatePath); err != nil {
+			return fmt.Errorf("add chat template file from path %q: %w", opts.chatTemplatePath, err)
 		}
 	}
 

@@ -1,7 +1,9 @@
 package gguf_parser
 
 import (
+	"regexp"
 	"slices"
+	"strconv"
 
 	"github.com/gpustack/gguf-parser-go/util/ptr"
 )
@@ -14,22 +16,29 @@ type (
 		MainGPUIndex        int
 		RPCServers          []string
 		TensorSplitFraction []float64
+		OverriddenTensors   []*GGUFRunOverriddenTensor
 		DeviceMetrics       []GGUFRunDeviceMetric
 
 		// LLaMACpp (LMC) specific
-		LMCContextSize        *int32
-		LMCInMaxContextSize   bool
-		LMCLogicalBatchSize   *int32
-		LMCPhysicalBatchSize  *int32
-		LMCVisualMaxImageSize *uint32
-		LMCCacheKeyType       *GGMLType
-		LMCCacheValueType     *GGMLType
-		LMCOffloadKVCache     *bool
-		LMCOffloadLayers      *uint64
-		LMCSplitMode          LLaMACppSplitMode
-		LMCProjector          *LLaMACppRunEstimate
-		LMCDrafter            *LLaMACppRunEstimate
-		LMCAdapters           []LLaMACppRunEstimate
+		LMCContextSize                    *int32
+		LMCRoPEFrequencyBase              *float32
+		LMCRoPEFrequencyScale             *float32
+		LMCRoPEScalingType                *string
+		LMCRoPEScalingOriginalContextSize *int32
+		LMCInMaxContextSize               bool
+		LMCLogicalBatchSize               *int32
+		LMCPhysicalBatchSize              *int32
+		LMCVisualMaxImageSize             *uint32
+		LMCMaxProjectedCache              *uint32
+		LMCCacheKeyType                   *GGMLType
+		LMCCacheValueType                 *GGMLType
+		LMCOffloadKVCache                 *bool
+		LMCOffloadLayers                  *uint64
+		LMCSplitMode                      LLaMACppSplitMode
+		LMCFullSizeSWACache               bool
+		LMCProjector                      *LLaMACppRunEstimate
+		LMCDrafter                        *LLaMACppRunEstimate
+		LMCAdapters                       []LLaMACppRunEstimate
 
 		// StableDiffusionCpp (SDC) specific
 		SDCOffloadLayers                *uint64
@@ -42,6 +51,24 @@ type (
 		SDCFreeComputeMemoryImmediately *bool
 		SDCUpscaler                     *StableDiffusionCppRunEstimate
 		SDCControlNet                   *StableDiffusionCppRunEstimate
+	}
+
+	// GGUFRunOverriddenTensor holds the overridden tensor information for the estimate.
+	//
+	// When BufferType is CPU,
+	// it indicates that the tensor should be loaded into the CPU memory,
+	// even if it belongs to a GPU offload layer.
+	GGUFRunOverriddenTensor struct {
+		// PatternRegex is the regex pattern to match the tensor name.
+		PatternRegex *regexp.Regexp
+		// BufferType is the buffer type to override,
+		// it can be "CPU", "CUDA0", "Metal" and others.
+		BufferType string
+
+		// _BufferType record parsed buffer type, used internally.
+		_BufferType GGUFRunOverriddenTensorBufferType
+		// _Index record parsed device index, used internally.
+		_Index string
 	}
 
 	// GGUFRunDeviceMetric holds the device metric for the estimate.
@@ -73,6 +100,53 @@ type (
 	// GGUFRunEstimateOption is the options for the estimate.
 	GGUFRunEstimateOption func(*_GGUFRunEstimateOptions)
 )
+
+// GGUFRunOverriddenTensorBufferType is the type of the overridden tensor buffer.
+type GGUFRunOverriddenTensorBufferType uint32
+
+const (
+	_ GGUFRunOverriddenTensorBufferType = iota
+	GGUFRunOverriddenTensorBufferTypeCPU
+	GGUFRunOverriddenTensorBufferTypeGPU
+	GGUFRunOverriddenTensorBufferTypeRPC
+	GGUFRunOverriddenTensorBufferTypeUnknown
+)
+
+var (
+	_GGUFRunOverriddenTensorBufferTypeCPURegex       = regexp.MustCompile(`^(CPU|AMX)`)
+	_GGUFRunOverriddenTensorBufferTypeUMAGPURegex    = regexp.MustCompile(`^(Metal|OpenCL)`)
+	_GGUFRunOverriddenTensorBufferTypeNonUMAGPURegex = regexp.MustCompile(`^(CUDA|CANN|ROCm|MUSA|SYCL|Vulkan|Kompute)(\d+)?`)
+	_GGUFRunOverriddenTensorBufferTypeRPCRegex       = regexp.MustCompile(`^RPC\[(.*)\]`)
+)
+
+// ParseBufferType returns the device index of the overridden tensor.
+//
+// The device index is used to determine which device the tensor belongs to,
+// it is according to the buffer type description.
+func (odt *GGUFRunOverriddenTensor) ParseBufferType() (GGUFRunOverriddenTensorBufferType, string) {
+	if odt == nil {
+		return GGUFRunOverriddenTensorBufferTypeUnknown, ""
+	}
+
+	if odt._BufferType == 0 {
+		odt._BufferType = GGUFRunOverriddenTensorBufferTypeUnknown
+		if ms := _GGUFRunOverriddenTensorBufferTypeCPURegex.FindStringSubmatch(odt.BufferType); len(ms) > 1 {
+			odt._BufferType, odt._Index = GGUFRunOverriddenTensorBufferTypeCPU, "0"
+		}
+		if ms := _GGUFRunOverriddenTensorBufferTypeUMAGPURegex.FindStringSubmatch(odt.BufferType); len(ms) > 1 {
+			odt._BufferType, odt._Index = GGUFRunOverriddenTensorBufferTypeGPU, "1"
+		}
+		if ms := _GGUFRunOverriddenTensorBufferTypeRPCRegex.FindStringSubmatch(odt.BufferType); len(ms) > 1 {
+			odt._BufferType, odt._Index = GGUFRunOverriddenTensorBufferTypeRPC, ms[1]
+		}
+		if ms := _GGUFRunOverriddenTensorBufferTypeNonUMAGPURegex.FindStringSubmatch(odt.BufferType); len(ms) > 2 {
+			if idx, err := strconv.ParseInt(ms[2], 10, 64); err == nil && idx >= 0 {
+				odt._BufferType, odt._Index = GGUFRunOverriddenTensorBufferTypeGPU, ms[2]
+			}
+		}
+	}
+	return odt._BufferType, odt._Index
+}
 
 // WithParallelSize sets the (decoding sequences) parallel size for the estimate.
 func WithParallelSize(size int32) GGUFRunEstimateOption {
@@ -137,6 +211,24 @@ func WithTensorSplitFraction(fractions []float64) GGUFRunEstimateOption {
 	}
 }
 
+// WithOverriddenTensors sets the overridden tensors for the estimate.
+func WithOverriddenTensors(tensors []GGUFRunOverriddenTensor) GGUFRunEstimateOption {
+	return func(o *_GGUFRunEstimateOptions) {
+		if len(tensors) == 0 {
+			return
+		}
+		for _, t := range tensors {
+			if t.PatternRegex == nil || t.BufferType == "" {
+				return
+			}
+		}
+		o.OverriddenTensors = make([]*GGUFRunOverriddenTensor, len(tensors))
+		for i := range tensors {
+			o.OverriddenTensors[i] = &tensors[i]
+		}
+	}
+}
+
 // WithDeviceMetrics sets the device metrics for the estimate.
 func WithDeviceMetrics(metrics []GGUFRunDeviceMetric) GGUFRunEstimateOption {
 	return func(o *_GGUFRunEstimateOptions) {
@@ -154,6 +246,29 @@ func WithLLaMACppContextSize(size int32) GGUFRunEstimateOption {
 			return
 		}
 		o.LMCContextSize = &size
+	}
+}
+
+// WithLLaMACppRoPE sets the RoPE parameters for the estimate.
+func WithLLaMACppRoPE(
+	frequencyBase float64,
+	frequencyScale float64,
+	scalingType string,
+	scalingOriginalContextSize int32,
+) GGUFRunEstimateOption {
+	return func(o *_GGUFRunEstimateOptions) {
+		if frequencyBase > 0 {
+			o.LMCRoPEFrequencyBase = ptr.Float32(float32(frequencyBase))
+		}
+		if frequencyScale > 0 {
+			o.LMCRoPEFrequencyScale = ptr.Float32(float32(frequencyScale))
+		}
+		if slices.Contains([]string{"none", "linear", "yarn"}, scalingType) {
+			o.LMCRoPEScalingType = &scalingType
+		}
+		if scalingOriginalContextSize > 0 {
+			o.LMCRoPEScalingOriginalContextSize = ptr.To(scalingOriginalContextSize)
+		}
 	}
 }
 
@@ -247,6 +362,13 @@ func WithLLaMACppSplitMode(mode LLaMACppSplitMode) GGUFRunEstimateOption {
 	}
 }
 
+// WithLLaMACppFullSizeSWACache enables full size sliding window attention cache.
+func WithLLaMACppFullSizeSWACache() GGUFRunEstimateOption {
+	return func(o *_GGUFRunEstimateOptions) {
+		o.LMCFullSizeSWACache = true
+	}
+}
+
 // WithLLaMACppVisualMaxImageSize sets the visual maximum image size input for the estimate.
 func WithLLaMACppVisualMaxImageSize(size uint32) GGUFRunEstimateOption {
 	return func(o *_GGUFRunEstimateOptions) {
@@ -254,6 +376,16 @@ func WithLLaMACppVisualMaxImageSize(size uint32) GGUFRunEstimateOption {
 			return
 		}
 		o.LMCVisualMaxImageSize = &size
+	}
+}
+
+// WithLLaMACppMaxProjectedCache sets the maximum projected embedding cache for the estimate.
+func WithLLaMACppMaxProjectedCache(cacheSize uint32) GGUFRunEstimateOption {
+	return func(o *_GGUFRunEstimateOptions) {
+		if cacheSize == 0 {
+			return
+		}
+		o.LMCMaxProjectedCache = ptr.To(cacheSize)
 	}
 }
 

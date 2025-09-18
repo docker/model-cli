@@ -23,6 +23,9 @@ const (
 	// MediaTypeMultimodalProjector indicates a Multimodal projector file
 	MediaTypeMultimodalProjector = types.MediaType("application/vnd.docker.ai.mmproj")
 
+	// MediaTypeChatTemplate indicates a Jinja chat template
+	MediaTypeChatTemplate = types.MediaType("application/vnd.docker.ai.chat.template.jinja")
+
 	FormatGGUF = Format("gguf")
 )
 
