@@ -8,9 +8,11 @@ import (
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // readMultilineInput reads input from stdin, supporting both single-line and multiline input.
@@ -78,6 +80,75 @@ func readMultilineInput(cmd *cobra.Command, scanner *bufio.Scanner) (string, err
 	return multilineInput.String(), nil
 }
 
+var (
+	markdownRenderer *glamour.TermRenderer
+	lastWidth        int
+)
+
+// getTerminalWidth returns the terminal width, with a fallback to 80.
+func getTerminalWidth() int {
+	width, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		return 80
+	}
+	return width
+}
+
+// getMarkdownRenderer returns a markdown renderer, recreating it if terminal width changed.
+func getMarkdownRenderer() (*glamour.TermRenderer, error) {
+	currentWidth := getTerminalWidth()
+
+	// Recreate if width changed or renderer doesn't exist.
+	if markdownRenderer == nil || currentWidth != lastWidth {
+		r, err := glamour.NewTermRenderer(
+			glamour.WithAutoStyle(),
+			glamour.WithWordWrap(currentWidth),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create markdown renderer: %w", err)
+		}
+		markdownRenderer = r
+		lastWidth = currentWidth
+	}
+
+	return markdownRenderer, nil
+}
+
+func renderMarkdown(content string) (string, error) {
+	r, err := getMarkdownRenderer()
+	if err != nil {
+		return "", fmt.Errorf("failed to create markdown renderer: %w", err)
+	}
+
+	rendered, err := r.Render(content)
+	if err != nil {
+		return "", fmt.Errorf("failed to render markdown: %w", err)
+	}
+
+	return rendered, nil
+}
+
+// chatWithMarkdown performs chat and renders the response as Markdown.
+func chatWithMarkdown(cmd *cobra.Command, client *desktop.Client, backend, model, prompt, apiKey string) error {
+	response, err := client.Chat(backend, model, prompt, apiKey)
+	if err != nil {
+		return err
+	}
+
+	// Try to render as Markdown, fallback to plain text if it fails.
+	rendered, err := renderMarkdown(response)
+	if err != nil {
+		if debug, _ := cmd.Flags().GetBool("debug"); debug {
+			cmd.PrintErrln(err)
+		}
+		cmd.Print(response)
+		return nil
+	}
+
+	cmd.Print(rendered)
+	return nil
+}
+
 func newRunCmd() *cobra.Command {
 	var debug bool
 	var backend string
@@ -103,8 +174,8 @@ func newRunCmd() *cobra.Command {
 
 			model := args[0]
 			prompt := ""
-			args_len := len(args)
-			if args_len > 1 {
+			argsLen := len(args)
+			if argsLen > 1 {
 				prompt = strings.Join(args[1:], " ")
 			}
 
@@ -149,7 +220,7 @@ func newRunCmd() *cobra.Command {
 			}
 
 			if prompt != "" {
-				if err := desktopClient.Chat(backend, model, prompt, apiKey); err != nil {
+				if err := chatWithMarkdown(cmd, desktopClient, backend, model, prompt, apiKey); err != nil {
 					return handleClientError(err, "Failed to generate a response")
 				}
 				cmd.Println()
@@ -178,7 +249,7 @@ func newRunCmd() *cobra.Command {
 					continue
 				}
 
-				if err := desktopClient.Chat(backend, model, userInput, apiKey); err != nil {
+				if err := chatWithMarkdown(cmd, desktopClient, backend, model, userInput, apiKey); err != nil {
 					cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
 					continue
 				}

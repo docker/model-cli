@@ -19,7 +19,6 @@ import (
 	"github.com/docker/model-runner/pkg/inference"
 	dmrm "github.com/docker/model-runner/pkg/inference/models"
 	"github.com/docker/model-runner/pkg/inference/scheduling"
-	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 )
@@ -364,15 +363,8 @@ func (c *Client) fullModelID(id string) (string, error) {
 	return "", fmt.Errorf("model with ID %s not found", id)
 }
 
-type chatPrinterState int
-
-const (
-	chatPrinterNone chatPrinterState = iota
-	chatPrinterContent
-	chatPrinterReasoning
-)
-
-func (c *Client) Chat(backend, model, prompt, apiKey string) error {
+// Chat performs a chat request and returns the response content.
+func (c *Client) Chat(backend, model, prompt, apiKey string) (string, error) {
 	model = normalizeHuggingFaceModelName(model)
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
@@ -394,7 +386,7 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return fmt.Errorf("error marshaling request: %w", err)
+		return "", fmt.Errorf("error marshaling request: %w", err)
 	}
 
 	var completionsPath string
@@ -412,17 +404,17 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 		apiKey,
 	)
 	if err != nil {
-		return c.handleQueryError(err, completionsPath)
+		return "", c.handleQueryError(err, completionsPath)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("error response: status=%d body=%s", resp.StatusCode, body)
+		return "", fmt.Errorf("error response: status=%d body=%s", resp.StatusCode, body)
 	}
 
-	printerState := chatPrinterNone
-	reasoningFmt := color.New(color.FgWhite).Add(color.Italic)
+	var responseContent strings.Builder
+	var reasoningContent strings.Builder
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -442,37 +434,33 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 
 		var streamResp OpenAIChatResponse
 		if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
-			return fmt.Errorf("error parsing stream response: %w", err)
+			return "", fmt.Errorf("error parsing stream response: %w", err)
 		}
 
 		if len(streamResp.Choices) > 0 {
 			if streamResp.Choices[0].Delta.ReasoningContent != "" {
-				chunk := streamResp.Choices[0].Delta.ReasoningContent
-				if printerState == chatPrinterContent {
-					fmt.Print("\n\n")
-				}
-				if printerState != chatPrinterReasoning {
-					reasoningFmt.Println("Thinking:")
-				}
-				printerState = chatPrinterReasoning
-				reasoningFmt.Print(chunk)
+				reasoningContent.WriteString(streamResp.Choices[0].Delta.ReasoningContent)
 			}
 			if streamResp.Choices[0].Delta.Content != "" {
-				chunk := streamResp.Choices[0].Delta.Content
-				if printerState == chatPrinterReasoning {
-					fmt.Print("\n\n")
-				}
-				printerState = chatPrinterContent
-				fmt.Print(chunk)
+				responseContent.WriteString(streamResp.Choices[0].Delta.Content)
 			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading response stream: %w", err)
+		return "", fmt.Errorf("error reading response stream: %w", err)
 	}
 
-	return nil
+	// Combine reasoning content and response content if both exist
+	var fullResponse strings.Builder
+	if reasoningContent.Len() > 0 {
+		fullResponse.WriteString("\n## 🤔 Thinking\n\n")
+		fullResponse.WriteString(reasoningContent.String())
+		fullResponse.WriteString("\n\n---\n\n")
+	}
+	fullResponse.WriteString(responseContent.String())
+
+	return fullResponse.String(), nil
 }
 
 func (c *Client) Remove(models []string, force bool) (string, error) {
