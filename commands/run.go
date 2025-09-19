@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/glamour"
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -85,6 +86,24 @@ var (
 	lastWidth        int
 )
 
+// shouldUseMarkdown determines if Markdown rendering should be used based on color mode.
+func shouldUseMarkdown(colorMode string) bool {
+	supportsColor := func() bool {
+		return !color.NoColor
+	}
+
+	switch colorMode {
+	case "yes":
+		return true
+	case "no":
+		return false
+	case "auto":
+		return supportsColor()
+	default:
+		return supportsColor()
+	}
+}
+
 // getTerminalWidth returns the terminal width, with a fallback to 80.
 func getTerminalWidth() int {
 	width, _, err := term.GetSize(int(os.Stdout.Fd()))
@@ -94,7 +113,7 @@ func getTerminalWidth() int {
 	return width
 }
 
-// getMarkdownRenderer returns a markdown renderer, recreating it if terminal width changed.
+// getMarkdownRenderer returns a Markdown renderer, recreating it if terminal width changed.
 func getMarkdownRenderer() (*glamour.TermRenderer, error) {
 	currentWidth := getTerminalWidth()
 
@@ -128,24 +147,30 @@ func renderMarkdown(content string) (string, error) {
 	return rendered, nil
 }
 
-// chatWithMarkdown performs chat and renders the response as Markdown.
+// chatWithMarkdown performs chat and renders the response as Markdown if color is enabled.
 func chatWithMarkdown(cmd *cobra.Command, client *desktop.Client, backend, model, prompt, apiKey string) error {
 	response, err := client.Chat(backend, model, prompt, apiKey)
 	if err != nil {
 		return err
 	}
 
-	// Try to render as Markdown, fallback to plain text if it fails.
-	rendered, err := renderMarkdown(response)
-	if err != nil {
-		if debug, _ := cmd.Flags().GetBool("debug"); debug {
-			cmd.PrintErrln(err)
+	colorMode, _ := cmd.Flags().GetString("color")
+	if shouldUseMarkdown(colorMode) {
+		// Try to render as Markdown, fallback to plain text if it fails.
+		rendered, err := renderMarkdown(response)
+		if err != nil {
+			if debug, _ := cmd.Flags().GetBool("debug"); debug {
+				cmd.PrintErrln(err)
+			}
+			cmd.Print(response)
+			return nil
 		}
+		cmd.Print(rendered)
+	} else {
+		// Use plain text output
 		cmd.Print(response)
-		return nil
 	}
 
-	cmd.Print(rendered)
 	return nil
 }
 
@@ -153,11 +178,20 @@ func newRunCmd() *cobra.Command {
 	var debug bool
 	var backend string
 	var ignoreRuntimeMemoryCheck bool
+	var colorMode string
 
 	const cmdArgs = "MODEL [PROMPT]"
 	c := &cobra.Command{
 		Use:   "run " + cmdArgs,
 		Short: "Run a model and interact with it using a submitted prompt or chat mode",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			switch colorMode {
+			case "auto", "yes", "no":
+				return nil
+			default:
+				return fmt.Errorf("--color must be one of: auto, yes, no (got %q)", colorMode)
+			}
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate backend if specified
 			if backend != "" {
@@ -276,6 +310,7 @@ func newRunCmd() *cobra.Command {
 	c.Flags().StringVar(&backend, "backend", "", fmt.Sprintf("Specify the backend to use (%s)", ValidBackendsKeys()))
 	c.Flags().MarkHidden("backend")
 	c.Flags().BoolVar(&ignoreRuntimeMemoryCheck, "ignore-runtime-memory-check", false, "Do not block pull if estimated runtime memory for model exceeds system resources.")
+	c.Flags().StringVar(&colorMode, "color", "auto", "Use colored output (auto|yes|no)")
 
 	return c
 }

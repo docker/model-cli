@@ -14,6 +14,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/docker/model-distribution v0.0.0-20250905083217-3f098b3d8058
 	github.com/docker/model-runner v0.0.0-20250911130340-38bb0171c947
+	github.com/fatih/color v1.18.0
 	github.com/google/go-containerregistry v0.20.6
 	github.com/mattn/go-isatty v0.0.20
 	github.com/nxadm/tail v1.4.8
@@ -77,6 +78,7 @@ require (
 	github.com/klauspost/compress v1.18.0 // indirect
 	github.com/kolesnikovae/go-winjob v1.0.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mattn/go-shellwords v1.0.12 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
