@@ -363,8 +363,8 @@ func (c *Client) fullModelID(id string) (string, error) {
 	return "", fmt.Errorf("model with ID %s not found", id)
 }
 
-// Chat performs a chat request and returns the response content.
-func (c *Client) Chat(backend, model, prompt, apiKey string) (string, error) {
+// Chat performs a chat request and streams the response content with selective markdown rendering.
+func (c *Client) ChatStreaming(backend, model, prompt, apiKey string, outputFunc func(string), shouldUseMarkdown bool) error {
 	model = normalizeHuggingFaceModelName(model)
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
@@ -386,7 +386,7 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) (string, error) {
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
-		return "", fmt.Errorf("error marshaling request: %w", err)
+		return fmt.Errorf("error marshaling request: %w", err)
 	}
 
 	var completionsPath string
@@ -404,17 +404,17 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) (string, error) {
 		apiKey,
 	)
 	if err != nil {
-		return "", c.handleQueryError(err, completionsPath)
+		return c.handleQueryError(err, completionsPath)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("error response: status=%d body=%s", resp.StatusCode, body)
+		return fmt.Errorf("error response: status=%d body=%s", resp.StatusCode, body)
 	}
 
-	var responseContent strings.Builder
-	var reasoningContent strings.Builder
+	reasoningShown := false
+
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -434,33 +434,46 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) (string, error) {
 
 		var streamResp OpenAIChatResponse
 		if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
-			return "", fmt.Errorf("error parsing stream response: %w", err)
+			return fmt.Errorf("error parsing stream response: %w", err)
 		}
 
 		if len(streamResp.Choices) > 0 {
+			// Handle reasoning content
 			if streamResp.Choices[0].Delta.ReasoningContent != "" {
-				reasoningContent.WriteString(streamResp.Choices[0].Delta.ReasoningContent)
+				if !reasoningShown {
+					outputFunc("\n## 🤔 Thinking\n\n")
+					reasoningShown = true
+				}
+				// For now, just output reasoning content as plain text
+				outputFunc(streamResp.Choices[0].Delta.ReasoningContent)
 			}
+
+			// Handle main content
 			if streamResp.Choices[0].Delta.Content != "" {
-				responseContent.WriteString(streamResp.Choices[0].Delta.Content)
+				if reasoningShown {
+					outputFunc("\n\n---\n\n")
+					reasoningShown = false // Prevent showing separator again
+				}
+				// For now, just output content as plain text (streaming without markdown)
+				outputFunc(streamResp.Choices[0].Delta.Content)
 			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("error reading response stream: %w", err)
+		return fmt.Errorf("error reading response stream: %w", err)
 	}
 
-	// Combine reasoning content and response content if both exist
-	var fullResponse strings.Builder
-	if reasoningContent.Len() > 0 {
-		fullResponse.WriteString("\n## 🤔 Thinking\n\n")
-		fullResponse.WriteString(reasoningContent.String())
-		fullResponse.WriteString("\n\n---\n\n")
-	}
-	fullResponse.WriteString(responseContent.String())
+	return nil
+}
 
-	return fullResponse.String(), nil
+// Chat performs a chat request and returns the response content (backwards compatibility).
+func (c *Client) Chat(backend, model, prompt, apiKey string) (string, error) {
+	var result strings.Builder
+	err := c.ChatStreaming(backend, model, prompt, apiKey, func(content string) {
+		result.WriteString(content)
+	}, false) // Use false to maintain backwards compatibility
+	return result.String(), err
 }
 
 func (c *Client) Remove(models []string, force bool) (string, error) {
