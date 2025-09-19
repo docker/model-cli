@@ -365,7 +365,7 @@ func (c *Client) fullModelID(id string) (string, error) {
 }
 
 // Chat performs a chat request and streams the response content with selective markdown rendering.
-func (c *Client) ChatStreaming(backend, model, prompt, apiKey string, outputFunc func(string), shouldUseMarkdown bool) error {
+func (c *Client) Chat(backend, model, prompt, apiKey string, outputFunc func(string)) error {
 	model = normalizeHuggingFaceModelName(model)
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
@@ -452,10 +452,19 @@ func (c *Client) ChatStreaming(backend, model, prompt, apiKey string, outputFunc
 					outputFunc("\n\n")
 				}
 				if printerState != chatPrinterReasoning {
-					reasoningFmt.Println("Thinking:")
+					const thinkingHeader = "Thinking:\n"
+					if reasoningFmt != nil {
+						outputFunc(reasoningFmt.Sprint(thinkingHeader))
+					} else {
+						outputFunc(thinkingHeader)
+					}
 				}
 				printerState = chatPrinterReasoning
-				reasoningFmt.Print(chunk)
+				if reasoningFmt != nil {
+					outputFunc(reasoningFmt.Sprint(chunk))
+				} else {
+					outputFunc(chunk)
+				}
 			}
 			if streamResp.Choices[0].Delta.Content != "" {
 				chunk := streamResp.Choices[0].Delta.Content
@@ -473,15 +482,6 @@ func (c *Client) ChatStreaming(backend, model, prompt, apiKey string, outputFunc
 	}
 
 	return nil
-}
-
-// Chat performs a chat request and returns the response content (backwards compatibility).
-func (c *Client) Chat(backend, model, prompt, apiKey string) (string, error) {
-	var result strings.Builder
-	err := c.ChatStreaming(backend, model, prompt, apiKey, func(content string) {
-		result.WriteString(content)
-	}, false) // Use false to maintain backwards compatibility
-	return result.String(), err
 }
 
 func (c *Client) Remove(models []string, force bool) (string, error) {

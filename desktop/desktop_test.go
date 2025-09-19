@@ -63,7 +63,7 @@ func TestChatHuggingFaceModel(t *testing.T) {
 		Body:       io.NopCloser(bytes.NewBufferString("data: {\"choices\":[{\"delta\":{\"content\":\"Hello there!\"}}]}\n")),
 	}, nil)
 
-	_, err := client.Chat("", modelName, prompt, "")
+	err := client.Chat("", modelName, prompt, "", func(s string) {})
 	assert.NoError(t, err)
 }
 

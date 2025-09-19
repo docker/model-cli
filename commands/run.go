@@ -269,15 +269,15 @@ func chatWithMarkdown(cmd *cobra.Command, client *desktop.Client, backend, model
 
 	if !useMarkdown {
 		// Simple case: just stream as plain text
-		return client.ChatStreaming(backend, model, prompt, apiKey, func(content string) {
+		return client.Chat(backend, model, prompt, apiKey, func(content string) {
 			cmd.Print(content)
-		}, false)
+		})
 	}
 
 	// For markdown: use streaming buffer to render code blocks as they complete
 	markdownBuffer := NewStreamingMarkdownBuffer()
 
-	err := client.ChatStreaming(backend, model, prompt, apiKey, func(content string) {
+	err := client.Chat(backend, model, prompt, apiKey, func(content string) {
 		// Use the streaming markdown buffer to intelligently render content
 		rendered, err := markdownBuffer.AddContent(content, true)
 		if err != nil {
@@ -289,8 +289,7 @@ func chatWithMarkdown(cmd *cobra.Command, client *desktop.Client, backend, model
 		} else if rendered != "" {
 			cmd.Print(rendered)
 		}
-	}, false)
-
+	})
 	if err != nil {
 		return err
 	}
