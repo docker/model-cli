@@ -19,6 +19,7 @@ import (
 	"github.com/docker/model-runner/pkg/inference"
 	dmrm "github.com/docker/model-runner/pkg/inference/models"
 	"github.com/docker/model-runner/pkg/inference/scheduling"
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel"
 )
@@ -413,8 +414,15 @@ func (c *Client) ChatStreaming(backend, model, prompt, apiKey string, outputFunc
 		return fmt.Errorf("error response: status=%d body=%s", resp.StatusCode, body)
 	}
 
-	reasoningShown := false
+	type chatPrinterState int
+	const (
+		chatPrinterNone chatPrinterState = iota
+		chatPrinterReasoning
+		chatPrinterContent
+	)
 
+	printerState := chatPrinterNone
+	reasoningFmt := color.New(color.FgWhite).Add(color.Italic)
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -438,24 +446,24 @@ func (c *Client) ChatStreaming(backend, model, prompt, apiKey string, outputFunc
 		}
 
 		if len(streamResp.Choices) > 0 {
-			// Handle reasoning content
 			if streamResp.Choices[0].Delta.ReasoningContent != "" {
-				if !reasoningShown {
-					outputFunc("\n## 🤔 Thinking\n\n")
-					reasoningShown = true
+				chunk := streamResp.Choices[0].Delta.ReasoningContent
+				if printerState == chatPrinterContent {
+					outputFunc("\n\n")
 				}
-				// For now, just output reasoning content as plain text
-				outputFunc(streamResp.Choices[0].Delta.ReasoningContent)
+				if printerState != chatPrinterReasoning {
+					reasoningFmt.Println("Thinking:")
+				}
+				printerState = chatPrinterReasoning
+				reasoningFmt.Print(chunk)
 			}
-
-			// Handle main content
 			if streamResp.Choices[0].Delta.Content != "" {
-				if reasoningShown {
-					outputFunc("\n\n---\n\n")
-					reasoningShown = false // Prevent showing separator again
+				chunk := streamResp.Choices[0].Delta.Content
+				if printerState == chatPrinterReasoning {
+					outputFunc("\n\n--\n\n")
 				}
-				// For now, just output content as plain text (streaming without markdown)
-				outputFunc(streamResp.Choices[0].Delta.Content)
+				printerState = chatPrinterContent
+				outputFunc(chunk)
 			}
 		}
 	}
