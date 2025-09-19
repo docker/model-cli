@@ -8,9 +8,12 @@ import (
 	"os"
 	"strings"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/docker/model-cli/commands/completion"
 	"github.com/docker/model-cli/desktop"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 // readMultilineInput reads input from stdin, supporting both single-line and multiline input.
@@ -78,15 +81,245 @@ func readMultilineInput(cmd *cobra.Command, scanner *bufio.Scanner) (string, err
 	return multilineInput.String(), nil
 }
 
+var (
+	markdownRenderer *glamour.TermRenderer
+	lastWidth        int
+)
+
+// StreamingMarkdownBuffer handles partial content and renders complete markdown blocks
+type StreamingMarkdownBuffer struct {
+	buffer       strings.Builder
+	inCodeBlock  bool
+	codeBlockEnd string // tracks the closing fence (``` or ```)
+	lastFlush    int    // position of last flush
+}
+
+// NewStreamingMarkdownBuffer creates a new streaming markdown buffer
+func NewStreamingMarkdownBuffer() *StreamingMarkdownBuffer {
+	return &StreamingMarkdownBuffer{}
+}
+
+// AddContent adds new content to the buffer and returns any content that should be displayed
+func (smb *StreamingMarkdownBuffer) AddContent(content string, shouldUseMarkdown bool) (string, error) {
+	smb.buffer.WriteString(content)
+
+	if !shouldUseMarkdown {
+		// If not using markdown, just return the new content as-is
+		result := content
+		smb.lastFlush = smb.buffer.Len()
+		return result, nil
+	}
+
+	return smb.processPartialMarkdown()
+}
+
+// processPartialMarkdown processes the buffer and returns content ready for display
+func (smb *StreamingMarkdownBuffer) processPartialMarkdown() (string, error) {
+	fullText := smb.buffer.String()
+
+	// Look for code block start/end in the full text from our last position
+	if !smb.inCodeBlock {
+		// Check if we're entering a code block
+		if idx := strings.Index(fullText[smb.lastFlush:], "```"); idx != -1 {
+			// Found code block start
+			beforeCodeBlock := fullText[smb.lastFlush : smb.lastFlush+idx]
+			smb.inCodeBlock = true
+			smb.codeBlockEnd = "```"
+
+			// Stream everything before the code block as plain text
+			smb.lastFlush = smb.lastFlush + idx
+			return beforeCodeBlock, nil
+		}
+
+		// No code block found, stream all new content as plain text
+		newContent := fullText[smb.lastFlush:]
+		smb.lastFlush = smb.buffer.Len()
+		return newContent, nil
+	} else {
+		// We're in a code block, look for the closing fence
+		searchStart := smb.lastFlush
+		if endIdx := strings.Index(fullText[searchStart:], smb.codeBlockEnd+"\n"); endIdx != -1 {
+			// Found complete code block with newline after closing fence
+			endPos := searchStart + endIdx + len(smb.codeBlockEnd) + 1
+			codeBlockContent := fullText[smb.lastFlush:endPos]
+
+			// Render the complete code block
+			rendered, err := renderMarkdown(codeBlockContent)
+			if err != nil {
+				// Fallback to plain text
+				smb.lastFlush = endPos
+				smb.inCodeBlock = false
+				return codeBlockContent, nil
+			}
+
+			smb.lastFlush = endPos
+			smb.inCodeBlock = false
+			return rendered, nil
+		} else if endIdx := strings.Index(fullText[searchStart:], smb.codeBlockEnd); endIdx != -1 && searchStart+endIdx+len(smb.codeBlockEnd) == len(fullText) {
+			// Found code block end at the very end of buffer (no trailing newline yet)
+			endPos := searchStart + endIdx + len(smb.codeBlockEnd)
+			codeBlockContent := fullText[smb.lastFlush:endPos]
+
+			// Render the complete code block
+			rendered, err := renderMarkdown(codeBlockContent)
+			if err != nil {
+				// Fallback to plain text
+				smb.lastFlush = endPos
+				smb.inCodeBlock = false
+				return codeBlockContent, nil
+			}
+
+			smb.lastFlush = endPos
+			smb.inCodeBlock = false
+			return rendered, nil
+		}
+
+		// Still in code block, don't output anything until it's complete
+		return "", nil
+	}
+}
+
+// Flush renders and returns any remaining content in the buffer
+func (smb *StreamingMarkdownBuffer) Flush(shouldUseMarkdown bool) (string, error) {
+	fullText := smb.buffer.String()
+	remainingContent := fullText[smb.lastFlush:]
+
+	if remainingContent == "" {
+		return "", nil
+	}
+
+	if !shouldUseMarkdown {
+		return remainingContent, nil
+	}
+
+	rendered, err := renderMarkdown(remainingContent)
+	if err != nil {
+		return remainingContent, nil
+	}
+
+	return rendered, nil
+}
+
+// shouldUseMarkdown determines if Markdown rendering should be used based on color mode.
+func shouldUseMarkdown(colorMode string) bool {
+	supportsColor := func() bool {
+		return !color.NoColor
+	}
+
+	switch colorMode {
+	case "yes":
+		return true
+	case "no":
+		return false
+	case "auto":
+		return supportsColor()
+	default:
+		return supportsColor()
+	}
+}
+
+// getTerminalWidth returns the terminal width, with a fallback to 80.
+func getTerminalWidth() int {
+	width, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		return 80
+	}
+	return width
+}
+
+// getMarkdownRenderer returns a Markdown renderer, recreating it if terminal width changed.
+func getMarkdownRenderer() (*glamour.TermRenderer, error) {
+	currentWidth := getTerminalWidth()
+
+	// Recreate if width changed or renderer doesn't exist.
+	if markdownRenderer == nil || currentWidth != lastWidth {
+		r, err := glamour.NewTermRenderer(
+			glamour.WithAutoStyle(),
+			glamour.WithWordWrap(currentWidth),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create markdown renderer: %w", err)
+		}
+		markdownRenderer = r
+		lastWidth = currentWidth
+	}
+
+	return markdownRenderer, nil
+}
+
+func renderMarkdown(content string) (string, error) {
+	r, err := getMarkdownRenderer()
+	if err != nil {
+		return "", fmt.Errorf("failed to create markdown renderer: %w", err)
+	}
+
+	rendered, err := r.Render(content)
+	if err != nil {
+		return "", fmt.Errorf("failed to render markdown: %w", err)
+	}
+
+	return rendered, nil
+}
+
+// chatWithMarkdown performs chat and streams the response with selective markdown rendering.
+func chatWithMarkdown(cmd *cobra.Command, client *desktop.Client, backend, model, prompt, apiKey string) error {
+	colorMode, _ := cmd.Flags().GetString("color")
+	useMarkdown := shouldUseMarkdown(colorMode)
+	debug, _ := cmd.Flags().GetBool("debug")
+
+	if !useMarkdown {
+		// Simple case: just stream as plain text
+		return client.Chat(backend, model, prompt, apiKey, func(content string) {
+			cmd.Print(content)
+		}, false)
+	}
+
+	// For markdown: use streaming buffer to render code blocks as they complete
+	markdownBuffer := NewStreamingMarkdownBuffer()
+
+	err := client.Chat(backend, model, prompt, apiKey, func(content string) {
+		// Use the streaming markdown buffer to intelligently render content
+		rendered, err := markdownBuffer.AddContent(content, true)
+		if err != nil {
+			if debug {
+				cmd.PrintErrln(err)
+			}
+			// Fallback to plain text on error
+			cmd.Print(content)
+		} else if rendered != "" {
+			cmd.Print(rendered)
+		}
+	}, true)
+	if err != nil {
+		return err
+	}
+
+	// Flush any remaining content from the markdown buffer
+	if remaining, flushErr := markdownBuffer.Flush(true); flushErr == nil && remaining != "" {
+		cmd.Print(remaining)
+	}
+
+	return nil
+}
+
 func newRunCmd() *cobra.Command {
 	var debug bool
 	var backend string
 	var ignoreRuntimeMemoryCheck bool
+	var colorMode string
 
 	const cmdArgs = "MODEL [PROMPT]"
 	c := &cobra.Command{
 		Use:   "run " + cmdArgs,
 		Short: "Run a model and interact with it using a submitted prompt or chat mode",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			switch colorMode {
+			case "auto", "yes", "no":
+				return nil
+			default:
+				return fmt.Errorf("--color must be one of: auto, yes, no (got %q)", colorMode)
+			}
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Validate backend if specified
 			if backend != "" {
@@ -103,8 +336,8 @@ func newRunCmd() *cobra.Command {
 
 			model := args[0]
 			prompt := ""
-			args_len := len(args)
-			if args_len > 1 {
+			argsLen := len(args)
+			if argsLen > 1 {
 				prompt = strings.Join(args[1:], " ")
 			}
 
@@ -149,7 +382,7 @@ func newRunCmd() *cobra.Command {
 			}
 
 			if prompt != "" {
-				if err := desktopClient.Chat(backend, model, prompt, apiKey); err != nil {
+				if err := chatWithMarkdown(cmd, desktopClient, backend, model, prompt, apiKey); err != nil {
 					return handleClientError(err, "Failed to generate a response")
 				}
 				cmd.Println()
@@ -178,7 +411,7 @@ func newRunCmd() *cobra.Command {
 					continue
 				}
 
-				if err := desktopClient.Chat(backend, model, userInput, apiKey); err != nil {
+				if err := chatWithMarkdown(cmd, desktopClient, backend, model, userInput, apiKey); err != nil {
 					cmd.PrintErr(handleClientError(err, "Failed to generate a response"))
 					continue
 				}
@@ -205,6 +438,7 @@ func newRunCmd() *cobra.Command {
 	c.Flags().StringVar(&backend, "backend", "", fmt.Sprintf("Specify the backend to use (%s)", ValidBackendsKeys()))
 	c.Flags().MarkHidden("backend")
 	c.Flags().BoolVar(&ignoreRuntimeMemoryCheck, "ignore-runtime-memory-check", false, "Do not block pull if estimated runtime memory for model exceeds system resources.")
+	c.Flags().StringVar(&colorMode, "color", "auto", "Use colored output (auto|yes|no)")
 
 	return c
 }

@@ -364,15 +364,8 @@ func (c *Client) fullModelID(id string) (string, error) {
 	return "", fmt.Errorf("model with ID %s not found", id)
 }
 
-type chatPrinterState int
-
-const (
-	chatPrinterNone chatPrinterState = iota
-	chatPrinterContent
-	chatPrinterReasoning
-)
-
-func (c *Client) Chat(backend, model, prompt, apiKey string) error {
+// Chat performs a chat request and streams the response content with selective markdown rendering.
+func (c *Client) Chat(backend, model, prompt, apiKey string, outputFunc func(string), shouldUseMarkdown bool) error {
 	model = normalizeHuggingFaceModelName(model)
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
@@ -421,8 +414,22 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 		return fmt.Errorf("error response: status=%d body=%s", resp.StatusCode, body)
 	}
 
+	type chatPrinterState int
+	const (
+		chatPrinterNone chatPrinterState = iota
+		chatPrinterReasoning
+		chatPrinterContent
+	)
+
 	printerState := chatPrinterNone
-	reasoningFmt := color.New(color.FgWhite).Add(color.Italic)
+	reasoningFmt := color.New().Add(color.Italic)
+
+	var finalUsage *struct {
+		CompletionTokens int `json:"completion_tokens"`
+		PromptTokens     int `json:"prompt_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	}
+
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -445,31 +452,57 @@ func (c *Client) Chat(backend, model, prompt, apiKey string) error {
 			return fmt.Errorf("error parsing stream response: %w", err)
 		}
 
+		if streamResp.Usage != nil {
+			finalUsage = streamResp.Usage
+		}
+
 		if len(streamResp.Choices) > 0 {
 			if streamResp.Choices[0].Delta.ReasoningContent != "" {
 				chunk := streamResp.Choices[0].Delta.ReasoningContent
 				if printerState == chatPrinterContent {
-					fmt.Print("\n\n")
+					outputFunc("\n\n")
 				}
 				if printerState != chatPrinterReasoning {
-					reasoningFmt.Println("Thinking:")
+					const thinkingHeader = "Thinking:\n"
+					if reasoningFmt != nil {
+						reasoningFmt.Print(thinkingHeader)
+					} else {
+						outputFunc(thinkingHeader)
+					}
 				}
 				printerState = chatPrinterReasoning
-				reasoningFmt.Print(chunk)
+				if reasoningFmt != nil {
+					reasoningFmt.Print(chunk)
+				} else {
+					outputFunc(chunk)
+				}
 			}
 			if streamResp.Choices[0].Delta.Content != "" {
 				chunk := streamResp.Choices[0].Delta.Content
 				if printerState == chatPrinterReasoning {
-					fmt.Print("\n\n")
+					outputFunc("\n\n--\n\n")
 				}
 				printerState = chatPrinterContent
-				fmt.Print(chunk)
+				outputFunc(chunk)
 			}
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("error reading response stream: %w", err)
+	}
+
+	if finalUsage != nil {
+		usageInfo := fmt.Sprintf("\n\nToken usage: %d prompt + %d completion = %d total",
+			finalUsage.PromptTokens,
+			finalUsage.CompletionTokens,
+			finalUsage.TotalTokens)
+
+		usageFmt := color.New(color.FgHiBlack)
+		if !shouldUseMarkdown {
+			usageFmt.DisableColor()
+		}
+		outputFunc(usageFmt.Sprint(usageInfo))
 	}
 
 	return nil
