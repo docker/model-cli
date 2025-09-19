@@ -365,7 +365,7 @@ func (c *Client) fullModelID(id string) (string, error) {
 }
 
 // Chat performs a chat request and streams the response content with selective markdown rendering.
-func (c *Client) Chat(backend, model, prompt, apiKey string, outputFunc func(string)) error {
+func (c *Client) Chat(backend, model, prompt, apiKey string, outputFunc func(string), shouldUseMarkdown bool) error {
 	model = normalizeHuggingFaceModelName(model)
 	if !strings.Contains(strings.Trim(model, "/"), "/") {
 		// Do an extra API call to check if the model parameter isn't a model ID.
@@ -422,7 +422,14 @@ func (c *Client) Chat(backend, model, prompt, apiKey string, outputFunc func(str
 	)
 
 	printerState := chatPrinterNone
-	reasoningFmt := color.New(color.FgWhite).Add(color.Italic)
+	reasoningFmt := color.New().Add(color.Italic)
+
+	var finalUsage *struct {
+		CompletionTokens int `json:"completion_tokens"`
+		PromptTokens     int `json:"prompt_tokens"`
+		TotalTokens      int `json:"total_tokens"`
+	}
+
 	scanner := bufio.NewScanner(resp.Body)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -445,6 +452,10 @@ func (c *Client) Chat(backend, model, prompt, apiKey string, outputFunc func(str
 			return fmt.Errorf("error parsing stream response: %w", err)
 		}
 
+		if streamResp.Usage != nil {
+			finalUsage = streamResp.Usage
+		}
+
 		if len(streamResp.Choices) > 0 {
 			if streamResp.Choices[0].Delta.ReasoningContent != "" {
 				chunk := streamResp.Choices[0].Delta.ReasoningContent
@@ -454,14 +465,14 @@ func (c *Client) Chat(backend, model, prompt, apiKey string, outputFunc func(str
 				if printerState != chatPrinterReasoning {
 					const thinkingHeader = "Thinking:\n"
 					if reasoningFmt != nil {
-						outputFunc(reasoningFmt.Sprint(thinkingHeader))
+						reasoningFmt.Print(thinkingHeader)
 					} else {
 						outputFunc(thinkingHeader)
 					}
 				}
 				printerState = chatPrinterReasoning
 				if reasoningFmt != nil {
-					outputFunc(reasoningFmt.Sprint(chunk))
+					reasoningFmt.Print(chunk)
 				} else {
 					outputFunc(chunk)
 				}
@@ -479,6 +490,19 @@ func (c *Client) Chat(backend, model, prompt, apiKey string, outputFunc func(str
 
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("error reading response stream: %w", err)
+	}
+
+	if finalUsage != nil {
+		usageInfo := fmt.Sprintf("\n\nToken usage: %d prompt + %d completion = %d total",
+			finalUsage.PromptTokens,
+			finalUsage.CompletionTokens,
+			finalUsage.TotalTokens)
+
+		usageFmt := color.New(color.FgHiBlack)
+		if !shouldUseMarkdown {
+			usageFmt.DisableColor()
+		}
+		outputFunc(usageFmt.Sprint(usageInfo))
 	}
 
 	return nil
