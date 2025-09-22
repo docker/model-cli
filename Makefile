@@ -7,6 +7,9 @@ PLUGIN_NAME=docker-model
 
 VERSION ?=
 
+MACOS_MIN_VERSION := 14.0
+MACOS_MIN_VERSION_LDFLAG := -mmacosx-version-min=$(MACOS_MIN_VERSION)
+
 all: build
 
 build:
@@ -33,7 +36,7 @@ release:
 		exit 1; \
 	fi
 	@echo "Building release version '$(VERSION)'..."
-	GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w -X github.com/docker/model-cli/desktop.Version=$(VERSION)" -o dist/darwin-arm64/$(PLUGIN_NAME) .
+	GOOS=darwin GOARCH=arm64 CGO_ENABLED=1 CGO_CFLAGS="$(MACOS_MIN_VERSION_LDFLAG)" CGO_LDFLAGS="$(MACOS_MIN_VERSION_LDFLAG)" go build -trimpath -ldflags="-s -w -X github.com/docker/model-cli/desktop.Version=$(VERSION)" -o dist/darwin-arm64/$(PLUGIN_NAME) .
 	GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w -X github.com/docker/model-cli/desktop.Version=$(VERSION)" -o dist/windows-amd64/$(PLUGIN_NAME).exe .
 	GOOS=windows GOARCH=arm64 go build -trimpath -ldflags="-s -w -X github.com/docker/model-cli/desktop.Version=$(VERSION)" -o dist/windows-arm64/$(PLUGIN_NAME).exe .
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w -X github.com/docker/model-cli/desktop.Version=$(VERSION)" -o dist/linux-amd64/$(PLUGIN_NAME) .
