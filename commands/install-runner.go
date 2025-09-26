@@ -179,6 +179,12 @@ func newInstallRunner() *cobra.Command {
 				return nil
 			}
 
+			if port == 0 {
+				// Use "0" as a sentinel default flag value so it's not displayed automatically.
+				// The default values are written in the usage string.
+				// Hence, the user currently won't be able to set the port to 0 in order to get a random available port.
+				port = standalone.DefaultControllerPortMoby
+			}
 			// HACK: If we're in a Cloud context, then we need to use a
 			// different default port because it conflicts with Docker Desktop's
 			// default model runner host-side port. Unfortunately we can't make
@@ -248,8 +254,8 @@ func newInstallRunner() *cobra.Command {
 		},
 		ValidArgsFunction: completion.NoComplete,
 	}
-	c.Flags().Uint16Var(&port, "port", standalone.DefaultControllerPortMoby,
-		"Docker container port for Docker Model Runner")
+	c.Flags().Uint16Var(&port, "port", 0,
+		"Docker container port for Docker Model Runner (default: 12434 for Docker CE, 12435 for Cloud mode)")
 	c.Flags().StringVar(&gpuMode, "gpu", "auto", "Specify GPU support (none|auto|cuda)")
 	c.Flags().BoolVar(&doNotTrack, "do-not-track", false, "Do not track models usage in Docker Model Runner")
 	return c
