@@ -269,7 +269,9 @@ func CreateControllerContainer(ctx context.Context, dockerClient *client.Client,
 		nat.Port(portStr + "/tcp"): portBindings,
 	}
 	if gpu == gpupkg.GPUSupportCUDA {
-		hostConfig.Runtime = "nvidia"
+		if ok, err := gpupkg.HasNVIDIARuntime(ctx, dockerClient); err == nil && ok {
+			hostConfig.Runtime = "nvidia"
+		}
 		hostConfig.DeviceRequests = []container.DeviceRequest{{Count: -1, Capabilities: [][]string{{"gpu"}}}}
 	}
 
