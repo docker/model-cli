@@ -17,6 +17,7 @@ import (
 	"github.com/docker/model-cli/pkg/standalone"
 	"github.com/docker/model-cli/pkg/types"
 	"github.com/docker/model-runner/pkg/inference"
+	"github.com/pkg/errors"
 )
 
 // isDesktopContext returns true if the CLI instance points to a Docker Desktop
@@ -115,8 +116,12 @@ func DetectContext(ctx context.Context, cli *command.DockerCli) (*ModelRunnerCon
 	treatDesktopAsMoby := os.Getenv("_MODEL_RUNNER_TREAT_DESKTOP_AS_MOBY") == "1"
 
 	// Detect the associated engine type.
-	kind := types.ModelRunnerEngineKindMoby
-	if modelRunnerHost != "" {
+	kind := types.ModelRunnerEngineKindUnknown
+	if runtime.GOOS == "linux" {
+		kind = types.ModelRunnerEngineKindMoby
+	}
+
+	if modelRunnerHost != "" && kind == types.ModelRunnerEngineKindMoby {
 		kind = types.ModelRunnerEngineKindMobyManual
 	} else if isDesktopContext(ctx, cli) {
 		kind = types.ModelRunnerEngineKindDesktop
@@ -125,6 +130,10 @@ func DetectContext(ctx context.Context, cli *command.DockerCli) (*ModelRunnerCon
 		}
 	} else if isCloudContext(cli) {
 		kind = types.ModelRunnerEngineKindCloud
+	}
+
+	if kind == types.ModelRunnerEngineKindUnknown {
+		return nil, errors.New("unable to determine docker engine type")
 	}
 
 	// Compute the URL prefix based on the associated engine kind.
