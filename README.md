@@ -1,5 +1,15 @@
 # Docker Model CLI
 
+## ⚠️ This Repository Has Moved
+
+This repository has been consolidated into [model-runner](https://github.com/docker/model-runner/tree/main/cmd/cli).
+
+All future development, issues, and pull requests should be directed there.
+
+Please visit the new repository for the latest updates and to contribute.
+
+---
+
 A powerful command-line interface for managing, running, packaging, and deploying AI/ML models using Docker. This CLI lets you install and control the Docker Model Runner, interact with models, manage model artifacts, and integrate with OpenAI and other backends—all from your terminal.
 
 ## Features
