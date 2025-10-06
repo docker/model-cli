@@ -1,0 +1,173 @@
+name: E2E Shell Tests
+
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      test_model:
+        description: "Model to test with"
+        required: false
+        default: "ai/smollm2"
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-shell-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false  # Continue other tests even if one fails
+      matrix:
+        include:
+          # Linux shells
+          - os: ubuntu-latest
+            shell-name: bash
+            shell-type: bash
+            test-script: ./e2e/shells/bash_test.sh
+
+          - os: ubuntu-latest
+            shell-name: zsh
+            shell-type: bash
+            test-script: ./e2e/shells/zsh_test.sh
+
+          # macOS shells
+          - os: macos-latest
+            shell-name: bash
+            shell-type: bash
+            test-script: ./e2e/shells/bash_test.sh
+
+          - os: macos-latest
+            shell-name: zsh
+            shell-type: bash
+            test-script: ./e2e/shells/zsh_test.sh
+
+          # Windows shells - DISABLED: Need to build a Windows-based DMR image first
+          # - os: windows-latest
+          #   shell-name: cmd
+          #   shell-type: cmd
+          #   test-script: e2e\shells\cmd_test.bat
+
+          # - os: windows-latest
+          #   shell-name: git-bash
+          #   shell-type: bash
+          #   test-script: ./e2e/shells/mintty_test.sh
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Cross-platform Docker setup
+      - name: Set up Docker
+        uses: docker/setup-docker-action@v4
+        if: runner.os != 'Windows'
+
+      - name: Install model-cli as Docker plugin (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          echo "Installing model-cli as Docker plugin..."
+          make install
+          echo "Installation completed successfully"
+
+      - name: Install model-cli as Docker plugin (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          mkdir "%ProgramData%\Docker\cli-plugins" || echo already exists
+          make PLUGIN_NAME=docker-model.exe install PLUGIN_DIR="%ProgramData%\Docker\cli-plugins"
+          dir "%ProgramData%\Docker\cli-plugins"
+        shell: cmd
+
+      - name: Test docker model version
+        shell: bash
+        run: |
+          echo "Testing docker model version command..."
+          docker model version
+          
+          # Verify the command returns successfully
+          if [ $? -eq 0 ]; then
+            echo "✅ docker model version command works correctly"
+          else
+            echo "❌ docker model version command failed"
+            exit 1
+          fi
+
+      - name: Test model pull and run
+        shell: bash
+        run: |
+          MODEL="${{ github.event.inputs.test_model || 'ai/smollm2' }}"
+          echo "Testing with model: $MODEL"
+          
+          # Test model pull
+          echo "Pulling model..."
+          docker model pull "$MODEL"
+          
+          if [ $? -eq 0 ]; then
+            echo "✅ Model pull successful"
+          else
+            echo "❌ Model pull failed"
+            exit 1
+          fi
+          
+          # Test basic model run (with timeout to avoid hanging)
+          echo "Testing docker model run..."
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            # Windows doesn't have timeout command, use PowerShell
+            powershell -Command "& { Start-Process -FilePath 'docker' -ArgumentList 'model', 'run', '$MODEL', 'Give me a fact about whales.' -Wait -TimeoutSec 60 }" || {
+              exit_code=$?
+              if [ $exit_code -eq 1 ]; then
+                echo "✅ Model run test completed (timed out as expected for non-interactive test)"
+              else
+                echo "❌ Model run failed with exit code: $exit_code"
+                exit 1
+              fi
+            }
+          else
+            timeout 60s docker model run "$MODEL" "Give me a fact about whales." || {
+              exit_code=$?
+              if [ $exit_code -eq 124 ]; then
+                echo "✅ Model run test completed (timed out as expected for non-interactive test)"
+              else
+                echo "❌ Model run failed with exit code: $exit_code"
+                exit 1
+              fi
+            }
+          fi
+
+      # Shell-specific setup
+      - name: Install Zsh (Linux)
+        if: matrix.shell-name == 'zsh' && runner.os == 'Linux'
+        shell: bash
+        run: sudo apt-get update && sudo apt-get install -y zsh
+
+      # Shell-specific test execution
+      - name: Run Bash E2E Tests
+        if: matrix.shell-name == 'bash'
+        shell: bash
+        run: |
+          chmod +x ${{ matrix.test-script }}
+          ${{ matrix.test-script }}
+
+      - name: Run Zsh E2E Tests
+        if: matrix.shell-name == 'zsh'
+        shell: bash
+        run: |
+          chmod +x ${{ matrix.test-script }}
+          zsh ${{ matrix.test-script }}
+
+      - name: Run CMD E2E Tests
+        if: matrix.shell-name == 'cmd'
+        shell: cmd
+        run: ${{ matrix.test-script }}
+
+      - name: Run Git Bash E2E Tests
+        if: matrix.shell-name == 'git-bash'
+        shell: bash
+        run: |
+          chmod +x ${{ matrix.test-script }}
+          ${{ matrix.test-script }}

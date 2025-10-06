@@ -66,9 +66,45 @@ unit-tests:
 	@go test -race -v ./...
 	@echo "Unit tests completed!"
 
+e2e-tests: build e2e-shell-bash e2e-shell-zsh e2e-shell-cmd e2e-shell-mintty
+	@echo "All shell-specific tests completed!"
+
+e2e-shell-bash:
+	@echo "Running bash-specific tests..."
+	@if command -v bash >/dev/null 2>&1; then \
+		./e2e/shells/bash_test.sh; \
+	else \
+		echo "Bash not available, skipping bash tests"; \
+	fi
+
+e2e-shell-zsh:
+	@echo "Running zsh-specific tests..."
+	@if command -v zsh >/dev/null 2>&1; then \
+		./e2e/shells/zsh_test.sh; \
+	else \
+		echo "Zsh not available, skipping zsh tests"; \
+	fi
+
+e2e-shell-cmd:
+	@echo "Running cmd.exe-specific tests..."
+	@if [ "$(shell uname -s)" = "MINGW64_NT" ] || [ "$(shell uname -s)" = "MSYS_NT" ]; then \
+		cmd.exe /c e2e\\shells\\cmd_test.bat; \
+	else \
+		echo "Windows cmd.exe not available, skipping cmd tests"; \
+	fi
+
+e2e-shell-mintty:
+	@echo "Running mintty bash-specific tests..."
+	@if [ -n "$$MSYSTEM" ] || [ "$$TERM" = "xterm" ]; then \
+		./e2e/shells/mintty_test.sh; \
+	else \
+		echo "Mintty/Git Bash not detected, skipping mintty tests"; \
+	fi
+
 clean:
 	@echo "Cleaning up..."
 	@rm -f $(BINARY_NAME)
+	@rm -f model-cli-test
 	@echo "Cleaned!"
 
 docs:
